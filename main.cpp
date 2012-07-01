@@ -4,6 +4,7 @@
 #include "PS_MathBase.h"
 #include "PS_Logger.h"
 #include <string>
+#include "PS_OclPolygonizer.h"
 
 using namespace std;
 using namespace PS;
@@ -100,6 +101,9 @@ int main(int argc, char* argv[])
 
 	//Print GPU INFO
 	GetGPUInfo();
+
+	//Run OCL TEST
+	PS::HPC::Run_SphereDistKernel();
 
 	//Run App
 	glutMainLoop();

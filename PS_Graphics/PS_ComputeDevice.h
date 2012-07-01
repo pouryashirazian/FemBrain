@@ -51,7 +51,7 @@ private:
 };
 
 /*!
-  * A program may contain multiple kernels.
+  * A program can contain multiple kernels.
   */
 class ComputeProgram
 {
@@ -70,7 +70,10 @@ private:
 };
 
 /*!
-  * A compute device holds multiple programs
+  * A compute device represents and OpenCL Compute Device and can hold multiple programs.
+  * An OpenCL program can be added directly from its source code or from a source file.
+  * Once the program is added the binary file can be stored.
+  * Compute Device can create memory buffer objects for the kernels.
   */
 class ComputeDevice{
 public:
@@ -78,11 +81,18 @@ public:
     enum MEMACCESSMODE{memReadOnly = CL_MEM_READ_ONLY, memWriteOnly = CL_MEM_WRITE_ONLY};
 
 	//Constructors
-    ComputeDevice() { m_bReady = false;}
+    ComputeDevice();
     ComputeDevice(DEVICETYPE dev, bool bWithOpenGLInterOp = true, const char* lpPlatformProvide = "DEFAULT");
   
 	//Destructor
 	virtual ~ComputeDevice();
+
+
+	bool isBinarySaved() const { return m_bSaveBinary;}
+	void setSaveBinary(bool bSave) 
+	{
+		m_bSaveBinary = bSave;
+	}
 
 
     bool isReady() const {return m_bReady;}
@@ -202,6 +212,7 @@ private:
 
     std::vector<ComputeProgram*> m_lstPrograms;
 
+	bool m_bSaveBinary;
     bool m_bReady;
 };
 

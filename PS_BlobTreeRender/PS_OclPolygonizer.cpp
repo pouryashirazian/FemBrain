@@ -444,7 +444,7 @@ namespace HPC{
 	int Run_SphereDistKernel()
 	{
 		DAnsiStr strFP = ExtractOneLevelUp(ExtractFilePath(GetExePath()));
-		strFP += DAnsiStr("/AA_Shaders/SphereDist.cl");
+		strFP += DAnsiStr("/PS_OpenCLKernels/SphereDist.cl");
 		PS::HPC::ComputeDevice* lpGPU = new ComputeDevice(ComputeDevice::dtGPU);
 		lpGPU->printInfo();
 

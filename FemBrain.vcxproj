@@ -100,6 +100,7 @@
     <ClCompile Include="PS_Graphics\PS_OclScan.cpp" />
     <ClCompile Include="PS_Graphics\PS_PixelMap.cpp" />
     <ClCompile Include="PS_Graphics\PS_SketchConfig.cpp" />
+    <ClCompile Include="PS_Particles.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AA_Sqlite\CppSQLite3.h" />
@@ -133,6 +134,13 @@
     <ClInclude Include="PS_Graphics\PS_SIMDVecN.h" />
     <ClInclude Include="PS_Graphics\PS_SketchConfig.h" />
     <ClInclude Include="PS_Graphics\PS_VectorMath.h" />
+    <ClInclude Include="PS_Particles.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="PS_OpenCLKernels\Polygonizer.cl" />
+    <None Include="PS_OpenCLKernels\Scan.cl" />
+    <None Include="PS_OpenCLKernels\scan_kernel.cl" />
+    <None Include="PS_OpenCLKernels\SphereDist.cl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

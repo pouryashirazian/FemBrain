@@ -64,7 +64,7 @@ bool ComputeProgram::saveBinary(const char* chrBinFilePath)
 	else
 	{
 		bool bres = false;
-		char* lpBinFile = new char[szBinFile];
+		char* lpBinFile = new char[szBinFile + 64];
 		err = clGetProgramInfo(m_clProgram, CL_PROGRAM_BINARIES, szBinFile, lpBinFile, NULL);
 		if(err != CL_SUCCESS)		
 			ReportError("Unable to retrieve the program binary.");					
@@ -84,6 +84,12 @@ bool ComputeProgram::saveBinary(const char* chrBinFilePath)
 	return false;
 }
 /////////////////////////////////////////////////////////////////////////////////////
+ComputeDevice::ComputeDevice()
+{
+	m_bReady = false;
+	m_bSaveBinary = false;	
+}
+
 ComputeDevice::ComputeDevice(DEVICETYPE dev, bool bWithOpenGLInterOp, const char* lpPlatformProvide)
 {
 	assert(initDevice(dev, bWithOpenGLInterOp, lpPlatformProvide) == true);
@@ -104,8 +110,14 @@ ComputeDevice::~ComputeDevice()
 	}
 }
 
+/*!
+* Initializes a device selected by devicetype. A compute context can be created to be InterOperable with
+* OpenGL buffers. In case there are multiple platforms installed on this machine, one can be selected
+* by specifying it at lpStrPlatformProvider. 
+*/
 bool ComputeDevice::initDevice(DEVICETYPE dev, bool bWithOpenGLInterOp, const char* lpStrPlatformProvider)
 {
+	m_bSaveBinary = false;
 	m_bReady = false;
     m_deviceType = dev;
 
@@ -634,8 +646,11 @@ ComputeProgram* ComputeDevice::addProgramFromFile(const char *chrFilePath)
 	
 	//Save Binary
 	ComputeProgram* lpProgram = addProgram(strCode.c_str());
-	std::string strBin = string(chrFilePath) + string(".ptx");
-	lpProgram->saveBinary(strBin.c_str());
+	if(m_bSaveBinary)
+	{
+		std::string strBin = string(chrFilePath) + string(".ptx");
+		lpProgram->saveBinary(strBin.c_str());
+	}
 	return lpProgram;
 }
 
@@ -673,9 +688,9 @@ ComputeProgram* ComputeDevice::addProgram(const char* chrComputeCode)
     }
 
 	//Add to the list of programs
-    ComputeProgram* compute = new ComputeProgram(program);
-    m_lstPrograms.push_back(compute);
-    return compute;
+    ComputeProgram* lpCompute = new ComputeProgram(program);
+    m_lstPrograms.push_back(lpCompute);
+    return lpCompute;
 }
 
 const char* ComputeDevice::oclErrorString(cl_int error)
