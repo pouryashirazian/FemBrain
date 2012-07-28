@@ -5,17 +5,49 @@
 #include "PS_Logger.h"
 #include <string>
 #include "PS_OclPolygonizer.h"
+#include "PS_Particles.h"
+#include "PS_ArcBallCamera.h"
 
 using namespace std;
 using namespace PS;
+using namespace PS::HPC;
 
 #define WINDOW_WIDTH 1024
 #define WINDOW_HEIGHT 768
+
+class AppSettings{
+public:
+	AppSettings(){
+		this->bPanCamera = false;
+		this->pan = svec2f(0.0f, 0.0f); 
+	}
+
+public:
+	bool bPanCamera;
+	svec2f pan;
+};
+
+//Global Variables
+PS::CArcBallCamera g_arcBallCam;
+PS::HPC::Particles* g_lpParticles = NULL;
+AppSettings g_appSettings;
+
 
 void Display()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glClearColor(1.0, 1.0, 1.0, 1.0);
+
+	//Render
+	glTranslatef(g_appSettings.pan.x, g_appSettings.pan.y, 0.0f);
+	svec3f p = g_arcBallCam.getCoordinates();
+	svec3f c = g_arcBallCam.getCenter();
+	gluLookAt(p.x, p.y, p.z, c.x, c.y, c.z, 0.0f, 1.0f, 0.0f);
+
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+	glPointSize(5.0f);
+		g_lpParticles->render();
+	glPopAttrib();
 
 
 	glutSwapBuffers();
@@ -25,19 +57,31 @@ void Resize(int w, int h)
 {
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	gluPerspective(60.0f, (double)h/(double)w, 0.1, 1000.0);
+	gluPerspective(60.0f, (double)w/(double)h, 0.1, 3000.0);
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-
 }
 
 void MousePress(int button, int state, int x, int y)
 {
+	if(state == GLUT_DOWN)
+		g_arcBallCam.mousePress((PS::CArcBallCamera::MOUSEBUTTONSTATE)button, x, y);
+	else
+		g_arcBallCam.mousePress(PS::CArcBallCamera::mbMiddle, x, y);
 }
 
 void MouseMove(int x, int y)
 {
+	if(g_appSettings.bPanCamera)
+	{
+		g_appSettings.pan.x += (x - g_arcBallCam.getLastPos().x) * 0.03f;
+		g_appSettings.pan.y += (g_arcBallCam.getLastPos().y - y) * 0.03f;
+		g_arcBallCam.setLastPos(svec2i(x, y));
+	}
+	else
+		g_arcBallCam.mouseMove(x, y);
+	glutPostRedisplay();
 }
 
 void Close()
@@ -89,8 +133,8 @@ int main(int argc, char* argv[])
 	
 	//Initialize app
 	glutInit(&argc, argv);
+	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
 	glutInitWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
-
 	glutCreateWindow("FEM Hydrocephalus Surgery Simulation");
 	glutDisplayFunc(Display);
 	glutReshapeFunc(Resize);
@@ -99,11 +143,22 @@ int main(int argc, char* argv[])
 ///	glutSpecialFunc(Keyboard);
 	glutCloseFunc(Close);
 
+	//Compiling shaders
+	GLenum err = glewInit();
+	if (err != GLEW_OK)
+	{
+		//Problem: glewInit failed, something is seriously wrong.
+		fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+		exit(1);
+	}
+
 	//Print GPU INFO
 	GetGPUInfo();
 
 	//Run OCL TEST
-	PS::HPC::Run_SphereDistKernel();
+	//PS::HPC::Run_SphereDistKernel();
+	g_lpParticles = new ::Particles(1024);
+	
 
 	//Run App
 	glutMainLoop();

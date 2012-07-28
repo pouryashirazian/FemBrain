@@ -3,6 +3,11 @@
 
 #include "PS_ComputeDevice.h"
 #include "PS_MathBase.h"
+#include "PS_VectorMath.h"
+#include "PS_MATRIX4.h"
+#include <vector>
+
+using namespace PS::FUNCTIONALMATH;
 
 namespace PS{
 namespace HPC{
@@ -33,13 +38,20 @@ public:
 	Particles(const U32 maxParticles = 1024);
 	virtual ~Particles();
 
-	void setup();
+	bool setup();
 	void render();
 	void animate();
 
+private: 
+	void cleanup();
 private:
+	ComputeDevice* m_lpDevice;
+	ComputeKernel* m_lpKernelMove;
 	U32 m_maxParticles;
 	MESH_BUFFER_OBJECTS m_meshBO;
+	std::vector<float> m_vPos;
+	std::vector<float> m_vVel;
+	std::vector<float> m_vColor;
 };
 
 }
