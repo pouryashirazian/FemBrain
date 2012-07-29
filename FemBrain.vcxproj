@@ -122,6 +122,7 @@
     <ClInclude Include="PS_BlobTreeRender\PS_PolyMemManager.h" />
     <ClInclude Include="PS_BlobTreeRender\PS_ReadSceneModel.h" />
     <ClInclude Include="PS_BlobTreeRender\_CellConfigTable.h" />
+    <ClInclude Include="PS_BlobTreeRender\_CellConfigTableCompact.h" />
     <ClInclude Include="PS_BlobTreeRender\_CellConfigTableGPU.h" />
     <ClInclude Include="PS_Graphics\PS_ArcBallCamera.h" />
     <ClInclude Include="PS_Graphics\PS_ComputeDevice.h" />
@@ -137,11 +138,33 @@
     <ClInclude Include="PS_Graphics\PS_VectorMath.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="PS_OpenCLKernels\ParticleSystem.cl" />
-    <None Include="PS_OpenCLKernels\Polygonizer.cl" />
-    <None Include="PS_OpenCLKernels\Scan.cl" />
-    <None Include="PS_OpenCLKernels\scan_kernel.cl" />
-    <None Include="PS_OpenCLKernels\SphereDist.cl" />
+    <None Include="AA_Models\peanut.scene" />
+    <None Include="AA_Models\peanutInstanced.scene" />
+    <None Include="AA_Models\peanutUnion.scene" />
+    <None Include="AA_Models\piza1x.scene" />
+    <None Include="AA_Models\piza4x4.scene" />
+    <None Include="AA_Models\pizaL2P4.scene" />
+    <None Include="AA_Models\pizaL6P6I4x4.scene" />
+    <None Include="AA_Models\pizaL6P6I5x5.scene" />
+    <None Include="AA_Models\pizaL6P6I8x8.scene" />
+    <None Include="AA_Models\pizaL6P8I5x5.scene" />
+    <None Include="AA_Models\pizaL6P8I7x7.scene" />
+    <None Include="AA_Models\pizaL6P8I8x8.scene" />
+    <None Include="AA_Models\pizaL8P4.scene" />
+    <None Include="AA_Models\pizaL8P8I8x8.scene" />
+    <None Include="AA_Models\sphere.txt" />
+    <None Include="AA_Models\test1.scene" />
+    <None Include="AA_Models\test3.scene" />
+    <None Include="AA_Models\testColor.scene" />
+    <None Include="AA_Models\testDisc2.scene" />
+    <None Include="AA_Models\testDisc3.scene" />
+    <None Include="AA_Models\testSphere3.scene" />
+    <None Include="PS_Shaders\ParticleSystem.cl" />
+    <None Include="PS_Shaders\PolyExtra.cl" />
+    <None Include="PS_Shaders\Polygonizer.cl" />
+    <None Include="PS_Shaders\Scan.cl" />
+    <None Include="PS_Shaders\scan_kernel.cl" />
+    <None Include="PS_Shaders\SphereDist.cl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

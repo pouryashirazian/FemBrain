@@ -40,9 +40,13 @@ namespace HPC{
  */
 class GPUPoly{
 public:
-	GPUPoly() { m_outMesh.bIsValid = false;}
-	virtual ~GPUPoly() { cleanup();}
+	GPUPoly();
+	explicit GPUPoly(const char* lpFilePath);
+	virtual ~GPUPoly();
 	void cleanup();
+
+	//Produce vertices count from the table
+	static void ProduceNumVerticesTable(const char* chrOutput);
 
 	/*!
 	 * Read a model from disk and converts it into a proper format for GPU
@@ -53,7 +57,11 @@ public:
 	//Draws the mesh using accelerated memory buffer objects
 	void drawMesh(bool bWireFrameMode = false);
 
-	int run(float cellsize);
+	/*!
+	*@param cellsize the cubic cellsize for the polygonizer
+	*@return true when done
+	*/
+	int run(float cellsize = DEFAULT_CELL_SIZE);
 
 private:
 	//Output:

@@ -416,6 +416,8 @@ int PrepareOpBBox_Recursive(U32 idxNode,
 						  	SOABlobBoxMatrices& boxMatrices,
 						  	svec3f& boxLo, svec3f& boxHi)
 {
+	if(blobOps.count == 0)
+		return RET_SUCCESS;
 	if(idxNode >= blobOps.count)
 		return RET_PARAM_ERROR;
 

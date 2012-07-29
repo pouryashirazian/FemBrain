@@ -11,7 +11,7 @@
 #include "PS_FileDirectory.h"
 #include "PS_Logger.h"
 #include "PS_ReadSceneModel.h"
-#include "_CellConfigTableGPU.h"
+#include "_CellConfigTableCompact.h"
 
 
 #include <iostream>
@@ -50,6 +50,41 @@ const char *KernelSource = "\n"		      \
 
 namespace PS{
 namespace HPC{
+	GPUPoly::GPUPoly()
+	{
+		m_outMesh.bIsValid = false;
+	}
+
+	GPUPoly::GPUPoly(const char* lpFilePath)
+	{
+		m_outMesh.bIsValid = false;
+		this->readModel(lpFilePath);
+	}
+
+	GPUPoly::~GPUPoly()
+	{
+		this->cleanup();
+	}
+
+	void GPUPoly::ProduceNumVerticesTable(const char* chrOutput)
+	{		
+		ofstream ofs;
+		ofs.open(chrOutput, ios::out);
+		for(size_t i=0; i < 256; i++)
+		{
+			int ctVertices = 0;
+			for(int j=0; j<16; j++)
+			{		
+				if(g_triTableCompact[i][j] != 255)
+					ctVertices++;
+				else
+					break;
+			}
+			ofs << "\t" << ctVertices << "," << '\0' << endl;
+		}
+		ofs.close();
+	}
+
 	void GPUPoly::cleanup()
 	{
 		m_outMesh.cleanup();
@@ -60,60 +95,63 @@ namespace HPC{
 		SOABlobPrims tempPrims;
 		SOABlobOps tempOps;
 		ModelReader mr(&tempPrims, &tempOps, &m_mtxNode, &m_mtxBox);
-		if(mr.read(lpFilePath) == MODELREAD_SUCCESS)
+		if(mr.read(lpFilePath) != MODELREAD_SUCCESS)
+			return false;
+
+		//Set Header
+		m_arrHeader[0] = tempPrims.bboxLo.x;
+		m_arrHeader[1] = tempPrims.bboxLo.y;
+		m_arrHeader[2] = tempPrims.bboxLo.z;
+		m_arrHeader[3] = 1.0f;
+		m_arrHeader[4] = tempPrims.bboxHi.x;
+		m_arrHeader[5] = tempPrims.bboxHi.y;
+		m_arrHeader[6] = tempPrims.bboxHi.z;
+		m_arrHeader[7] = 1.0f;
+
+		m_arrHeader[8] = static_cast<float>(tempPrims.count);
+		m_arrHeader[9] = static_cast<float>(tempOps.count);
+		m_arrHeader[10] = static_cast<float>(m_mtxNode.count);
+		m_arrHeader[11] = DEFAULT_CELL_SIZE;
+
+		//Count
+		m_ctPrims = tempPrims.count;
+		m_ctOps = tempOps.count;
+
+		//Prims
+		for(U32 i=0; i < tempPrims.count; i++)
 		{
-			//Set Header
-			m_arrHeader[0] = tempPrims.bboxLo.x;
-			m_arrHeader[1] = tempPrims.bboxLo.y;
-			m_arrHeader[2] = tempPrims.bboxLo.z;
-			m_arrHeader[3] = 1.0f;
-			m_arrHeader[4] = tempPrims.bboxHi.x;
-			m_arrHeader[5] = tempPrims.bboxHi.y;
-			m_arrHeader[6] = tempPrims.bboxHi.z;
-			m_arrHeader[7] = 1.0f;
+			//Update Parent/Link and Link Properties
+			m_arrPrims[i * DATASIZE_PRIMITIVE + 0] = static_cast<float>(tempPrims.type[i]);
+			m_arrPrims[i * DATASIZE_PRIMITIVE + 1] = static_cast<float>(tempPrims.idxMatrix[i]);
 
-			m_arrHeader[8] = static_cast<float>(tempPrims.count);
-			m_arrHeader[9] = static_cast<float>(tempOps.count);
-			m_arrHeader[10] = static_cast<float>(m_mtxNode.count);
-			m_arrHeader[11] = DEFAULT_CELL_SIZE;
+			//Pos
+			m_arrPrims[i * DATASIZE_PRIMITIVE + 4] = tempPrims.posX[i];
+			m_arrPrims[i * DATASIZE_PRIMITIVE + 5] = tempPrims.posY[i];
+			m_arrPrims[i * DATASIZE_PRIMITIVE + 6] = tempPrims.posZ[i];
+			m_arrPrims[i * DATASIZE_PRIMITIVE + 7] = 0.0f;
 
-			//Count
-			m_ctPrims = tempPrims.count;
-			m_ctOps = tempOps.count;
+			//Dir
+			m_arrPrims[i * DATASIZE_PRIMITIVE + 8] = tempPrims.dirX[i];
+			m_arrPrims[i * DATASIZE_PRIMITIVE + 9] = tempPrims.dirY[i];
+			m_arrPrims[i * DATASIZE_PRIMITIVE + 10] = tempPrims.dirZ[i];
+			m_arrPrims[i * DATASIZE_PRIMITIVE + 11] = 0.0f;
 
-			//Prims
-			for(U32 i=0; i < tempPrims.count; i++)
-			{
-				//Update Parent/Link and Link Properties
-				m_arrPrims[i * DATASIZE_PRIMITIVE + 0] = static_cast<float>(tempPrims.type[i]);
-				m_arrPrims[i * DATASIZE_PRIMITIVE + 1] = static_cast<float>(tempPrims.idxMatrix[i]);
+			//Res
+			m_arrPrims[i * DATASIZE_PRIMITIVE + 12] = tempPrims.resX[i];
+			m_arrPrims[i * DATASIZE_PRIMITIVE + 13] = tempPrims.resY[i];
+			m_arrPrims[i * DATASIZE_PRIMITIVE + 14] = tempPrims.resZ[i];
+			m_arrPrims[i * DATASIZE_PRIMITIVE + 15] = 0.0f;
 
-				//Pos
-				m_arrPrims[i * DATASIZE_PRIMITIVE + 4] = tempPrims.posX[i];
-				m_arrPrims[i * DATASIZE_PRIMITIVE + 5] = tempPrims.posY[i];
-				m_arrPrims[i * DATASIZE_PRIMITIVE + 6] = tempPrims.posZ[i];
-				m_arrPrims[i * DATASIZE_PRIMITIVE + 7] = 0.0f;
+			//Color
+			m_arrPrims[i * DATASIZE_PRIMITIVE + 16] = tempPrims.colorX[i];
+			m_arrPrims[i * DATASIZE_PRIMITIVE + 17] = tempPrims.colorY[i];
+			m_arrPrims[i * DATASIZE_PRIMITIVE + 18] = tempPrims.colorZ[i];
+			m_arrPrims[i * DATASIZE_PRIMITIVE + 19] = 1.0f;
+		}
 
-				//Dir
-				m_arrPrims[i * DATASIZE_PRIMITIVE + 8] = tempPrims.dirX[i];
-				m_arrPrims[i * DATASIZE_PRIMITIVE + 9] = tempPrims.dirY[i];
-				m_arrPrims[i * DATASIZE_PRIMITIVE + 10] = tempPrims.dirZ[i];
-				m_arrPrims[i * DATASIZE_PRIMITIVE + 11] = 0.0f;
-
-				//Res
-				m_arrPrims[i * DATASIZE_PRIMITIVE + 12] = tempPrims.resX[i];
-				m_arrPrims[i * DATASIZE_PRIMITIVE + 13] = tempPrims.resY[i];
-				m_arrPrims[i * DATASIZE_PRIMITIVE + 14] = tempPrims.resZ[i];
-				m_arrPrims[i * DATASIZE_PRIMITIVE + 15] = 0.0f;
-
-				//Color
-				m_arrPrims[i * DATASIZE_PRIMITIVE + 16] = tempPrims.colorX[i];
-				m_arrPrims[i * DATASIZE_PRIMITIVE + 17] = tempPrims.colorY[i];
-				m_arrPrims[i * DATASIZE_PRIMITIVE + 18] = tempPrims.colorZ[i];
-				m_arrPrims[i * DATASIZE_PRIMITIVE + 19] = 1.0f;
-			}
-
-			//Ops
+		//Ops		
+		if(tempOps.count > 0)
+		{
 			for(U32 i=0; i < tempOps.count; i++)
 			{
 				//Update Parent/Link and Link Properties
@@ -198,12 +236,11 @@ namespace HPC{
 				}
 
 			}
-
-			return true;
 		}
-
-		return false;
+		
+		return true;
 	}
+
 
 	void GPUPoly::drawMesh(bool bWireFrameMode)
 	{
@@ -228,6 +265,8 @@ namespace HPC{
 		//glDisableClientState(GL_ELEMENT_ARRAY_BUFFER);
 	}
 
+
+	//////////////////////////////////////////////////////////////////////
 	int GPUPoly::run(float cellsize)
 	{
 		m_arrHeader[OFFSET_CELLSIZE] = cellsize;
@@ -235,7 +274,7 @@ namespace HPC{
 
 		DAnsiStr strFP = ExtractFilePath(GetExePath());
 		strFP = ExtractOneLevelUp(strFP);
-		strFP += DAnsiStr("/AA_Shaders/Polygonizer.cl");
+		strFP += DAnsiStr("PS_Shaders/Polygonizer.cl");
 
 		LogInfo("1.Setup compute device. Prefer AMD GPU.");
 		//Algorithm Overview
@@ -256,10 +295,6 @@ namespace HPC{
 		if(lpProgram == NULL)
 			return ERR_GPUPOLY_KERNEL_NOT_BUILT;
 
-		DAnsiStr strLogPath = ExtractFilePath(GetExePath()) + DAnsiStr("OpenCL_Framework.log");
-		TheEventLogger::Instance().setOutFilePath(strLogPath.cptr());
-		TheEventLogger::Instance().flush();
-
 		//Build Kernel
 		ComputeKernel* lpKernelCellConfig = lpProgram->addKernel("ComputeConfigIndexVertexCount");
 
@@ -275,7 +310,19 @@ namespace HPC{
 		arrNeeded[3] = 0;
 		m_ctCells = arrNeeded[0] * arrNeeded[1] * arrNeeded[2];
 
-		//Buffers
+		//Output Buffers for the mesh from GL		
+		/*
+		glGenBuffers(1, &m_meshBuffer.vboNormal);
+		glBindBuffer(GL_ARRAY_BUFFER, m_meshBuffer.vboNormal);
+		glBufferData(GL_ARRAY_BUFFER, MAX_MPU_VERTEX_COUNT * 4 * sizeof(float), 0, GL_DYNAMIC_DRAW);
+		cl_mem inMemMeshNormal = clCreateFromGLBuffer(lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_meshBuffer.vboNormal, NULL);
+
+		glGenBuffers(1, &m_meshBuffer.iboFaces);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_meshBuffer.iboFaces);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_MPU_TRIANGLE_COUNT * 3 * sizeof(U32), 0, GL_DYNAMIC_DRAW);
+		cl_mem inMemMeshFaces = clCreateFromGLBuffer(lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_meshBuffer.iboFaces, NULL);
+		*/
+
 		glGenBuffers(1, &m_outMesh.vboVertex);
 		glBindBuffer(GL_ARRAY_BUFFER, m_outMesh.vboVertex);
 		glBufferData(GL_ARRAY_BUFFER, m_ctCells * 4 * sizeof(float), 0, GL_DYNAMIC_DRAW);
@@ -285,36 +332,46 @@ namespace HPC{
 		glBindBuffer(GL_ARRAY_BUFFER, m_outMesh.vboColor);
 		glBufferData(GL_ARRAY_BUFFER, m_ctCells * 4 * sizeof(float), 0, GL_DYNAMIC_DRAW);
 		cl_mem outMemMeshColor = clCreateFromGLBuffer(lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_outMesh.vboColor, NULL);
-
+		
 		//Load Marching Cubes tables
 		cl_image_format imageFormat;
 		imageFormat.image_channel_order = CL_R;
 		imageFormat.image_channel_data_type = CL_UNSIGNED_INT8;
 
-		//Triangle and Vertex Count Tables
-		cl_int errNum;
-		cl_mem inMemTriTable = clCreateImage2D(lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-											   &imageFormat, 16, 256, 0, (void*) g_triTableGPU, &errNum);
-		if(errNum != CL_SUCCESS)					
-			return ERR_GPUPOLY_TRITABLE_NOT_READ;
-		
+		//Vertex Count Table
+		cl_int errNum;		
 		cl_mem inMemVertexCountTable = clCreateImage2D(lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-													   &imageFormat, 256, 1, 0, (void*) g_numVertsTableGPU, &errNum);
+													   &imageFormat, 256, 1, 0, (void*) g_numVerticesTableCompact, &errNum);
 		if(errNum != CL_SUCCESS)
 			return ERR_GPUPOLY_VERTEXTABLE_NOT_READ;
-		
+
+		//Triangle Count Table
+		cl_mem inMemTriTable = clCreateImage2D(lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+											   &imageFormat, 16, 256, 0, (void*) g_triTableCompact, &errNum);
+		if(errNum != CL_SUCCESS)					
+			return ERR_GPUPOLY_TRITABLE_NOT_READ;
+
 		//Input Pos
+		cl_mem outMemCellConfig;
+		cl_mem outMemVertexCount;
+		cl_mem outMemFields;
 		cl_mem inMemHeader;
 		cl_mem inMemOps;
 		cl_mem inMemPrims;		
 		cl_mem inMemMtx;
 		cl_mem inMemNeededCells;
-
+		U32 ctOpsToCopy = MATHMAX(m_ctOps, 1);
+		U32 ctPrimsToCopy = MATHMAX(m_ctPrims, 1);
+		
 		// Create the device memory vectors
+		outMemCellConfig = lpGPU->createMemBuffer(sizeof(U8) * m_ctCells, ComputeDevice::memWriteOnly);
+		outMemVertexCount = lpGPU->createMemBuffer(sizeof(U8) * m_ctCells, ComputeDevice::memWriteOnly);
+		outMemFields = lpGPU->createMemBuffer(sizeof(float) * m_ctCells, ComputeDevice::memWriteOnly);
+			
 		inMemHeader = lpGPU->createMemBuffer(sizeof(float) * DATASIZE_HEADER, ComputeDevice::memReadOnly);
-		inMemOps  	= lpGPU->createMemBuffer(sizeof(float) * DATASIZE_OPERATOR * m_ctOps, ComputeDevice::memReadOnly);
-		inMemPrims  = lpGPU->createMemBuffer(sizeof(float) * DATASIZE_PRIMITIVE * m_ctPrims, ComputeDevice::memReadOnly);		
-		inMemMtx	= lpGPU->createMemBuffer(sizeof(float) * PRIM_MATRIX_STRIDE * m_mtxNode.count, ComputeDevice::memReadOnly);
+		inMemOps  	= lpGPU->createMemBuffer(sizeof(float) * DATASIZE_OPERATOR * ctOpsToCopy, ComputeDevice::memReadOnly);
+		inMemPrims  = lpGPU->createMemBuffer(sizeof(float) * DATASIZE_PRIMITIVE * ctPrimsToCopy, ComputeDevice::memReadOnly);		
+		inMemMtx	= lpGPU->createMemBuffer(sizeof(float) * PRIM_MATRIX_STRIDE, ComputeDevice::memReadOnly);
 		inMemNeededCells = lpGPU->createMemBuffer(sizeof(int) * 4, ComputeDevice::memReadOnly);
 
 		// Transfer the input vector into device memory.
@@ -323,32 +380,21 @@ namespace HPC{
 			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
 
 		//Ops
-		if(!lpGPU->enqueueWriteBuffer(inMemOps, sizeof(float) * DATASIZE_OPERATOR * m_ctOps, m_arrOps))
+		if(!lpGPU->enqueueWriteBuffer(inMemOps, sizeof(float) * DATASIZE_OPERATOR * ctOpsToCopy, m_arrOps))
 			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
 
 		//Prims
-		if(!lpGPU->enqueueWriteBuffer(inMemPrims, sizeof(float) * DATASIZE_PRIMITIVE * m_ctPrims, m_arrPrims))
+		if(!lpGPU->enqueueWriteBuffer(inMemPrims, sizeof(float) * DATASIZE_PRIMITIVE * ctPrimsToCopy, m_arrPrims))
 			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
 
 		//Matrix
-		if(!lpGPU->enqueueWriteBuffer(inMemMtx, sizeof(float) * PRIM_MATRIX_STRIDE * m_mtxNode.count, m_mtxNode.matrix))
+		if(!lpGPU->enqueueWriteBuffer(inMemMtx, sizeof(float) * PRIM_MATRIX_STRIDE * m_mtxNode.count, m_mtxNode.matrix))	
 			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
 
 		//Needed
 		if(!lpGPU->enqueueWriteBuffer(inMemNeededCells, sizeof(int) * 4, arrNeeded))
 			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
 
-			/*
-			glGenBuffers(1, &m_meshBuffer.vboNormal);
-			glBindBuffer(GL_ARRAY_BUFFER, m_meshBuffer.vboNormal);
-			glBufferData(GL_ARRAY_BUFFER, MAX_MPU_VERTEX_COUNT * 4 * sizeof(float), 0, GL_DYNAMIC_DRAW);
-			cl_mem inMemMeshNormal = clCreateFromGLBuffer(lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_meshBuffer.vboNormal, NULL);
-
-			glGenBuffers(1, &m_meshBuffer.iboFaces);
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_meshBuffer.iboFaces);
-			glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_MPU_TRIANGLE_COUNT * 3 * sizeof(U32), 0, GL_DYNAMIC_DRAW);
-			cl_mem inMemMeshFaces = clCreateFromGLBuffer(lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_meshBuffer.iboFaces, NULL);
-		 */
 			/*
 		__kernel void ComputeConfigIndexVertexCount(const uint ctTotalCells,
 			__global uchar* arrOutCellConfig,
@@ -362,16 +408,19 @@ namespace HPC{
 			*/
 
 		// Set the arguments to the compute kernel
-		//lpKernelCellConfig->setArg(0, sizeof(cl_mem), &inMem);
-		//lpKernelCellConfig->setArg(1, sizeof(cl_mem), &inMem);
-		//lpKernelCellConfig->setArg(2, sizeof(cl_mem), &inMem);
-		lpKernelCellConfig->setArg(3, sizeof(cl_mem), &inMemHeader);
-		lpKernelCellConfig->setArg(4, sizeof(cl_mem), &inMemOps);
-		lpKernelCellConfig->setArg(5, sizeof(cl_mem), &inMemPrims);
-		lpKernelCellConfig->setArg(6, sizeof(cl_mem), &inMemMtx);
-		lpKernelCellConfig->setArg(7, sizeof(cl_mem), &inMemNeededCells);
-		lpKernelCellConfig->setArg(8, sizeof(cl_mem), &inMemVertexCountTable);
+		lpKernelCellConfig->setArg(0, sizeof(U32), &m_ctCells);
+		lpKernelCellConfig->setArg(1, sizeof(cl_mem), &outMemCellConfig);
+		lpKernelCellConfig->setArg(2, sizeof(cl_mem), &outMemVertexCount);
+		lpKernelCellConfig->setArg(3, sizeof(cl_mem), &outMemMeshVertex);
+		lpKernelCellConfig->setArg(4, sizeof(cl_mem), &outMemMeshColor);
 
+		lpKernelCellConfig->setArg(5, sizeof(cl_mem), &inMemHeader);
+		lpKernelCellConfig->setArg(6, sizeof(cl_mem), &inMemOps);
+		lpKernelCellConfig->setArg(7, sizeof(cl_mem), &inMemPrims);
+		lpKernelCellConfig->setArg(8, sizeof(cl_mem), &inMemMtx);
+		lpKernelCellConfig->setArg(9, sizeof(cl_mem), &inMemNeededCells);
+		lpKernelCellConfig->setArg(10, sizeof(cl_mem), &inMemVertexCountTable);
+		lpKernelCellConfig->setArg(11, sizeof(cl_mem), &inMemTriTable);
 
 		//Acquire Mesh for Writing
 		clEnqueueAcquireGLObjects(lpGPU->getCommandQ(), 1, &outMemMeshVertex, 0, 0, 0);
@@ -412,11 +461,33 @@ namespace HPC{
 		//Release Mesh for Writing
 		clEnqueueReleaseGLObjects(lpGPU->getCommandQ(), 1, &outMemMeshVertex, 0, 0, 0);
 		clEnqueueReleaseGLObjects(lpGPU->getCommandQ(), 1, &outMemMeshColor, 0, 0, 0);
-
 		m_outMesh.bIsValid = true;
 
+		// Read back the results from the device to verify the output
+		//U8* arrCellConfig = new U8[m_ctCells];
+		U8* arrVertexCount = new U8[m_ctCells];
+		U8* arrConfigIndex = new U8[m_ctCells];		
+		U32 ctSumVertices = 0;
+		U32 ctFilled = 0;
+		if(lpGPU->enqueueReadBuffer(outMemVertexCount, sizeof(U8) * m_ctCells, arrVertexCount) &&
+		   lpGPU->enqueueReadBuffer(outMemCellConfig, sizeof(U8) * m_ctCells, arrConfigIndex))		  
+		{
+			//return -1;			
+			for(U32 i=0; i < m_ctCells; i++)
+			{				
+				ctSumVertices += arrVertexCount[i];			
+				if((arrConfigIndex[i] != 0)&&(arrConfigIndex[i] != 255))
+				{
+					arrConfigIndex[i] = arrConfigIndex[i];
+					ctFilled ++;
+				}
+			}
+		}
 
 		// Shutdown and cleanup
+		clReleaseMemObject(outMemCellConfig);
+		clReleaseMemObject(outMemVertexCount);
+
 		clReleaseMemObject(inMemTriTable);
 		clReleaseMemObject(inMemVertexCountTable);
 
@@ -426,7 +497,9 @@ namespace HPC{
 		clReleaseMemObject(inMemMtx);
 		clReleaseMemObject(inMemNeededCells);
 
-
+		SAFE_DELETE(arrConfigIndex);
+		SAFE_DELETE(arrVertexCount);
+		//SAFE_DELETE(arrFields);
 		SAFE_DELETE(lpGPU);
 		return 1;
 	}

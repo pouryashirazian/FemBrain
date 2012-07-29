@@ -4,12 +4,16 @@
 #include "PS_MathBase.h"
 #include "PS_Logger.h"
 #include <string>
+#include <fstream>
 #include "PS_OclPolygonizer.h"
 #include "PS_Particles.h"
 #include "PS_ArcBallCamera.h"
+#include "PS_Base/PS_FileDirectory.h"
+#include "PS_BlobTreeRender/PS_OclPolygonizer.h"
 
 using namespace std;
 using namespace PS;
+using namespace PS::FILESTRINGUTILS;
 using namespace PS::HPC;
 
 #define WINDOW_WIDTH 1024
@@ -30,25 +34,26 @@ public:
 //Global Variables
 PS::CArcBallCamera g_arcBallCam;
 PS::HPC::Particles* g_lpParticles = NULL;
+PS::HPC::GPUPoly* g_lpBlobRender = NULL;
 AppSettings g_appSettings;
 
 
 void Display()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glClearColor(1.0, 1.0, 1.0, 1.0);
+	glClearColor(0.4, 0.4, 0.4, 1.0);
 
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
 	//Render
+	/*
 	glTranslatef(g_appSettings.pan.x, g_appSettings.pan.y, 0.0f);
 	svec3f p = g_arcBallCam.getCoordinates();
 	svec3f c = g_arcBallCam.getCenter();
 	gluLookAt(p.x, p.y, p.z, c.x, c.y, c.z, 0.0f, 1.0f, 0.0f);
-
-	glPushAttrib(GL_ALL_ATTRIB_BITS);
-	glPointSize(5.0f);
-		g_lpParticles->render();
-	glPopAttrib();
-
+	*/
+	if(g_lpBlobRender)
+		g_lpBlobRender->drawMesh();
 
 	glutSwapBuffers();
 }
@@ -57,7 +62,8 @@ void Resize(int w, int h)
 {
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	gluPerspective(60.0f, (double)w/(double)h, 0.1, 3000.0);
+	//gluPerspective(60.0f, (double)w/(double)h, 0.1, 3000.0);
+	glOrtho(-2.0f, 2.0f, -2.0f, 2.0f, -2.0f, 2.0f);
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
@@ -65,14 +71,17 @@ void Resize(int w, int h)
 
 void MousePress(int button, int state, int x, int y)
 {
+	/*
 	if(state == GLUT_DOWN)
 		g_arcBallCam.mousePress((PS::CArcBallCamera::MOUSEBUTTONSTATE)button, x, y);
 	else
 		g_arcBallCam.mousePress(PS::CArcBallCamera::mbMiddle, x, y);
+		*/
 }
 
 void MouseMove(int x, int y)
 {
+	/*
 	if(g_appSettings.bPanCamera)
 	{
 		g_appSettings.pan.x += (x - g_arcBallCam.getLastPos().x) * 0.03f;
@@ -82,6 +91,7 @@ void MouseMove(int x, int y)
 	else
 		g_arcBallCam.mouseMove(x, y);
 	glutPostRedisplay();
+	*/
 }
 
 void Close()
@@ -157,7 +167,18 @@ int main(int argc, char* argv[])
 
 	//Run OCL TEST
 	//PS::HPC::Run_SphereDistKernel();
-	g_lpParticles = new ::Particles(1024);
+	//g_lpParticles = new ::Particles(1024);
+	DAnsiStr strFPModel;
+	{
+		strFPModel = ExtractOneLevelUp(ExtractFilePath(GetExePath()));
+		strFPModel += "AA_Models/sphere.txt";
+	}
+
+	g_lpBlobRender = new GPUPoly();
+	g_lpBlobRender->readModel(strFPModel.cptr());
+	g_lpBlobRender->run();
+
+
 	
 
 	//Run App
