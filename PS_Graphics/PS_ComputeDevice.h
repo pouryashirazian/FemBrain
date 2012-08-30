@@ -78,7 +78,7 @@ private:
 class ComputeDevice{
 public:
     enum DEVICETYPE{dtCPU = CL_DEVICE_TYPE_CPU, dtGPU = CL_DEVICE_TYPE_GPU};
-    enum MEMACCESSMODE{memReadOnly = CL_MEM_READ_ONLY, memWriteOnly = CL_MEM_WRITE_ONLY};
+    enum MEMACCESSMODE{memReadWrite = CL_MEM_READ_WRITE, memReadOnly = CL_MEM_READ_ONLY, memWriteOnly = CL_MEM_WRITE_ONLY};
 
 	//Constructors
     ComputeDevice();
@@ -136,6 +136,8 @@ public:
      */
     void finishAllCommands();
 
+
+	U32 getKernelWorkgroupSize(ComputeKernel* lpKernel);
 
     //Access
     cl_device_id getDevice() const {return m_clDeviceID;}

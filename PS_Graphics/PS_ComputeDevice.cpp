@@ -693,6 +693,21 @@ ComputeProgram* ComputeDevice::addProgram(const char* chrComputeCode)
     return lpCompute;
 }
 
+U32 ComputeDevice::getKernelWorkgroupSize(ComputeKernel* lpKernel)
+{
+	U32 szWorkGroup = 0;
+	cl_int err = clGetKernelWorkGroupInfo(lpKernel->getKernel(), 
+										  m_clDeviceID,
+										  CL_KERNEL_WORK_GROUP_SIZE,
+										  sizeof(szWorkGroup), &szWorkGroup, NULL);
+	if (err != CL_SUCCESS) 
+	{
+		cerr << "Error: Failed to retrieve kernel work group info! " <<  err << endl;
+	}
+
+	return szWorkGroup;
+}
+
 const char* ComputeDevice::oclErrorString(cl_int error)
 {
     static const char* errorString[] = {

@@ -8,8 +8,12 @@
 #define PS_OCLPOLYGONIZER_H
 
 #include "PS_PolyMemManager.h"
+#include "PS_ComputeDevice.h"
+#include "PS_VectorMath.h"
 
 using namespace PS::SIMDPOLY;
+using namespace PS::HPC;
+using namespace PS::FUNCTIONALMATH;
 
 //DATASIZES
 #define DATASIZE_HEADER			12
@@ -56,6 +60,9 @@ public:
 
 	//Draws the mesh using accelerated memory buffer objects
 	void drawMesh(bool bWireFrameMode = false);
+	void drawBBox();
+
+	static void DrawBox(const svec3f& lo, const svec3f& hi, const svec3f& color, float lineWidth);
 
 	/*!
 	*@param cellsize the cubic cellsize for the polygonizer
@@ -63,11 +70,34 @@ public:
 	*/
 	int run(float cellsize = DEFAULT_CELL_SIZE);
 
+	/*!
+	 * Run the algorithm in tandem
+	 */
+	int runTandem(float cellsize = DEFAULT_CELL_SIZE);
+
 private:
+	void init();
+
+private:
+	typedef struct CellParam{
+		U8 corner1[12];
+		U8 corner2[12];
+		U8 edgeaxis[12];
+		U32 ctNeededCells[3];
+		U32 ctTotalCells;
+	};
+
+	CellParam m_param;
+
 	//Output:
 	//Mesh Buffer Object for Drawing
 	MESH_BUFFER_OBJECTS m_outMesh;
 
+	//Compute Kernels
+	PS::HPC::ComputeDevice* m_lpGPU;
+	PS::HPC::ComputeKernel* m_lpKernelCellConfig;
+	PS::HPC::ComputeKernel* m_lpKernelComputeConfig;
+	PS::HPC::ComputeKernel* m_lpKernelComputeMesh;
 
 	//Inputs:
 	//BlobNode Matrix
@@ -83,10 +113,12 @@ private:
 	//Operators Data
 	float PS_SIMD_ALIGN(m_arrOps[PS_SIMD_PADSIZE(MAX_TREE_NODES*DATASIZE_OPERATOR)]);
 
+	svec3f m_bboxLo;
+	svec3f m_bboxHi;
+
 	//Count of primitives and ops
 	U32 m_ctPrims;
 	U32 m_ctOps;
-
 	U32 m_ctCells;
 };
 

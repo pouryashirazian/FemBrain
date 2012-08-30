@@ -18,10 +18,9 @@ struct MESH_BUFFER_OBJECTS{
 	U32 vboVertex;
 	U32 vboColor;
 	U32 vboNormal;
-	//U32 vboNormalEnd;
-
 	U32 iboFaces;
 
+	//Count
 	U32 ctTriangles;
 	U32 ctVertices;
 

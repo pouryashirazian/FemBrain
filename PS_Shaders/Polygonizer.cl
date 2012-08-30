@@ -26,6 +26,8 @@
 //OFFSETS in HEADER
 #define OFFSET4_HEADER_LOWER	0
 #define OFFSET4_HEADER_UPPER	1
+#define OFFSET4_HEADER_PARAMS	2
+
 #define OFFSET_HEADER_BBOX_LO_X 	0
 #define OFFSET_HEADER_BBOX_LO_Y 	1
 #define OFFSET_HEADER_BBOX_LO_Z 	2
@@ -45,11 +47,16 @@
 #define BOX_MATRIX_STRIDE 16
 
 #define ISO_VALUE 0.5f
+#define NORMAL_DELTA 0.0001f
 
 #define ZERO4 {0.0f, 0.0f, 0.0f, 0.0f}
 #define AXISX {1.0f, 0.0f, 0.0f, 0.0f}
 #define AXISY {0.0f, 1.0f, 0.0f, 0.0f}
 #define AXISZ {0.0f, 0.0f, 1.0f, 0.0f}
+
+#define MAX_VERTICES_COUNT_PER_CELL		15
+#define MAX_TRIANGLES_COUNT_PER_CELL	5
+
 
 //Comfort Types
 typedef unsigned char		U8;
@@ -72,6 +79,36 @@ enum OPFLAGS {ofRightChildIsOp = 1, ofLeftChildIsOp = 2, ofChildIndexIsRange = 4
 
 //Sampler
 const sampler_t tableSampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_NEAREST;
+
+
+//Directions
+const int LBN =	0;  /* left bottom near corner  */
+const int LBF =	1;  /* left bottom far corner   */
+const int LTN =	2;  /* left top near corner     */
+const int LTF =	3;  /* left top far corner      */
+const int RBN =	4;  /* right bottom near corner */
+const int RBF =	5;  /* right bottom far corner  */
+const int RTN =	6;  /* right top near corner    */
+const int RTF =	7;  /* right top far corner     */
+
+//Axis
+const int AAX = 0;
+const int AAY = 1;
+const int AAZ = 2;
+
+//edge: LB, LT, LN, LF, RB, RT, RN, RF, BN, BF, TN, TF
+//Corner and EdgeAxis
+//const int corner1[12]    = {LBN,LTN,LBN,LBF,RBN,RTN,RBN,RBF,LBN,LBF,LTN,LTF};
+//const int corner2[12]    = {LBF,LTF,LTN,LTF,RBF,RTF,RTN,RTF,RBN,RBF,RTN,RTF};
+//const int edgeaxis[12]   = {AAZ,AAZ,AAY,AAY,AAZ,AAZ,AAY,AAY,AAX,AAX,AAX,AAX};
+
+typedef struct CellParam{
+	U8 corner1[12];
+	U8 corner2[12];
+	U8 edgeaxis[12];
+	U32 ctNeededCells[3];
+	U32 ctTotalCells;
+}CellParam;
 
 //Computes Wyvill Field-Function
 float ComputeWyvillField(float dd)
@@ -264,85 +301,290 @@ float ComputePrimitiveField(int idxPrimitive,
 }
 
 
+float3 ComputeNormal(int idxPrimitive, float4 v, 
+		   __global float4* arrOps4,
+		   __global float4* arrPrims4,
+		   __global float4* arrMtxNodes4)
+{
+	const float deltaInv = -1.0f / NORMAL_DELTA;	
+	float inFieldValue = ComputePrimitiveField(0, v, arrOps4, arrPrims4, arrMtxNodes4);
+	//printf("FieldValue= %.2f \n", inFieldValue); 
+	
+	
+	float3 n;
+	n.x = ComputePrimitiveField(0, v + (float4)(NORMAL_DELTA,0,0,0), arrOps4, arrPrims4, arrMtxNodes4);
+	n.y = ComputePrimitiveField(0, v + (float4)(0, NORMAL_DELTA, 0, 0), arrOps4, arrPrims4, arrMtxNodes4);
+	n.z = ComputePrimitiveField(0, v + (float4)(0, 0, NORMAL_DELTA, 0), arrOps4, arrPrims4, arrMtxNodes4);
+	//n.w = 0.0f;
+
+	n = deltaInv * (n - (float3)(inFieldValue, inFieldValue, inFieldValue));
+	n = normalize(n);
+	//printf("Prenormalized N= [%.2f, %.2f, %.2f, %.2f] \n", n.x, n.y, n.z, n.w); 
+	return n;
+}
+
+float4 ComputePrimitiveColor(int idxPrimitive, __global float4* arrPrims4)
+{
+	return arrPrims4[idxPrimitive * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
+}
+
+
 
 
 /*!
 * Compute Cell Configuration index and Number Vertices Output for all cells.
+* @param ctTotalCells total number of cells
+* @param arrOutCellConfig array containing the configuration of cubic cells
+* @param arrOutVertexCount array containing the number of vertices output 
+* per each cell
+* @param color of each vertex
 */
-__kernel void ComputeConfigIndexVertexCount(const uint ctTotalCells,
+__kernel void ComputeConfigIndexVertexCount(__global float4* arrInHeader4,
+											__global float4* arrInOps4,										 
+											__global float4* arrInPrims4,											 
+					 					    __global float4* arrInMtxNode4,
+											__constant struct CellParam* inCellParams,
+											__read_only image2d_t texInVertexCountTable,
+											__read_only image2d_t texInTriangleTable,
 											__global uchar* arrOutCellConfig,
 											__global uchar* arrOutVertexCount,	
 											__global float4* arrOutMeshVertex,
-											__global float4* arrOutMeshColor,
-											__global float* arrInHeader,
-											__global float* arrInOps,										 
-											__global float* arrInPrims,											 
-											 __global float* arrInMtxNode,
-											 const __global uint* arrInNeededCells,
-											 __read_only image2d_t texInVertexCountTable,
-											 __read_only image2d_t texInTriangleTable)
+											__global float4* arrOutMeshNormal,
+											__global float4* arrOutMeshColor)
 {
 	//Get XY plane index
 	int idX = get_global_id(0);
 	int idY = get_global_id(1);
 	int idZ = get_global_id(2);
-	if((idX >= arrInNeededCells[0])||(idY >= arrInNeededCells[1])||(idZ >= arrInNeededCells[2]))
+	if((idX >= inCellParams->ctNeededCells[0])||(idY >= inCellParams->ctNeededCells[1])||(idZ >= inCellParams->ctNeededCells[2]))
 		return;
-	uint idxCell = idZ * (arrInNeededCells[0] * arrInNeededCells[1]) + idY * arrInNeededCells[0] + idX;
-	if(idxCell > ctTotalCells)
+	uint idxCell = idZ * (inCellParams->ctNeededCells[0] * inCellParams->ctNeededCells[1]) + idY * inCellParams->ctNeededCells[0] + idX;
+	if(idxCell > inCellParams->ctTotalCells)
 		return;
-
-	__global float4* header4  = (__global float4 *)arrInHeader;
-	__global float4* ops4     = (__global float4 *)arrInOps;
-	__global float4* prims4   = (__global float4 *)arrInPrims;	
-	__global float4* matrix4  = (__global float4 *)arrInMtxNode;
-
-	//printf("Box Lo X = %.2f\n", arrInHeader[0]);
-	//printf("Box Hi X = %.2f\n", header4[1].x);
-	printf("Matrix 0,0 = %.2f \n", matrix4[0].x);
-	//printf("Total Nodes = %d \n", ctTotalCells);
-
-	float cellsize = arrInHeader[OFFSET_HEADER_CELLSIZE];	
-	float4 lower = header4[0] + cellsize * (float4)(idX, idY, idZ, 0.0f);
+	
+	//float cellsize = arrInHeader4[OFFSET_HEADER_CELLSIZE];	
+	float cellsize = arrInHeader4[OFFSET4_HEADER_PARAMS].w;
+	float4 lower = arrInHeader4[OFFSET4_HEADER_LOWER] + cellsize * (float4)(idX, idY, idZ, 0.0f);
 	float arrFields[8];
 	float4 arrVertices[8];
-
 	arrVertices[0] = lower;
-	arrVertices[1] = lower + cellsize * (float4)(1, 0, 0, 0);
-	arrVertices[2] = lower + cellsize * (float4)(1, 1, 0, 0);
-  	arrVertices[3] = lower + cellsize * (float4)(0, 1, 0, 0);
-	arrVertices[4] = lower + cellsize * (float4)(0, 0, 1, 0);
+	arrVertices[1] = lower + cellsize * (float4)(0, 0, 1, 0);
+	arrVertices[2] = lower + cellsize * (float4)(0, 1, 0, 0);
+  	arrVertices[3] = lower + cellsize * (float4)(0, 1, 1, 0);
+	arrVertices[4] = lower + cellsize * (float4)(1, 0, 0, 0);
 	arrVertices[5] = lower + cellsize * (float4)(1, 0, 1, 0);
-  	arrVertices[6] = lower + cellsize * (float4)(1, 1, 1, 0);
-	arrVertices[7] = lower + cellsize * (float4)(0, 1, 1, 0);
+  	arrVertices[6] = lower + cellsize * (float4)(1, 1, 0, 0);
+	arrVertices[7] = lower + cellsize * (float4)(1, 1, 1, 0);
 
-
-	//Compute Fields
-	for(int i=0; i<8; i++)
-	{
-		arrFields[i] = ComputePrimitiveField(0, arrVertices[i], ops4, prims4, matrix4);
-		//arrFields[i] = ComputeOperatorField(0, arrVertices[i], arrInHeader, arrInOps, arrInPrims, arrInMtxNode);
-	}
-	
     //Compute Configuration index
     int idxConfig = 0;
 	for(int i=0; i<8; i++)
 	{
+		//arrFields[i] = ComputePrimitiveField(0, arrVertices[i], ops4, prims4, matrix4);
+		arrFields[i] = ComputePrimitiveField(0, arrVertices[i], arrInOps4, arrInPrims4, arrInMtxNode4);
 		if(isgreaterequal(arrFields[i], ISO_VALUE))
 			idxConfig += (1 << i);
 	}
-
+	
     // read number of vertices from texture
     U8 ctVertices = read_imageui(texInVertexCountTable, tableSampler, (int2)(idxConfig,0)).x;
-	U8 arrConfig[16];
-	
-	//Read configurations from texture memory
-	for(int i=0; i<ctVertices; i++)
-		arrConfig[i] = read_imageui(texInTriangleTable, tableSample, (int2)(idxConfig, i)).x;
 
-
-
+	//Cell-based output											
 	arrOutCellConfig[idxCell] = idxConfig;
 	arrOutVertexCount[idxCell] = ctVertices;
 	
+
+	//Variables
+	U8 idxEdge;
+	float4 e1;
+	float4 e2;
+	float4 v;
+	float scale;
+	U32 idxMeshAttrib;
+	int idxEdgeStart, idxEdgeEnd, idxEdgeAxis;
+	
+	//Read configurations from texture memory
+	for(int i=0; i<ctVertices; i++)
+	{
+		idxEdge = read_imageui(texInTriangleTable, tableSampler, (int2)(idxConfig, i)).x;
+		idxEdgeStart = inCellParams->corner1[idxEdge];
+		idxEdgeEnd   = inCellParams->corner2[idxEdge];
+		idxEdgeAxis  = inCellParams->edgeaxis[idxEdge];	
+
+		e1 = lower + cellsize * (float4)((int)((idxEdgeStart & 0x04) >> 2), (int)((idxEdgeStart & 0x02) >> 1), (int)(idxEdgeStart & 0x01), 0.0f);
+		e2 = e1;
+		if(idxEdgeAxis == 0)
+			e2.x += cellsize;
+		else if(idxEdgeAxis == 1)
+			e2.y += cellsize;
+		else
+			e2.z += cellsize;
+		//e2[idxEdgeAxis] = e2[idxEdgeAxis] + cellsize;
+		scale = (ISO_VALUE - arrFields[idxEdgeStart])/(arrFields[idxEdgeEnd] - arrFields[idxEdgeStart]);
+		v = e1 + scale * (e2 - e1);
+
+
+		idxMeshAttrib = idxCell * MAX_VERTICES_COUNT_PER_CELL + i; 
+		arrOutMeshVertex[idxMeshAttrib] = v;
+		//arrOutMeshNormal[idxMeshAttrib] = ComputeNormal(0, v, arrInOps4, arrInPrims4, arrInMtxNode4);
+		arrOutMeshColor[idxMeshAttrib] = ComputePrimitiveColor(0, arrInPrims4);
+	}
+}
+
+
+
+__kernel void ComputeConfig(__global float4* arrInHeader4,
+							__global float4* arrInOps4,										 
+							__global float4* arrInPrims4,											 
+	 					    __global float4* arrInMtxNode4,
+							__constant struct CellParam* inCellParams,
+							__read_only image2d_t texInVertexCountTable,
+							__global uchar* arrOutCellConfig,
+							__global uchar* arrOutVertexCount)		
+{
+	//Get XY plane index
+	int idX = get_global_id(0);
+	int idY = get_global_id(1);
+	int idZ = get_global_id(2);
+	if((idX >= inCellParams->ctNeededCells[0])||(idY >= inCellParams->ctNeededCells[1])||(idZ >= inCellParams->ctNeededCells[2]))
+		return;
+	uint idxCell = idZ * (inCellParams->ctNeededCells[0] * inCellParams->ctNeededCells[1]) + idY * inCellParams->ctNeededCells[0] + idX;
+	if(idxCell > inCellParams->ctTotalCells)
+		return;
+	
+	//float cellsize = arrInHeader4[OFFSET_HEADER_CELLSIZE];	
+	float cellsize = arrInHeader4[OFFSET4_HEADER_PARAMS].w;
+	float4 lower = arrInHeader4[OFFSET4_HEADER_LOWER] + cellsize * (float4)(idX, idY, idZ, 0.0f);
+	float arrFields[8];
+	float4 arrVertices[8];
+	arrVertices[0] = lower;
+	arrVertices[1] = lower + cellsize * (float4)(0, 0, 1, 0);
+	arrVertices[2] = lower + cellsize * (float4)(0, 1, 0, 0);
+  	arrVertices[3] = lower + cellsize * (float4)(0, 1, 1, 0);
+	arrVertices[4] = lower + cellsize * (float4)(1, 0, 0, 0);
+	arrVertices[5] = lower + cellsize * (float4)(1, 0, 1, 0);
+  	arrVertices[6] = lower + cellsize * (float4)(1, 1, 0, 0);
+	arrVertices[7] = lower + cellsize * (float4)(1, 1, 1, 0);
+
+    //Compute Configuration index
+    int idxConfig = 0;
+	for(int i=0; i<8; i++)
+	{
+		//arrFields[i] = ComputePrimitiveField(0, arrVertices[i], ops4, prims4, matrix4);
+		arrFields[i] = ComputePrimitiveField(0, arrVertices[i], arrInOps4, arrInPrims4, arrInMtxNode4);
+		if(isgreaterequal(arrFields[i], ISO_VALUE))
+			idxConfig += (1 << i);
+	}
+	
+    // read number of vertices from texture
+    U8 ctVertices = read_imageui(texInVertexCountTable, tableSampler, (int2)(idxConfig,0)).x;
+
+	//Cell-based output											
+	arrOutCellConfig[idxCell] = idxConfig;
+	arrOutVertexCount[idxCell] = ctVertices;
+}
+
+//Compute Mesh
+__kernel void ComputeMesh(__global float4* arrInHeader4,
+						  __global float4* arrInOps4,										 
+						  __global float4* arrInPrims4,											 
+						  __global float4* arrInMtxNode4,
+					      __constant struct CellParam* inCellParams,
+						  __read_only image2d_t texInTriangleTable,
+						  __global U8* arrInCellConfig,
+						  __global U8* arrInVertexCount,
+						  __global U32* arrInVertexBufferOffset,	
+						  __global float4* arrOutMeshVertex,
+						  __global float4* arrOutMeshColor,
+						  __global float* arrOutMeshNormal)						  
+{
+	//Get XY plane index
+	int idX = get_global_id(0);
+	int idY = get_global_id(1);
+	int idZ = get_global_id(2);
+	if((idX >= inCellParams->ctNeededCells[0])||(idY >= inCellParams->ctNeededCells[1])||(idZ >= inCellParams->ctNeededCells[2]))
+		return;
+	uint idxCell = idZ * (inCellParams->ctNeededCells[0] * inCellParams->ctNeededCells[1]) + idY * inCellParams->ctNeededCells[0] + idX;
+	if(idxCell > inCellParams->ctTotalCells)
+		return;
+	if(arrInVertexCount[idxCell] == 0)
+		return;
+	
+	//float cellsize = arrInHeader4[OFFSET_HEADER_CELLSIZE];	
+	float cellsize = arrInHeader4[OFFSET4_HEADER_PARAMS].w;
+	float4 lower = arrInHeader4[OFFSET4_HEADER_LOWER] + cellsize * (float4)(idX, idY, idZ, 0.0f);
+	float arrFields[8];
+	float4 arrVertices[8];
+	arrVertices[0] = lower;
+	arrVertices[1] = lower + cellsize * (float4)(0, 0, 1, 0);
+	arrVertices[2] = lower + cellsize * (float4)(0, 1, 0, 0);
+  	arrVertices[3] = lower + cellsize * (float4)(0, 1, 1, 0);
+	arrVertices[4] = lower + cellsize * (float4)(1, 0, 0, 0);
+	arrVertices[5] = lower + cellsize * (float4)(1, 0, 1, 0);
+  	arrVertices[6] = lower + cellsize * (float4)(1, 1, 0, 0);
+	arrVertices[7] = lower + cellsize * (float4)(1, 1, 1, 0);
+
+    //Compute Configuration index
+	for(int i=0; i<8; i++)
+	{
+		arrFields[i] = ComputePrimitiveField(0, arrVertices[i], arrInOps4, arrInPrims4, arrInMtxNode4);
+	}
+		
+
+	//Variables
+	U32 idxEdge;
+	float4 e1;
+	float4 e2;
+	float4 v;
+	float3 n;
+	float scale;
+	U32 idxMeshAttrib;
+	int idxEdgeStart, idxEdgeEnd, idxEdgeAxis;
+	int ctVertex = arrInVertexCount[idxCell];
+	int idxConfig = arrInCellConfig[idxCell];
+	int voffset = arrInVertexBufferOffset[idxCell];
+	//printf("Vertex Offset %d \n", voffset);
+
+	/*
+	printf("Tritable, config 1: ");
+	for(int i=0; i < 16; i++)
+		printf("%d, ", read_imageui(texInTriangleTable, tableSampler, (int2)(i, 1)).x);
+	printf(" \n");
+	*/
+
+	//Read configurations from texture memory
+	for(int i=0; i<ctVertex; i++)
+	{
+		idxEdge = read_imageui(texInTriangleTable, tableSampler, (int2)(i, idxConfig)).x;
+		idxEdgeStart = inCellParams->corner1[idxEdge];
+		idxEdgeEnd   = inCellParams->corner2[idxEdge];
+		idxEdgeAxis  = inCellParams->edgeaxis[idxEdge];	
+
+		e1 = lower + cellsize * (float4)((int)((idxEdgeStart & 0x04) >> 2), (int)((idxEdgeStart & 0x02) >> 1), (int)(idxEdgeStart & 0x01), 0.0f);
+		e2 = e1;
+		if(idxEdgeAxis == 0)
+			e2.x += cellsize;
+		else if(idxEdgeAxis == 1)
+			e2.y += cellsize;
+		else
+			e2.z += cellsize;
+		scale = (ISO_VALUE - arrFields[idxEdgeStart])/(arrFields[idxEdgeEnd] - arrFields[idxEdgeStart]);
+		v = e1 + scale * (e2 - e1);
+
+		//printf("v = [%.2f, %.2f, %.2f]\n", v.x, v.y, v.z);
+		//printf("idxCfg = %d, idxEdge = %d, idxEdgeStart = %d, idxEdgeEnd = %d, idxEdgeAxis = %d \n", idxConfig, idxEdge, idxEdgeStart, idxEdgeEnd, idxEdgeAxis);
+
+		n = ComputeNormal(0, v, arrInOps4, arrInPrims4, arrInMtxNode4);
+
+		//MeshAttrib index
+		idxMeshAttrib = voffset + i; 
+		arrOutMeshVertex[idxMeshAttrib] = v;
+		//arrOutMeshColor[idxMeshAttrib] = ComputePrimitiveColor(0, arrInPrims4);
+		arrOutMeshColor[idxMeshAttrib] = (float4)(1,0,0,1);
+		arrOutMeshNormal[idxMeshAttrib * 3] = n.x;
+		arrOutMeshNormal[idxMeshAttrib * 3 + 1] = n.y;
+		arrOutMeshNormal[idxMeshAttrib * 3 + 2] = n.z;
+		printf("n = [%.2f, %.2f, %.2f] \n", n.x, n.y, n.z); 
+	//	printf("n = [%.2f, %.2f, %.2f, %.2f] \n", n.x, n.y, n.z, n.w); 
+	}
 }
