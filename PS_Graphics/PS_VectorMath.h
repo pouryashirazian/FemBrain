@@ -274,6 +274,7 @@ inline svec4f vscale4f(float a, const svec4f& b)
 	return res;
 }
 ///////////////////////////////////////////////////////////
+
 }
 }
 

@@ -228,7 +228,7 @@ inline T gmin(T a, T b)
 #undef max
 #endif // #ifdef min
 template <typename T>
-T getMaxLimit(void)
+T MaxLimit(void)
 {
 	return std::numeric_limits<T>::max();
 }
@@ -237,7 +237,7 @@ T getMaxLimit(void)
 #undef min
 #endif // #ifdef min
 template <typename T>
-T getMinLimit(void)
+T MinLimit(void)
 {
 	return std::numeric_limits<T>::min();
 }
