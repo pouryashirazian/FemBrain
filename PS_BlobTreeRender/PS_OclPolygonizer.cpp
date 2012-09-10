@@ -746,7 +746,7 @@ namespace HPC{
 		//Normal
 		glGenBuffers(1, &m_outMesh.vboNormal);
 		glBindBuffer(GL_ARRAY_BUFFER, m_outMesh.vboNormal);
-		glBufferData(GL_ARRAY_BUFFER, szVertexBuffer, 0, GL_DYNAMIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, szNormalBuffer, 0, GL_DYNAMIC_DRAW);
 		cl_mem outMemMeshNormal = clCreateFromGLBuffer(m_lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_outMesh.vboNormal, NULL);
 
 		//Acquire Mesh for Writing

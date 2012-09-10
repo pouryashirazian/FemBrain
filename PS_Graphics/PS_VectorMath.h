@@ -21,6 +21,7 @@ struct svec2
 template <typename T>
 struct svec3
 {
+
 	svec3() {}
 	explicit svec3(T x_, T y_, T z_):x(x_), y(y_), z(z_) {}
 	T x;

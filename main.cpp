@@ -26,12 +26,14 @@ using namespace PS::HPC;
 class AppSettings{
 public:
 	AppSettings(){
+		this->bDrawWireFrame = false;
 		this->bPanCamera = false;
 		this->pan = svec2f(0.0f, 0.0f); 
 	}
 
 public:
 	bool bPanCamera;
+	bool bDrawWireFrame;
 	svec2f pan;
 };
 
@@ -83,7 +85,7 @@ void Display()
 	if(g_lpBlobRender)
 	{
 		g_lpBlobRender->drawBBox();
-		g_lpBlobRender->drawMesh(false);
+		g_lpBlobRender->drawMesh(g_appSettings.bDrawWireFrame);
 	}
 
 	glUseProgram(0);
@@ -125,6 +127,9 @@ void MouseMove(int x, int y)
 
 void Close()
 {
+	//Cleanup
+	cout << "Cleanup Memory objects" << endl;
+	SAFE_DELETE(g_lpBlobRender);
 	PS::TheEventLogger::Instance().flush();
 }
 
@@ -164,6 +169,20 @@ bool GetGPUInfo()
 	return true;
 }
 
+void Keyboard(int key, int x, int y)
+{
+	switch(key)
+	{
+		case(GLUT_KEY_F2):
+		{
+			g_appSettings.bDrawWireFrame = !g_appSettings.bDrawWireFrame;
+			break;
+		}
+
+	}
+
+	glutPostRedisplay();
+}
 
 //Main Loop of Application
 int main(int argc, char* argv[])
@@ -180,7 +199,7 @@ int main(int argc, char* argv[])
 	glutReshapeFunc(Resize);
 	glutMouseFunc(MousePress);
 	glutMotionFunc(MouseMove);
-///	glutSpecialFunc(Keyboard);
+	glutSpecialFunc(Keyboard);
 	glutCloseFunc(Close);
 
 	//Print GPU INFO

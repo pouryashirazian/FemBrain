@@ -81,6 +81,7 @@
     <ClCompile Include="AA_Sqlite\sqlite3.c" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PS_Base\PS_AppConfig.cpp" />
+    <ClCompile Include="PS_Base\PS_AssetManager.cpp" />
     <ClCompile Include="PS_Base\PS_CPU_INFO.cpp" />
     <ClCompile Include="PS_Base\PS_ErrorManager.cpp" />
     <ClCompile Include="PS_Base\PS_FileDirectory.cpp" />
@@ -97,6 +98,7 @@
     <ClCompile Include="PS_Graphics\PS_ComputeDevice.cpp" />
     <ClCompile Include="PS_Graphics\PS_GLFuncs.cpp" />
     <ClCompile Include="PS_Graphics\PS_GLSurface.cpp" />
+    <ClCompile Include="PS_Graphics\PS_Mesh.cpp" />
     <ClCompile Include="PS_Graphics\PS_OclScan.cpp" />
     <ClCompile Include="PS_Graphics\PS_Particles.cpp" />
     <ClCompile Include="PS_Graphics\PS_PixelMap.cpp" />
@@ -107,6 +109,7 @@
     <ClInclude Include="AA_Sqlite\sqlite3.h" />
     <ClInclude Include="AA_Sqlite\sqlite3ext.h" />
     <ClInclude Include="PS_Base\PS_AppConfig.h" />
+    <ClInclude Include="PS_Base\PS_AssetManager.h" />
     <ClInclude Include="PS_Base\PS_CPU_INFO.h" />
     <ClInclude Include="PS_Base\PS_ErrorManager.h" />
     <ClInclude Include="PS_Base\PS_AlignedAlloc.h" />
@@ -125,10 +128,12 @@
     <ClInclude Include="PS_BlobTreeRender\_CellConfigTableCompact.h" />
     <ClInclude Include="PS_BlobTreeRender\_CellConfigTableGPU.h" />
     <ClInclude Include="PS_Graphics\PS_ArcBallCamera.h" />
+    <ClInclude Include="PS_Graphics\PS_BBOX.h" />
     <ClInclude Include="PS_Graphics\PS_ComputeDevice.h" />
     <ClInclude Include="PS_Graphics\PS_GLFuncs.h" />
     <ClInclude Include="PS_Graphics\PS_GLSurface.h" />
     <ClInclude Include="PS_Graphics\PS_MATRIX4.h" />
+    <ClInclude Include="PS_Graphics\PS_Mesh.h" />
     <ClInclude Include="PS_Graphics\PS_OclScan.h" />
     <ClInclude Include="PS_Graphics\PS_Particles.h" />
     <ClInclude Include="PS_Graphics\PS_PixelMap.h" />
