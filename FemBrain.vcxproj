@@ -140,7 +140,7 @@
     <ClInclude Include="PS_Graphics\PS_SIMDSpecialMathFuncs.h" />
     <ClInclude Include="PS_Graphics\PS_SIMDVecN.h" />
     <ClInclude Include="PS_Graphics\PS_SketchConfig.h" />
-    <ClInclude Include="PS_Graphics\PS_Vector.h" />
+    <ClInclude Include="PS_Graphics\PS_Vector_Untested.h" />
     <ClInclude Include="PS_Graphics\PS_VectorMath.h" />
   </ItemGroup>
   <ItemGroup>
