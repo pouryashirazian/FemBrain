@@ -26,8 +26,24 @@ void GLSurface::cleanup()
 	glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
 	//Cleanup by deleting all buffers
-	glDeleteFramebuffers(1, &m_glFBO);
-	glDeleteTextures(1, &m_glTexture);
+	glDeleteFramebuffers(2, (GLuint*)&m_glFBO);
+	glDeleteTextures(1, (GLuint*)&m_glTex);
+}
+
+void GLSurface::initTextures(U32 w, U32 h)
+{
+	glGenTextures(2, m_glTex);
+
+	for (GLint i = 0; i < 2; i++){
+		glBindTexture(GL_TEXTURE_2D, m_glTex[i]);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		// this may change with window size changes
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+	}
+	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 /*!
@@ -39,17 +55,34 @@ void GLSurface::init(U32 w, U32 h)
 
 	m_width = w;
 	m_height = h;
+	initTextures(w, h);
 
-	//Create a texture handle
-	glGenTextures(1, &m_glTexture);
+	//Generate 2 Textures and 2 frame buffers, 1 Render Buffer
+	glGenFramebuffers(2, m_glFBO);
 
-	//Bind Texture
-	glBindTexture(GL_TEXTURE_2D, m_glTexture);
+	//First Frame with RenderBuffer (Depth) and Texture
+	glBindFramebuffer(GL_FRAMEBUFFER, m_glFBO[0]);
+	glGenRenderbuffers(1, &m_glRBO);
+	glBindRenderbuffer(GL_RENDERBUFFER, m_glRBO);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32, m_width, m_height);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_glRBO);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_glTex[0], 0);
+	GLenum fboStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	if(fboStatus != GL_FRAMEBUFFER_COMPLETE){
+		fprintf(stderr, "FBO #1 Error!");
+	}
 
-	//Create the texture
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_width, m_height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	//Second Frame and Texture
+	glBindFramebuffer(GL_FRAMEBUFFER, m_glFBO[1]);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_glTex[1], 0);
+	fboStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	if(fboStatus != GL_FRAMEBUFFER_COMPLETE){
+		fprintf(stderr, "FBO #2 Error!");
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 
+	  /*
 	//Create an openGL framebuffer object
 	glGenFramebuffers(1, &m_glFBO);
 
@@ -58,7 +91,7 @@ void GLSurface::init(U32 w, U32 h)
 
 	//Attach 2D Texture to render 
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 
-						   GL_TEXTURE_2D, m_glTexture, 0);
+						   GL_TEXTURE_2D, m_glRenderTexture, 0);
 
 	//Render Buffer
 	//Create Render Buffer for Depth Testing
@@ -66,18 +99,22 @@ void GLSurface::init(U32 w, U32 h)
 	glBindRenderbuffer(GL_RENDERBUFFER, m_glRBO);
 
 	//Specify width and height for storage of render buffer
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, m_width, m_height);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32, m_width, m_height);
 
 	//Attach Render Buffer to Frame Buffer
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_glRBO);
+	*/
 }
 
 
 //Attach to surface
 void GLSurface::attach()
 {
-	glBindFramebuffer(GL_FRAMEBUFFER, m_glFBO);
+	glBindFramebuffer(GL_FRAMEBUFFER, m_glFBO[0]);
 	glBindRenderbuffer(GL_RENDERBUFFER, m_glRBO);
+
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glViewport(0, 0, m_width, m_height);
 }
 
 //Detach from surface
@@ -102,8 +139,6 @@ void GLSurface::test()
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
 
-	glClearColor(1.0, 0.0f, 0.0f, 1.0f);
-
 	glColor3f(0.0f, 0.0f, 1.0f);
 	glBegin(GL_TRIANGLES);
 		glVertex3f(-1.0f, 0.0f, 0.0f);
@@ -111,32 +146,34 @@ void GLSurface::test()
 		glVertex3f(0.0f, 1.0f, 0.0f);
 	glEnd();
 
-	glFlush();
 
 	glMatrixMode(GL_PROJECTION);
 	glPopMatrix();
 
 	glMatrixMode(GL_MODELVIEW);
 	glPopMatrix();
+
+	glFlush();
 }
 
-//Save the framebuffer output as a ppm
-void GLSurface::saveAsPPM(const char* lpFilePath)
-{
-	CPixelMap* lpMap = new CPixelMap(m_width, m_height);
-	
-	//Saving to ppm
-	glReadPixels(0, 0, m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)lpMap->buffer());
-	lpMap->save(lpFilePath);
-
-	SAFE_DELETE(lpMap);
-}
 
 void GLSurface::drawAsQuad()
 {
-	glEnable(GL_TEXTURE_2D);
+	glViewport(0, 0, m_width, m_height);
 
-	glBindTexture(GL_TEXTURE_2D, m_glTexture);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glMatrixMode(GL_PROJECTION);
+	glPushMatrix();
+	glLoadIdentity();
+	glOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f);
+
+	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
+	glLoadIdentity();
+
+
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, m_glTex[0]);
 	glBegin(GL_QUADS);
 		glVertex2f(0.0f, 0.0f);
 		glTexCoord2f(0.0f, 0.0f);
@@ -151,4 +188,31 @@ void GLSurface::drawAsQuad()
 		glTexCoord2f(0.0f, 1.0f);
 
 	glEnd();
+
+
+	glMatrixMode(GL_MODELVIEW);
+	glPopMatrix();
+
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
+
+	glFlush();
+}
+
+
+//Save the framebuffer output as a ppm
+void GLSurface::saveAsPPM(const char* lpFilePath)
+{
+	CPixelMap* lpMap = new CPixelMap(m_width, m_height);
+
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, m_glTex[0]);
+
+	//Saving to ppm
+	glReadPixels(0, 0, m_width, m_height, GL_RGBA8, GL_UNSIGNED_BYTE, (GLvoid*)lpMap->buffer());
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	lpMap->save(lpFilePath);
+
+	SAFE_DELETE(lpMap);
 }

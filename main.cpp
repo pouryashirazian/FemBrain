@@ -11,6 +11,7 @@
 #include "PS_BlobTreeRender/PS_OclPolygonizer.h"
 #include "PS_Graphics/PS_ArcBallCamera.h"
 #include "PS_Graphics/PS_GLFuncs.h"
+#include "PS_Graphics/PS_GLSurface.h"
 
 
 using namespace std;
@@ -41,6 +42,8 @@ public:
 //Global Variables
 PS::CArcBallCamera g_arcBallCam;
 PS::HPC::GPUPoly* g_lpBlobRender = NULL;
+
+GLSurface* g_lpSurface = NULL;
 AppSettings g_appSettings;
 GLuint g_uiShader;
 
@@ -73,6 +76,7 @@ const char* g_lpFragShaderCode =
 ////////////////////////////////////////////////////////////////////////////////////////
 void Draw()
 {
+	/*
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
@@ -92,6 +96,10 @@ void Draw()
 	}
 
 	glUseProgram(0);
+*/
+
+	g_lpSurface->drawAsQuad();
+	//g_lpSurface->test();
 
 	glutSwapBuffers();
 }
@@ -132,7 +140,9 @@ void Close()
 {
 	//Cleanup
 	cout << "Cleanup Memory objects" << endl;
+	SAFE_DELETE(g_lpSurface);
 	SAFE_DELETE(g_lpBlobRender);
+
 	PS::TheEventLogger::Instance().flush();
 }
 
@@ -253,6 +263,18 @@ int main(int argc, char* argv[])
 	g_lpBlobRender = new GPUPoly();
 	g_lpBlobRender->readModel(strFPModel.cptr());
 	g_lpBlobRender->runTandem(0.1);
+
+
+	//Surface
+    glDisable(GL_TEXTURE_2D);
+	g_lpSurface = new GLSurface(WINDOW_WIDTH, WINDOW_HEIGHT);
+	g_lpSurface->attach();
+    g_lpSurface->test();
+    g_lpSurface->detach();
+
+   // g_lpSurface->saveAsPPM("/home/pourya/Desktop/110.ppm");
+
+
 	glutPostRedisplay();
 
 	

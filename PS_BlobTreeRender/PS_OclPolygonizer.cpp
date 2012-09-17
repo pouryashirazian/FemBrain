@@ -622,7 +622,11 @@ namespace HPC{
 		desc.image_type = CL_MEM_OBJECT_IMAGE2D;
 		desc.image_width = 256;
 		desc.image_height = 1;
+		desc.image_depth = 1;
+		desc.image_array_size = 1;
 		desc.image_row_pitch = 0;
+		desc.num_mip_levels = 0;
+		desc.num_samples = 0;
 		desc.buffer = NULL;
 
 		cl_mem inMemVertexCountTable = clCreateImage(m_lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,

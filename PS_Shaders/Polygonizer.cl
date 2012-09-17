@@ -386,6 +386,8 @@ __kernel void ComputeConfigIndexVertexCount(__global float4* arrInHeader4,
 			idxConfig += (1 << i);
 	}
 	
+	//printf("idxConfig: %d\n", idxConfig);
+	
     // read number of vertices from texture
     U8 ctVertices = read_imageui(texInVertexCountTable, tableSampler, (int2)(idxConfig,0)).x;
 
@@ -571,20 +573,22 @@ __kernel void ComputeMesh(__global float4* arrInHeader4,
 		scale = (ISO_VALUE - arrFields[idxEdgeStart])/(arrFields[idxEdgeEnd] - arrFields[idxEdgeStart]);
 		v = e1 + scale * (e2 - e1);
 
+		
+
 		//printf("v = [%.2f, %.2f, %.2f]\n", v.x, v.y, v.z);
 		//printf("idxCfg = %d, idxEdge = %d, idxEdgeStart = %d, idxEdgeEnd = %d, idxEdgeAxis = %d \n", idxConfig, idxEdge, idxEdgeStart, idxEdgeEnd, idxEdgeAxis);
 
 		n = ComputeNormal(0, v, arrInOps4, arrInPrims4, arrInMtxNode4);
 
 		//MeshAttrib index
-		idxMeshAttrib = voffset + i; 
+		idxMeshAttrib = voffset + i;
+		 
 		arrOutMeshVertex[idxMeshAttrib] = v;
-		//arrOutMeshColor[idxMeshAttrib] = ComputePrimitiveColor(0, arrInPrims4);
-		arrOutMeshColor[idxMeshAttrib] = (float4)(1,0,0,1);
+		arrOutMeshColor[idxMeshAttrib] = ComputePrimitiveColor(0, arrInPrims4);
+		//arrOutMeshColor[idxMeshAttrib] = (float4)(1,0,0,1);
 		arrOutMeshNormal[idxMeshAttrib * 3] = n.x;
 		arrOutMeshNormal[idxMeshAttrib * 3 + 1] = n.y;
 		arrOutMeshNormal[idxMeshAttrib * 3 + 2] = n.z;
-		printf("n = [%.2f, %.2f, %.2f] \n", n.x, n.y, n.z); 
-	//	printf("n = [%.2f, %.2f, %.2f, %.2f] \n", n.x, n.y, n.z, n.w); 
+	//	printf("n = [%.2f, %.2f, %.2f] \n", n.x, n.y, n.z);  
 	}
 }

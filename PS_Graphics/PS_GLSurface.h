@@ -4,6 +4,7 @@
 */
 #include "../PS_Base/PS_MathBase.h"
 #include "PS_PixelMap.h"
+//#include <GL/glew.h>
 
 #define DEFAULT_SURFACE_WIDTH 512
 #define DEFAULT_SURFACE_HEIGHT 512
@@ -14,7 +15,6 @@ public:
 	GLSurface(U32 w, U32 h);
 	~GLSurface();
 
-	void init(U32 w, U32 h);
 	void cleanup();
 
 	//Attach surface to the render buffer target of the pipeline
@@ -32,9 +32,14 @@ public:
 	*  Draws the output texture as a quad
 	*/
 	void drawAsQuad();
+
 private:
-	U32 m_glTexture;
-	U32 m_glFBO;
+	void init(U32 w, U32 h);
+	void initTextures(U32 w, U32 h);
+
+private:
+	U32 m_glTex[2];
+	U32 m_glFBO[2];
 	U32 m_glRBO;
 
 	U32 m_width;
