@@ -8,8 +8,8 @@
 #define PS_OCLPOLYGONIZER_H
 
 #include "PS_PolyMemManager.h"
-#include "PS_ComputeDevice.h"
-#include "PS_VectorMath.h"
+#include "../PS_Graphics/PS_ComputeDevice.h"
+#include "../PS_Graphics/PS_VectorMath.h"
 
 using namespace PS::SIMDPOLY;
 using namespace PS::HPC;
@@ -79,7 +79,7 @@ private:
 	void init();
 
 private:
-	typedef struct CellParam{
+    struct CellParam{
 		U8 corner1[12];
 		U8 corner2[12];
 		U8 edgeaxis[12];

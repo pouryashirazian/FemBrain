@@ -2,13 +2,13 @@
 #define PS_COMPUTEDEVICE_H
 #include <vector>
 #include <string>
-#include "PS_MathBase.h"
+#include "../PS_Base/PS_MathBase.h"
 
 #ifdef PS_OS_WINDOWS
 	#include <CL/cl.h>
 	#include <CL/cl_gl.h>
 	#include <CL/cl_ext.h>
-#else defined(PS_OS_LINUX)
+#elif defined(PS_OS_LINUX)
 	#include <CL/opencl.h>
 	#include <GL/glxew.h>
 #endif

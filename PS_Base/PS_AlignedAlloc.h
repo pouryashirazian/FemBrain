@@ -1,4 +1,5 @@
 #include "PS_MathBase.h"
+#include <malloc.h>
 
 #ifndef PS_L1_CACHE_LINE_SIZE
 	#define PS_L1_CACHE_LINE_SIZE 64

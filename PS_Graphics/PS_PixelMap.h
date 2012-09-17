@@ -4,7 +4,7 @@
 #include <iostream>
 #include <fstream>
 #include <math.h>
-#include "PS_MathBase.h"
+#include "../PS_Base/PS_MathBase.h"
 
 using namespace std;
 

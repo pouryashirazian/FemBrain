@@ -7,8 +7,8 @@
 #include "tbb/task_scheduler_observer.h"
 #include "tbb/tick_count.h"
 
-#include "PS_VectorMath.h"
-#include "PS_SIMDVecN.h"
+#include "../PS_Graphics/PS_VectorMath.h"
+#include "../PS_Graphics/PS_SIMDVecN.h"
 
 namespace PS{
 namespace SIMDPOLY{

@@ -8,8 +8,8 @@
 #ifndef PS_READSCENEMODEL_H_
 #define PS_READSCENEMODEL_H_
 
-#include "PS_SketchConfig.h"
-#include "PS_FileDirectory.h"
+#include "../PS_Graphics/PS_SketchConfig.h"
+#include "../PS_Base/PS_FileDirectory.h"
 #include "PS_PolyMemManager.h"
 
 using namespace PS::MATHSIMD;

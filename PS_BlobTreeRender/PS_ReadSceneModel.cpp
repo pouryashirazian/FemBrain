@@ -5,8 +5,8 @@
  *      Author: pourya
  */
 #include "PS_ReadSceneModel.h"
-#include "PS_MATRIX4.h"
-#include "PS_String.h"
+#include "../PS_Graphics/PS_MATRIX4.h"
+#include "../PS_Base/PS_String.h"
 #include <list>
 
 using namespace PS;

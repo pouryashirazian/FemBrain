@@ -1,8 +1,8 @@
 #include <assert.h>
 #include "PS_Polygonizer.h"
 #include "_CellConfigTable.h"
-#include "PS_SIMDVecN.h"
-#include "PS_MATRIX4.h"
+#include "../PS_Graphics/PS_SIMDVecN.h"
+#include "../PS_Graphics/PS_MATRIX4.h"
 
 //#include "PS_KDTree.h"
 //#include "stdio.h"

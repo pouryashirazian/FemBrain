@@ -1,6 +1,6 @@
 #include "PS_ComputeDevice.h"
-#include "PS_ErrorManager.h"
-#include "PS_Logger.h"
+#include "../PS_Base/PS_ErrorManager.h"
+#include "../PS_Base/PS_Logger.h"
 #include <iostream>
 #include <fstream>
 
@@ -543,7 +543,7 @@ void ComputeDevice::printInfo()
 		cerr << "Error: Failed to get CL_DEVICE_GLOBAL_MEM_SIZE" << endl;
 		return;
 	}
-	sprintf(buffer, "Global memory size = %u MB", (szMem >> 20));
+	sprintf(buffer, "Global memory size = %u MB", (U32)(szMem >> 20));
 	cout << buffer << endl;
 
 	//Max local memory size
@@ -552,7 +552,7 @@ void ComputeDevice::printInfo()
 		cerr << "Error: Failed to get CL_DEVICE_LOCAL_MEM_SIZE" << endl;
 		return;
 	}
-	sprintf(buffer, "Local memory size = %u Bytes", szMem);
+	sprintf(buffer, "Local memory size = %u Bytes", (U32)szMem);
 	cout << buffer << endl;
 
 	//Max workgroup size

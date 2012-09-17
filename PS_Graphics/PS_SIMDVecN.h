@@ -2,7 +2,7 @@
 #define PS_SIMDVECN_H
 
 //#include "PS_VectorMath.h"
-#include "PS_AlignedAlloc.h"
+#include "../PS_Base/PS_AlignedAlloc.h"
 #include <malloc.h>
 
 #if defined(PS_OS_WINDOWS)

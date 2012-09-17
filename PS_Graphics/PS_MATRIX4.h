@@ -9,6 +9,7 @@
 #define PS_MATRIX4_H_
 
 #include "PS_VectorMath.h"
+#include <cstring>
 
 namespace PS{
 namespace FUNCTIONALMATH{
@@ -91,7 +92,6 @@ inline MAT44 mat4Mult(const MAT44& m1, const MAT44& m2)
 				*/
 
 	MAT44 result;
-
 	memset(result.e, 0, sizeof(float)*16);
 	for(int i=0; i<4; i++ )
 		for(int j=0; j<4; j++ )

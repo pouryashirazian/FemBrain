@@ -3,7 +3,7 @@
 #define PS_SKETCHCONFIG_H
 
 #include <vector>
-#include "PS_AppConfig.h"
+#include "../PS_Base/PS_AppConfig.h"
 #include "PS_VectorMath.h"
 using namespace PS::FUNCTIONALMATH;
 using namespace std;

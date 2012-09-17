@@ -5,10 +5,9 @@
  *      Author: pourya
  */
 #include "PS_OclPolygonizer.h"
-#include "PS_OclScan.h"
-
-#include "PS_FileDirectory.h"
-#include "PS_Logger.h"
+#include "../PS_Graphics/PS_OclScan.h"
+#include "../PS_Base/PS_FileDirectory.h"
+#include "../PS_Base/PS_Logger.h"
 #include "PS_ReadSceneModel.h"
 #include "_CellConfigTable.h"
 #include "_CellConfigTableCompact.h"
@@ -416,6 +415,25 @@ namespace HPC{
 		imageFormat.image_channel_data_type = CL_UNSIGNED_INT8;
 
 		//Vertex Count Table
+#ifdef CL_API_SUFFIX__VERSION_1_2
+		cl_int errNum;
+		cl_image_desc desc;
+		desc.image_type = CL_MEM_OBJECT_IMAGE2D;
+		desc.image_width = 256;
+		desc.image_height = 1;
+		desc.image_row_pitch = 0;
+		desc.buffer = NULL;
+
+		cl_mem inMemVertexCountTable = clCreateImage(m_lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+					  	  	  	  	  	     &imageFormat, &desc, (void*) g_numVerticesTableCompact, &errNum );
+		if(errNum != CL_SUCCESS)
+			return ERR_GPUPOLY_TRITABLE_NOT_READ;
+
+		desc.image_width = 16;
+		desc.image_height = 256;
+		cl_mem inMemTriTable = clCreateImage(m_lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+													&imageFormat, &desc, (void*) g_triTableCompact, &errNum);
+#else
 		cl_int errNum;		
 		cl_mem inMemVertexCountTable = clCreateImage2D(m_lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
 													   &imageFormat, 256, 1, 0, (void*) g_numVerticesTableCompact, &errNum);
@@ -427,7 +445,7 @@ namespace HPC{
 											   &imageFormat, 16, 256, 0, (void*) g_triTableCompact, &errNum);
 		if(errNum != CL_SUCCESS)					
 			return ERR_GPUPOLY_TRITABLE_NOT_READ;
-
+#endif
 		//Input Pos
 		cl_mem outMemCellConfig;
 		cl_mem outMemVertexCount;
@@ -598,8 +616,26 @@ namespace HPC{
 		imageFormat.image_channel_order = CL_R;
 		imageFormat.image_channel_data_type = CL_UNSIGNED_INT8;
 
-		//Vertex Count Table
-		cl_int errNum;		
+#ifdef CL_API_SUFFIX__VERSION_1_2
+		cl_int errNum;
+		cl_image_desc desc;
+		desc.image_type = CL_MEM_OBJECT_IMAGE2D;
+		desc.image_width = 256;
+		desc.image_height = 1;
+		desc.image_row_pitch = 0;
+		desc.buffer = NULL;
+
+		cl_mem inMemVertexCountTable = clCreateImage(m_lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+					  	  	  	  	  	     &imageFormat, &desc, (void*) g_numVerticesTableCompact, &errNum );
+		if(errNum != CL_SUCCESS)
+			return ERR_GPUPOLY_TRITABLE_NOT_READ;
+
+		desc.image_width = 16;
+		desc.image_height = 256;
+		cl_mem inMemTriTable = clCreateImage(m_lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+													&imageFormat, &desc, (void*) g_triTableCompact, &errNum);
+#else
+		cl_int errNum;
 		cl_mem inMemVertexCountTable = clCreateImage2D(m_lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
 													   &imageFormat, 256, 1, 0, (void*) g_numVerticesTableCompact, &errNum);
 		if(errNum != CL_SUCCESS)
@@ -608,8 +644,9 @@ namespace HPC{
 		//Triangle Count Table
 		cl_mem inMemTriTable = clCreateImage2D(m_lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
 											   &imageFormat, 16, 256, 0, (void*) g_triTableCompact, &errNum);
-		if(errNum != CL_SUCCESS)					
+		if(errNum != CL_SUCCESS)
 			return ERR_GPUPOLY_TRITABLE_NOT_READ;
+#endif
 
 		//Input Pos
 		cl_mem inoutMemCellConfig;

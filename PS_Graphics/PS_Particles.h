@@ -2,7 +2,7 @@
 #define PS_PARTICLES_H
 
 #include "PS_ComputeDevice.h"
-#include "PS_MathBase.h"
+#include "../PS_Base/PS_MathBase.h"
 #include "PS_VectorMath.h"
 #include "PS_MATRIX4.h"
 #include <vector>

@@ -6,7 +6,7 @@
  */
 #include "PS_PolyMemManager.h"
 #include "PS_ReadSceneModel.h"
-#include "PS_MATRIX4.h"
+#include "../PS_Graphics/PS_MATRIX4.h"
 
 #include <vector>
 #include <GL/glew.h>

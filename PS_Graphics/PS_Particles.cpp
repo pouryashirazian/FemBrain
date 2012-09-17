@@ -1,7 +1,7 @@
 #include "PS_Particles.h"
 #include <GL/glew.h>
 
-#include "PS_FileDirectory.h"
+#include "../PS_Base/PS_FileDirectory.h"
 
 using namespace PS::FILESTRINGUTILS;
 

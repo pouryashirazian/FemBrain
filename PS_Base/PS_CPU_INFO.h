@@ -17,8 +17,6 @@
 
 #define MAX_CACHE_INFO_LENGTH 5
 #define MAX_CACHE_LEVEL 3
-enum CACHE_TYPE {ctNone, ctData, ctInstruction, ctUnified};
-
 
 #define OSXSAVEFlag (1UL<<27)
 #define AVXFlag     ((1UL<<28)|OSXSAVEFlag)
@@ -57,6 +55,8 @@ inline bool SimdDetectFeature(U32 idFeature)
  */
 class ProcessorInfo{
 public:
+	enum CACHE_TYPE {ctNone, ctData, ctInstruction, ctUnified};
+
 	
 	ProcessorInfo() { getAllInfo();}
 	~ProcessorInfo() {}

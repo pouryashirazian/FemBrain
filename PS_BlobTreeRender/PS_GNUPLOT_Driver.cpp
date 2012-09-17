@@ -8,7 +8,7 @@
 #include <string.h>
 #include <limits.h>
 #include "PS_GNUPLOT_Driver.h"
-#include "PS_FileDirectory.h"
+#include "../PS_Base/PS_FileDirectory.h"
 using namespace PS;
 using namespace PS::FILESTRINGUTILS;
 

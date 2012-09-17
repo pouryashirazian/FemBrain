@@ -9,7 +9,7 @@
 #define PS_GLFUNCS_H_
 
 #include <string>
-#include "PS_MathBase.h"
+#include "../PS_Base/PS_MathBase.h"
 
 
 using namespace std;

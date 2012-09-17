@@ -1,6 +1,6 @@
 #include "PS_OclScan.h"
-#include "PS_FileDirectory.h"
-#include "PS_ErrorManager.h"
+#include "../PS_Base/PS_FileDirectory.h"
+#include "../PS_Base/PS_ErrorManager.h"
 
 using namespace PS;
 using namespace PS::FILESTRINGUTILS;

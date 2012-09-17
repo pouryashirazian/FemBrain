@@ -1,16 +1,17 @@
 #include <GL/glew.h>
 #include <GL/freeglut.h>
 #include <iostream>
-#include "PS_MathBase.h"
-#include "PS_Logger.h"
+
 #include <string>
 #include <fstream>
-#include "PS_OclPolygonizer.h"
-#include "PS_Particles.h"
-#include "PS_ArcBallCamera.h"
+
+#include "PS_Base/PS_MathBase.h"
+#include "PS_Base/PS_Logger.h"
 #include "PS_Base/PS_FileDirectory.h"
 #include "PS_BlobTreeRender/PS_OclPolygonizer.h"
+#include "PS_Graphics/PS_ArcBallCamera.h"
 #include "PS_Graphics/PS_GLFuncs.h"
+
 
 using namespace std;
 using namespace PS;
@@ -39,10 +40,12 @@ public:
 
 //Global Variables
 PS::CArcBallCamera g_arcBallCam;
-PS::HPC::Particles* g_lpParticles = NULL;
 PS::HPC::GPUPoly* g_lpBlobRender = NULL;
 AppSettings g_appSettings;
 GLuint g_uiShader;
+
+//Function Prototype
+void Draw();
 
 //Vertex Shader Code
 const char * g_lpVertexShaderCode = 
@@ -68,7 +71,7 @@ const char* g_lpFragShaderCode =
 	"gl_FragColor = gl_FrontLightModelProduct.sceneColor + Iamb + Idif + Ispec;	}";
 
 ////////////////////////////////////////////////////////////////////////////////////////
-void Display()
+void Draw()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glMatrixMode(GL_MODELVIEW);
@@ -195,7 +198,7 @@ int main(int argc, char* argv[])
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
 	glutInitWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
 	glutCreateWindow("FEM Hydrocephalus Surgery Simulation");
-	glutDisplayFunc(Display);
+	glutDisplayFunc(Draw);
 	glutReshapeFunc(Resize);
 	glutMouseFunc(MousePress);
 	glutMotionFunc(MouseMove);

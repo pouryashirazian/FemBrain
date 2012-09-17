@@ -1,9 +1,9 @@
 #ifndef PS_VECTORMATH_H
 #define PS_VECTORMATH_H
 
-#include "PS_MathBase.h"
 #include <iostream>
 #include <algorithm>
+#include "../PS_Base/PS_MathBase.h"
 
 namespace PS{
 namespace FUNCTIONALMATH{

@@ -1,5 +1,5 @@
 #include "PS_GLSurface.h"
-#include "PS_Logger.h"
+#include "../PS_Base/PS_Logger.h"
 #include <GL/glew.h>
 
 using namespace PS::RASTER;

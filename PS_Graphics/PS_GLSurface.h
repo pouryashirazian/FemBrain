@@ -2,7 +2,7 @@
 * When programming for GPGPU there are times when you need to pass the result one rendering step to
 * the next step. GLSurface is an interface for rendering to a texture
 */
-#include "PS_MathBase.h"
+#include "../PS_Base/PS_MathBase.h"
 #include "PS_PixelMap.h"
 
 #define DEFAULT_SURFACE_WIDTH 512

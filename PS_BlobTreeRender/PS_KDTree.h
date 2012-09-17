@@ -8,7 +8,7 @@
 #ifndef PS_KDTREE_H_
 #define PS_KDTREE_H_
 
-#include "PS_SIMDVecN.h"
+#include "../PS_Graphics/PS_SIMDVecN.h"
 #include "PS_Polygonizer.h"
 
 #define MAX_BVH_NODES 256
