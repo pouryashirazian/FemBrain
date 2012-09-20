@@ -350,7 +350,8 @@ namespace HPC{
 		assert(lpProgram != NULL);
 
 		//Build Kernel
-		m_lpKernelComputeConfig = lpProgram->addKernel("ComputeConfigIndexVertexCount");
+		LogInfo("3.Setup Kernel Functions.");
+		//m_lpKernelComputeConfig = lpProgram->addKernel("ComputeConfigIndexVertexCount");
 		m_lpKernelComputeConfig = lpProgram->addKernel("ComputeConfig");
 		m_lpKernelComputeMesh = lpProgram->addKernel("ComputeMesh");
 	}
@@ -729,7 +730,8 @@ namespace HPC{
 											3, NULL, szNeeded, NULL, 0, NULL, NULL);
 		if (err) {
 			char buffer[1024];
-			sprintf(buffer, "Error: Failed to execute kernel! (%s)", ComputeDevice::oclErrorString(err));
+			sprintf(buffer, "Error: Failed to execute ComputeConfig kernel! (%s)", ComputeDevice::oclErrorString(err));
+			LogError(buffer);
 			cerr << buffer << endl;
 			return EXIT_FAILURE;
 		}
@@ -820,7 +822,8 @@ namespace HPC{
 									 3, NULL, szNeeded, NULL, 0, NULL, NULL);
 		if (err) {
 			char buffer[1024];
-			sprintf(buffer, "Error: Failed to execute kernel! (%s)", ComputeDevice::oclErrorString(err));
+			sprintf(buffer, "Error: Failed to execute ComputeMesh kernel! (%s)", ComputeDevice::oclErrorString(err));
+			psLog(buffer);
 			cerr << buffer << endl;
 			return EXIT_FAILURE;
 		}

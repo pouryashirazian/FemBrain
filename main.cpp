@@ -25,17 +25,24 @@ using namespace PS::HPC;
 #define ZNEAR 0.1
 #define ZFAR 3000
 
+//Application Settings
 class AppSettings{
 public:
+
+	//Set to default values in constructor
 	AppSettings(){
 		this->bDrawWireFrame = false;
 		this->bPanCamera = false;
+		this->bShowElements = false;
 		this->pan = svec2f(0.0f, 0.0f); 
 	}
 
 public:
 	bool bPanCamera;
 	bool bDrawWireFrame;
+	bool bShowElements;
+
+
 	svec2f pan;
 };
 
@@ -76,7 +83,7 @@ const char* g_lpFragShaderCode =
 ////////////////////////////////////////////////////////////////////////////////////////
 void Draw()
 {
-	/*
+
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
@@ -96,10 +103,6 @@ void Draw()
 	}
 
 	glUseProgram(0);
-*/
-
-	g_lpSurface->drawAsQuad();
-	//g_lpSurface->test();
 
 	glutSwapBuffers();
 }
@@ -192,6 +195,13 @@ void Keyboard(int key, int x, int y)
 			break;
 		}
 
+		case(GLUT_KEY_F11):
+		{
+			printf("Exiting...\n");
+			glutLeaveMainLoop();
+			break;
+		}
+
 	}
 
 	glutPostRedisplay();
@@ -266,11 +276,13 @@ int main(int argc, char* argv[])
 
 
 	//Surface
+	/*
     glDisable(GL_TEXTURE_2D);
 	g_lpSurface = new GLSurface(WINDOW_WIDTH, WINDOW_HEIGHT);
 	g_lpSurface->attach();
-    g_lpSurface->test();
+    g_lpSurface->testDrawTriangle();
     g_lpSurface->detach();
+    */
 
    // g_lpSurface->saveAsPPM("/home/pourya/Desktop/110.ppm");
 

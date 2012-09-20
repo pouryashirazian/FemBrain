@@ -124,7 +124,7 @@ void GLSurface::detach()
 	glBindRenderbuffer(GL_RENDERBUFFER, 0);
 }
 
-void GLSurface::test()
+void GLSurface::testDrawTriangle()
 {
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();

@@ -434,7 +434,9 @@ __kernel void ComputeConfigIndexVertexCount(__global float4* arrInHeader4,
 }
 
 
-
+/*!
+ *  Compute the cell configuration by evaluating the field at 8 vertices of the cube.
+ */
 __kernel void ComputeConfig(__global float4* arrInHeader4,
 							__global float4* arrInOps4,										 
 							__global float4* arrInPrims4,											 
@@ -478,7 +480,7 @@ __kernel void ComputeConfig(__global float4* arrInHeader4,
 			idxConfig += (1 << i);
 	}
 	
-    // read number of vertices from texture
+    //read number of vertices that output from this cell
     U8 ctVertices = read_imageui(texInVertexCountTable, tableSampler, (int2)(idxConfig,0)).x;
 
 	//Cell-based output											
@@ -486,7 +488,9 @@ __kernel void ComputeConfig(__global float4* arrInHeader4,
 	arrOutVertexCount[idxCell] = ctVertices;
 }
 
-//Compute Mesh
+/*
+ * Extract mesh by computing its vertices
+ */
 __kernel void ComputeMesh(__global float4* arrInHeader4,
 						  __global float4* arrInOps4,										 
 						  __global float4* arrInPrims4,											 
@@ -571,9 +575,10 @@ __kernel void ComputeMesh(__global float4* arrInHeader4,
 		else
 			e2.z += cellsize;
 		scale = (ISO_VALUE - arrFields[idxEdgeStart])/(arrFields[idxEdgeEnd] - arrFields[idxEdgeStart]);
-		v = e1 + scale * (e2 - e1);
-
 		
+		//Use Linear Interpolation for now. Upgrade to Newton-Raphson (Gradient Marching)
+		v = e1 + scale * (e2 - e1);
+	
 
 		//printf("v = [%.2f, %.2f, %.2f]\n", v.x, v.y, v.z);
 		//printf("idxCfg = %d, idxEdge = %d, idxEdgeStart = %d, idxEdgeEnd = %d, idxEdgeAxis = %d \n", idxConfig, idxEdge, idxEdgeStart, idxEdgeEnd, idxEdgeAxis);
@@ -585,7 +590,6 @@ __kernel void ComputeMesh(__global float4* arrInHeader4,
 		 
 		arrOutMeshVertex[idxMeshAttrib] = v;
 		arrOutMeshColor[idxMeshAttrib] = ComputePrimitiveColor(0, arrInPrims4);
-		//arrOutMeshColor[idxMeshAttrib] = (float4)(1,0,0,1);
 		arrOutMeshNormal[idxMeshAttrib * 3] = n.x;
 		arrOutMeshNormal[idxMeshAttrib * 3 + 1] = n.y;
 		arrOutMeshNormal[idxMeshAttrib * 3 + 2] = n.z;

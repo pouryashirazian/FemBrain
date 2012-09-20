@@ -23,9 +23,12 @@ public:
 	//Detach surface from the render buffer target
 	void detach();
 
-	//
-	void test();
+	//Draw a triangle in orthographic projects for testing the surface
+	void testDrawTriangle();
 
+	/*!
+	 * Save the surface as a ppm image
+	 */
 	void saveAsPPM(const char* lpFilePath);
 
 	/*!
@@ -33,6 +36,10 @@ public:
 	*/
 	void drawAsQuad();
 
+
+	U32 texture() const { return m_glTex[0];}
+	U32 width() const {return m_width;}
+	U32 height() const {return m_height;}
 private:
 	void init(U32 w, U32 h);
 	void initTextures(U32 w, U32 h);
