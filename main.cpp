@@ -12,18 +12,19 @@
 #include "PS_Graphics/PS_ArcBallCamera.h"
 #include "PS_Graphics/PS_GLFuncs.h"
 #include "PS_Graphics/PS_GLSurface.h"
-
+#include "PS_Deformable/PS_Deformable.h"
 
 using namespace std;
 using namespace PS;
 using namespace PS::FILESTRINGUTILS;
 using namespace PS::HPC;
 
-#define WINDOW_WIDTH 1024
-#define WINDOW_HEIGHT 768
-#define FOVY 60.0
-#define ZNEAR 0.1
-#define ZFAR 3000
+#define WINDOW_WIDTH 800
+#define WINDOW_HEIGHT 600
+#define FOVY 45.0
+#define ZNEAR 0.01
+#define ZFAR 100.0
+#define DEFAULT_TIMER_MILLIS 33
 
 //Application Settings
 class AppSettings{
@@ -34,29 +35,45 @@ public:
 		this->bDrawWireFrame = false;
 		this->bPanCamera = false;
 		this->bShowElements = false;
-		this->pan = svec2f(0.0f, 0.0f); 
+		this->pan = svec2f(0.0f, 0.0f);
+		this->millis = DEFAULT_TIMER_MILLIS;
 	}
 
 public:
 	bool bPanCamera;
 	bool bDrawWireFrame;
 	bool bShowElements;
-
+	U32   millis;
+	int appWidth;
+	int appHeight;
 
 	svec2f pan;
 };
 
 //Global Variables
-PS::CArcBallCamera g_arcBallCam;
+PS::ArcBallCamera g_arcBallCam;
 PS::HPC::GPUPoly* g_lpBlobRender = NULL;
+Deformable* g_lpDeformable = NULL;
+
+std::string g_strLine1;
+std::string g_strLine2;
 
 GLSurface* g_lpSurface = NULL;
 AppSettings g_appSettings;
 GLuint g_uiShader;
 
+////////////////////////////////////////////////
 //Function Prototype
 void Draw();
+void Resize(int w, int h);
+void TimeStep(int t);
+void MousePress(int button, int state, int x, int y);
+void MouseMove(int x, int y);
+void MouseWheel(int button, int dir, int x, int y);
 
+void Keyboard(int key, int x, int y);
+void DrawText(const char* chrText, int x, int y);
+////////////////////////////////////////////////
 //Vertex Shader Code
 const char * g_lpVertexShaderCode = 
 	"varying vec3 N;"
@@ -83,28 +100,66 @@ const char* g_lpFragShaderCode =
 ////////////////////////////////////////////////////////////////////////////////////////
 void Draw()
 {
-
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
 	//Render
+	g_arcBallCam.look();
+
+	//glTranslatef(0,0,10);
+	/*
 	glTranslatef(g_appSettings.pan.x, g_appSettings.pan.y, 0.0f);
 	svec3f p = g_arcBallCam.getCoordinates();
 	svec3f c = g_arcBallCam.getCenter();
 	gluLookAt(p.x, p.y, p.z, c.x, c.y, c.z, 0.0f, 1.0f, 0.0f);
-	
+	*/
 	//Use Shader Effect
+	/*
 	glUseProgram(g_uiShader);
 	if(g_lpBlobRender)
 	{
 		g_lpBlobRender->drawBBox();
 		g_lpBlobRender->drawMesh(g_appSettings.bDrawWireFrame);
 	}
-
 	glUseProgram(0);
+	*/
+	g_lpDeformable->draw();
+	{
+		char chrMsg[1024];
+		sprintf(chrMsg,"Camera [Roll=%.1f, Tilt=%.1f, PanX=%.2f, PanY=%.2f",
+				g_arcBallCam.getRoll(),
+				g_arcBallCam.getTilt(),
+				g_arcBallCam.getPan().x,
+				g_arcBallCam.getPan().y);
+		DrawText(chrMsg, 10, 20);
+	}
 
 	glutSwapBuffers();
+}
+
+void DrawText(const char* chrText, int x, int y)
+{
+	//GLint vp[4];
+	//glGetIntegerv(GL_VIEWPORT, vp);
+
+	glMatrixMode(GL_PROJECTION);
+	glPushMatrix();
+	glLoadIdentity();
+	//glOrtho(0, vp[2], 0, vp[3], -1, 1);
+
+
+	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
+	glLoadIdentity();
+
+	float clFont[] = { 1, 0, 0, 1 };
+	DrawString(chrText, x, WINDOW_HEIGHT - y, clFont, GLUT_BITMAP_9_BY_15);
+
+	glMatrixMode(GL_MODELVIEW);
+	glPopMatrix();
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
 }
 
 void Resize(int w, int h)
@@ -120,22 +175,54 @@ void Resize(int w, int h)
 
 void MousePress(int button, int state, int x, int y)
 {
-	if(state == GLUT_DOWN)
-		g_arcBallCam.mousePress((PS::CArcBallCamera::MOUSEBUTTONSTATE)button, x, y);
-	else
-		g_arcBallCam.mousePress(PS::CArcBallCamera::mbMiddle, x, y);
+	if(button == GLUT_RIGHT_BUTTON)
+	{
+		if(state == GLUT_UP)
+		{
+			GLdouble model[16];
+			glGetDoublev (GL_MODELVIEW_MATRIX, model);
+
+			GLdouble proj[16];
+			glGetDoublev (GL_PROJECTION_MATRIX, proj);
+
+			GLint view[4];
+			glGetIntegerv (GL_VIEWPORT, view);
+
+			int winX = x;
+			int winY = view[3] - 1 - y;
+
+			float zValue;
+			glReadPixels(winX, winY, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &zValue);
+
+			GLubyte stencilValue;
+			glReadPixels(winX, winY, 1, 1, GL_STENCIL_INDEX, GL_UNSIGNED_BYTE, &stencilValue);
+
+			GLdouble worldX, worldY, worldZ;
+			gluUnProject(winX, winY, zValue, model, proj, view,
+						   &worldX, &worldY, &worldZ);
+
+			if (stencilValue == 1) {
+				//dragStartX = x;
+				//dragStartY = y;
+				//Vec3d pos(worldX, worldY, worldZ);
+				g_lpDeformable->toggleVertex(worldX, worldY, worldZ);
+			}
+		}
+	}
+
+	//Camera
+	g_arcBallCam.mousePress(button, state, x, y);
 }
 
 void MouseMove(int x, int y)
 {
-	if(g_appSettings.bPanCamera)
-	{
-		g_appSettings.pan.x += (x - g_arcBallCam.getLastPos().x) * 0.03f;
-		g_appSettings.pan.y += (g_arcBallCam.getLastPos().y - y) * 0.03f;
-		g_arcBallCam.setLastPos(svec2i(x, y));
-	}
-	else
-		g_arcBallCam.mouseMove(x, y);
+	g_arcBallCam.mouseMove(x, y);
+	glutPostRedisplay();
+}
+
+void MouseWheel(int button, int dir, int x, int y)
+{
+	g_arcBallCam.mouseWheel(button, dir, x, y);
 	glutPostRedisplay();
 }
 
@@ -145,6 +232,7 @@ void Close()
 	cout << "Cleanup Memory objects" << endl;
 	SAFE_DELETE(g_lpSurface);
 	SAFE_DELETE(g_lpBlobRender);
+	SAFE_DELETE(g_lpDeformable);
 
 	PS::TheEventLogger::Instance().flush();
 }
@@ -192,6 +280,12 @@ void Keyboard(int key, int x, int y)
 		case(GLUT_KEY_F2):
 		{
 			g_appSettings.bDrawWireFrame = !g_appSettings.bDrawWireFrame;
+			LogInfoArg1("Draw wireframe mode: %d", g_appSettings.bDrawWireFrame);
+			break;
+		}
+
+		case(GLUT_KEY_F3):
+		{
 			break;
 		}
 
@@ -207,23 +301,34 @@ void Keyboard(int key, int x, int y)
 	glutPostRedisplay();
 }
 
+
+void TimeStep(int t)
+{
+	g_lpDeformable->timestep();
+	glutTimerFunc(g_appSettings.millis, TimeStep, 0);
+}
+
 //Main Loop of Application
 int main(int argc, char* argv[])
 {
 	//Setup the event logger
-	PS::TheEventLogger::Instance().setWriteFlags(PS_LOG_WRITE_EVENTTYPE | PS_LOG_WRITE_TIMESTAMP | PS_LOG_WRITE_SOURCE);
+	PS::TheEventLogger::Instance().setWriteFlags(PS_LOG_WRITE_EVENTTYPE | PS_LOG_WRITE_TIMESTAMP | PS_LOG_WRITE_SOURCE | PS_LOG_WRITE_TO_SCREEN);
+	LogInfo("Starting FemMain Application");
 	
 	//Initialize app
 	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
+	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH | GLUT_STENCIL);
 	glutInitWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
-	glutCreateWindow("FEM Hydrocephalus Surgery Simulation");
+	glutCreateWindow("FEM Hydrocephalus Surgery Simulation - PhD Project - Pourya Shirazian");
 	glutDisplayFunc(Draw);
 	glutReshapeFunc(Resize);
 	glutMouseFunc(MousePress);
 	glutMotionFunc(MouseMove);
+	glutMouseWheelFunc(MouseWheel);
+
 	glutSpecialFunc(Keyboard);
 	glutCloseFunc(Close);
+	glutTimerFunc(g_appSettings.millis, TimeStep, 0);
 
 	//Print GPU INFO
 	GetGPUInfo();
@@ -243,10 +348,16 @@ int main(int argc, char* argv[])
 	//Enable Lighting
 	glEnable(GL_LIGHTING);
 
-	//Enable features we want to use from OpenGL			
+	//Enable features we want to use from OpenGL
 	glShadeModel(GL_SMOOTH);
+	glEnable(GL_POLYGON_SMOOTH);
+	glEnable(GL_LINE_SMOOTH);
+
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
+	glEnable(GL_STENCIL_TEST);
+	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
 	glClearColor(0.45f, 0.45f, 0.45f, 1.0f);
 
 	//Compiling shaders
@@ -258,18 +369,30 @@ int main(int argc, char* argv[])
 		exit(1);
 	}
 	CompileShaderCode(g_lpVertexShaderCode, g_lpFragShaderCode, g_uiShader);
+
 	
 
 
-	//Run OCL TEST
-	//PS::HPC::Run_SphereDistKernel();
-	//g_lpParticles = new ::Particles(1024);
+	DAnsiStr strDeformableVeg;
+	DAnsiStr strDeformableObj;
+	{
+		strDeformableVeg = ExtractOneLevelUp(ExtractFilePath(GetExePath()));
+		strDeformableVeg += DAnsiStr("AA_Models/beam3/beam3_tet.veg");
+		strDeformableObj = ExtractOneLevelUp(ExtractFilePath(GetExePath()));
+		strDeformableObj += DAnsiStr("AA_Models/beam3/beam3_tet.obj");
+	}
+	g_lpDeformable = new Deformable(strDeformableVeg.cptr(), strDeformableObj.cptr());
+
+
+
+
 	DAnsiStr strFPModel;
 	{
 		strFPModel = ExtractOneLevelUp(ExtractFilePath(GetExePath()));
 		strFPModel += "AA_Models/sphere.txt";
 	}
 
+	//
 	g_lpBlobRender = new GPUPoly();
 	g_lpBlobRender->readModel(strFPModel.cptr());
 	g_lpBlobRender->runTandem(0.1);

@@ -16,7 +16,7 @@ namespace PS{
 
 using namespace PS::FUNCTIONALMATH;
 
-class CArcBallCamera
+class ArcBallCamera
 {
 public:
 	enum MOUSEBUTTONSTATE {mbLeft, mbMiddle, mbRight, mbNone};
@@ -30,58 +30,63 @@ private:
 	//Center point in scene to lookAt
 	svec3f  m_center;
 	svec2i m_lastPos;
+	svec2f m_pan;
 	MOUSEBUTTONSTATE m_mouseButton;
 public:
-
 	//Default Constructor
-	CArcBallCamera();
+	ArcBallCamera();
 
 	//Constructor with valid values
-	CArcBallCamera(float o, float p, float r);
+	ArcBallCamera(float o, float p, float r);
 
-	//Access to member variables of this class
-	const float getHorizontalAngle() const {return m_omega;}
-	const float getVerticalAngle() const {return m_phi;}
-	const float getCurrentZoom() const {return m_rho;}
-	svec3f getOrigin() {return m_origin;}
-	svec3f getCenter() {return m_center;}
+	//Look Matrix
+	void look();
 
-	void mousePress(MOUSEBUTTONSTATE btn, int x, int y);
-	void mouseMove(int x, int y);
+	//Roll is the horizontal movement
+	float getRoll() const {return RADTODEG(m_omega);}
+	void setRoll(float rollHDeg);
 
-	//Set our horizontal angle can be any value (Omega)
-	void setHorizontalAngle(float o);
+	//Tilt is the vertical movement
+	float getTilt() const {return RADTODEG(m_phi);}
+	void setTilt(float tiltVDeg);
 
-	//Set our vertical angle. This is clamped between 0 and 180
-	void setVerticalAngle(float p);
-
-	//Zoom or CCamera distance from scene is clamped.
+	//Zoom
+	float getCurrentZoom() const {return m_rho;}
 	void setZoom(float r);
 
-	//Set Origin
+	//Pan
+	svec2f getPan() const { return m_pan;}
+	void setPan(const svec2f& pan) { m_pan = pan;}
+
+	//Origin position
+	svec3f getOrigin() {return m_origin;}
 	void setOrigin(const svec3f& org) { m_origin = org;}
 
-	//Set Center point inside scene
+	//Center Position
+	svec3f getCenter() {return m_center;}
 	void setCenter(const svec3f& c) {m_center = c;}
 
+
+	//Handle Mouse Events
+	void mousePress(int button, int state, int x, int y);
+	void mouseMove(int x, int y);
+	void mouseWheel(int button, int dir, int x, int y);
+
+
 	//convert spherical coordinates to Eulerian values
-	svec3f getCoordinates() const;
+	svec3f getPos() const;
 
 	//Return Current CCamera Direction
-	svec3f getDirection() const;
+	svec3f getDir() const;
 
 	//Calculate an Up vector
 	svec3f getUp() const;
 
 	svec3f getStrafe() const;
 
-	//Set the last position
-	void setLastPos(const svec2i& lastPos)
-	{
-		m_lastPos = lastPos;
-	}
-
+	//Last position
 	svec2i getLastPos() const {return m_lastPos;}
+	void setLastPos(const svec2i& lastPos) { m_lastPos = lastPos;}
 
 	void goHome();
 };

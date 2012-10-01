@@ -568,7 +568,7 @@ namespace HPC{
 			
 				if((arrConfigIndex[i] != 0)&&(arrConfigIndex[i] != 255))
 				{
-					arrConfigIndex[i] = arrConfigIndex[i];
+					//arrConfigIndex[i] = arrConfigIndex[i];
 					ctFilled ++;
 				}
 			}
