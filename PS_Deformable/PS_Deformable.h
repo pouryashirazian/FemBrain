@@ -17,6 +17,7 @@
 #include "generateMassMatrix.h"
 #include "implicitBackwardEulerSparse.h"
 #include "sceneObjectDeformable.h"
+#include "graph.h"
 
 using namespace std;
 
@@ -35,12 +36,33 @@ public:
 	void draw();
 	void timestep();
 
-	//Toggles a vertex state
-	void toggleVertex(double worldX, double worldY, double worldZ);
+	//Pick a vertex
+	bool pickFreeVertex(double worldX, double worldY, double worldZ);
+
+	//Haptic Interaction
+	void hapticStart();
+	void hapticEnd();
+	bool hapticUpdate();
+	void hapticSetCurrentForce(double extForce[3]);
+
+	bool isHapticInProgress() const {return m_bHapticForceInProgress;}
+
+
+	//Render
+	bool renderVertices() const {return m_bRenderVertices;}
+	void setRenderVertices(bool bRender) { m_bRenderVertices = bRender;}
+
 
 private:
 	void computeConstrainedDof(std::vector<int>& vArrOutputDof);
 private:
+	bool m_bHapticForceInProgress;
+	double m_hapticCompliance;
+	double m_hapticExtForce[3];
+	int m_hapticForceNeighorhoodSize;
+	Graph* m_lpMeshGraph;
+	//double* m_lpHapticForces;
+
 	GLMeshBuffer m_meshBuffer;
 
 	//Tetrahedra input mesh
@@ -73,7 +95,7 @@ private:
 	int m_idxPulledVertex;
 
 	bool m_bRenderFixedVertices;
-
+	bool m_bRenderVertices;
 };
 
 #endif /* PS_DEFORMABLE_H_ */

@@ -43,12 +43,15 @@ struct svec4
 ///////////////////////////////////////////////////////////
 typedef svec2<int> svec2i;
 typedef svec2<float> svec2f;
+typedef svec2<double> svec2d;
 
 typedef svec3<int> svec3i;
 typedef svec3<float> svec3f;
+typedef svec3<double> svec3d;
 
 typedef svec4<int> svec4i;
 typedef svec4<float> svec4f;
+typedef svec4<double> svec4d;
 ///////////////////////////////////////////////////////////
 inline bool isBoxInside(const svec3f& aLo, const svec3f& aHi, const svec3f& bLo, const svec3f& bHi)
 {

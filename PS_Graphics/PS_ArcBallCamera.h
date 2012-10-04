@@ -31,6 +31,11 @@ private:
 	svec3f  m_center;
 	svec2i m_lastPos;
 	svec2f m_pan;
+
+	svec3f m_xAxis;
+	svec3f m_yAxis;
+	svec3f m_zAxis;
+
 	MOUSEBUTTONSTATE m_mouseButton;
 public:
 	//Default Constructor
@@ -87,6 +92,11 @@ public:
 	//Last position
 	svec2i getLastPos() const {return m_lastPos;}
 	void setLastPos(const svec2i& lastPos) { m_lastPos = lastPos;}
+
+	//
+	//svec3f convertToWorld(const svec3f& pos);
+	void computeLocalCoordinateSystem();
+	void screenToWorld_OrientationOnly3D(const svec3f& ptScreen, svec3f& ptWorld);
 
 	void goHome();
 };

@@ -137,9 +137,9 @@ void ArcBallCamera::mouseWheel(int button, int dir, int x, int y)
 {
 	//Zoom on Mouse Wheel
 	if(dir > 0)
-		setZoom(m_rho + 1);
+		setZoom(m_rho + 0.5);
 	else
-		setZoom(m_rho - 1);
+		setZoom(m_rho - 0.5);
 }
 
 void ArcBallCamera::look()
@@ -150,5 +150,30 @@ void ArcBallCamera::look()
 	gluLookAt(p.x, p.y, p.z, c.x, c.y, c.z, 0.0f, 1.0f, 0.0f);
 }
 
+void ArcBallCamera::computeLocalCoordinateSystem()
+{
+	m_xAxis.x = - m_rho * sin(m_phi) * cos(m_omega);
+	m_xAxis.y = 0;
+	m_xAxis.z = - m_rho * cos(m_phi) * cos(m_omega);
+
+	m_yAxis.x = - m_rho * cos(m_phi) * sin(m_omega);
+	m_yAxis.y = m_rho * cos(m_omega);
+	m_yAxis.z = m_rho * sin(m_phi) * sin(m_omega);
+
+	m_zAxis = vsub3f(m_origin, m_center);
+
+	vnormalize3f(m_xAxis);
+	vnormalize3f(m_yAxis);
+	vnormalize3f(m_zAxis);
+}
+
+void ArcBallCamera::screenToWorld_OrientationOnly3D(const svec3f& ptScreen, svec3f& ptWorld)
+{
+	computeLocalCoordinateSystem();
+
+	ptWorld = vscale3f(ptScreen.x, m_xAxis);
+	ptWorld = vadd3f(ptWorld, vscale3f(ptScreen.y, m_yAxis));
+	ptWorld = vadd3f(ptWorld, vscale3f(ptScreen.z, m_zAxis));
+}
 
 }

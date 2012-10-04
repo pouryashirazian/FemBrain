@@ -1,9 +1,12 @@
 #include "PS_Deformable.h"
 #include "../PS_Base/PS_Logger.h"
 #include "volumetricMeshLoader.h"
+#include "generateMeshGraph.h"
 #include <algorithm>
 
 #define DEFAULT_TIME_STEP 0.0333
+#define DEFAULT_FORCE_NEIGHBORHOOD_SIZE 5
+
 Deformable::Deformable()
 {
 	//this->setup();
@@ -28,6 +31,8 @@ void Deformable::cleanup()
 
 	SAFE_DELETE(m_lpMassMatrix);
 
+	SAFE_DELETE(m_lpMeshGraph);
+
 	SAFE_DELETE(m_lpDeformableMesh);
 
 	SAFE_DELETE(m_lpDeformableForceModel);
@@ -49,6 +54,14 @@ void Deformable::setup(const char* lpVegFilePath, const char* lpObjFilePath)
 	m_lpDeformableMesh->BuildNeighboringStructure();
 	m_lpDeformableMesh->BuildNormals();
 	m_lpDeformableMesh->SetMaterialAlpha(0.5);
+	m_idxPulledVertex = -1;
+	m_bRenderFixedVertices = true;
+	m_bRenderVertices = false;
+
+	//m_hapticCompliance = 1.0;
+	m_hapticCompliance = 1.0;
+	m_hapticForceNeighorhoodSize = DEFAULT_FORCE_NEIGHBORHOOD_SIZE;
+	m_bHapticForceInProgress = false;
 
 
 	VolumetricMesh * lpVolMesh = VolumetricMeshLoader::load(const_cast<char*>(lpVegFilePath));
@@ -67,6 +80,8 @@ void Deformable::setup(const char* lpVegFilePath, const char* lpObjFilePath)
 	else
 		LogError("Loading mesh failed.");
 
+	//MeshGraph
+	m_lpMeshGraph = GenerateMeshGraph::Generate(m_lpTetMesh);
 
 	//Setup Deformable Model
 	m_lpDeformable = new CorotationalLinearFEM(m_lpTetMesh);
@@ -83,7 +98,22 @@ void Deformable::setup(const char* lpVegFilePath, const char* lpObjFilePath)
 	// With CG, this option is ignored.
 	int positiveDefiniteSolver = 0;
 
-	// constraining vertices 4, 10, 14 (constrained DOFs are specified 0-indexed):
+	//(constrained DOFs are specified 0-indexed):
+	//DISC
+	m_vFixedVertices.push_back(2);
+	m_vFixedVertices.push_back(3);
+	m_vFixedVertices.push_back(4);
+	m_vFixedVertices.push_back(5);
+
+	m_vFixedVertices.push_back(34);
+	m_vFixedVertices.push_back(35);
+	m_vFixedVertices.push_back(36);
+	m_vFixedVertices.push_back(37);
+
+
+
+	/*
+	//BEAM
 	m_vFixedVertices.push_back(206);
 	m_vFixedVertices.push_back(207);
 	m_vFixedVertices.push_back(154);
@@ -93,12 +123,10 @@ void Deformable::setup(const char* lpVegFilePath, const char* lpObjFilePath)
 	m_vFixedVertices.push_back(103);
 	m_vFixedVertices.push_back(50);
 	m_vFixedVertices.push_back(51);
+	*/
 
 	vector<int> vConstainedDofs;
 	computeConstrainedDof(vConstainedDofs);
-
-	m_idxPulledVertex = -1;
-	m_bRenderFixedVertices = true;
 
 	// (tangential) Rayleigh damping
 	// "underwater"-like damping
@@ -129,6 +157,7 @@ void Deformable::setup(const char* lpVegFilePath, const char* lpObjFilePath)
 	m_ctTimeStep = 0;
 }
 
+//Computes constrained dofs based on selected fixed vertices
 void Deformable::computeConstrainedDof(std::vector<int>& vArrFixedDof)
 {
 	if(m_vFixedVertices.size() == 0)
@@ -148,13 +177,17 @@ void Deformable::computeConstrainedDof(std::vector<int>& vArrFixedDof)
 	}
 }
 
+
 //TimeStep the animation
 void Deformable::timestep()
 {
 	// important: must always clear forces, as they remain in effect unless changed
 	m_lpIntegrator->SetExternalForcesToZero();
 
+	this->hapticUpdate();
+
 	//Apply forces
+	/*
 	if (m_ctTimeStep % 100 == 0) // set some force at the first timestep
 	{
 		LogInfoArg1("Apply force at timestep %d",m_ctTimeStep);
@@ -166,6 +199,8 @@ void Deformable::timestep()
 
 		m_lpIntegrator->SetExternalForces(m_arrExtForces);
 	}
+	*/
+
 	//Time Step
 	m_lpIntegrator->DoTimestep();
 
@@ -179,30 +214,122 @@ void Deformable::timestep()
 	glutPostRedisplay();
 }
 
-void Deformable::toggleVertex(double worldX, double worldY, double worldZ)
+bool Deformable::pickFreeVertex(double worldX, double worldY, double worldZ)
 {
 	Vec3d wPos(worldX, worldY, worldZ);
 	m_idxPulledVertex = m_lpDeformableMesh->FindClosestVertex(wPos);
-	LogInfoArg1("Clicked on vertex: %d (0-indexed)\n", m_idxPulledVertex);
+	LogInfoArg1("Clicked on vertex: %d (0-indexed).", m_idxPulledVertex);
 
-	//Toggle Fixed
-	/*
-	int ctConstrainedDOFs = 9;
-	int constrainedDOFs[9] = { 12, 13, 14, 30, 31, 32, 42, 43, 44 };
-
-	//Remove from list
 	if(m_vFixedVertices.size() > 0)
 	{
 		for(U32 i=0; i < m_vFixedVertices.size(); i++)
 		{
 			if(m_vFixedVertices[i] == m_idxPulledVertex)
-			{
-				m_vFixedVertices.erase(m_vFixedVertices.begin() + i);
-				break;
-			}
+				return false;
 		}
 	}
-	*/
+
+	m_bHapticForceInProgress = true;
+	return true;
+}
+
+void Deformable::hapticStart()
+{
+	m_bHapticForceInProgress = true;
+}
+
+void Deformable::hapticEnd()
+{
+	m_bHapticForceInProgress = false;
+	m_idxPulledVertex = -1;
+}
+
+void Deformable::hapticSetCurrentForce(double extForce[3])
+{
+	for(int i=0; i<3; i++)
+		m_hapticExtForce[i] = extForce[i];
+}
+
+//Apply External Forces to the integrator
+bool Deformable::hapticUpdate()
+{
+	if (m_idxPulledVertex < 0)
+		return false;
+	if (!m_bHapticForceInProgress)
+		return false;
+
+	double extForce[3];
+	for (int j = 0; j < 3; j++)
+		extForce[j] = m_hapticCompliance * m_hapticExtForce[j];
+
+	//LogInfoArg3()("%d fx: %G fy: %G | %G %G %G\n", m_idxPulledVertex, forceX, forceY, externalForce[0], externalForce[1], externalForce[2]);
+
+	//Reset External Force
+	memset(m_arrExtForces, 0, sizeof(double) * m_dof);
+
+	//Register force on the pulled vertex
+	m_arrExtForces[3 * m_idxPulledVertex + 0] += extForce[0];
+	m_arrExtForces[3 * m_idxPulledVertex + 1] += extForce[1];
+	m_arrExtForces[3 * m_idxPulledVertex + 2] += extForce[2];
+
+	// distribute force over the neighboring vertices
+	set<int> affectedVertices;
+	set<int> lastLayerVertices;
+	affectedVertices.insert(m_idxPulledVertex);
+	lastLayerVertices.insert(m_idxPulledVertex);
+
+	for (int j = 1; j < m_hapticForceNeighorhoodSize; j++)
+	{
+		// linear kernel
+		double forceMagnitude = 1.0 * (m_hapticForceNeighorhoodSize - j)
+				/ static_cast<double>(m_hapticForceNeighorhoodSize);
+
+		set<int> newAffectedVertices;
+		for (set<int>::iterator iter = lastLayerVertices.begin(); iter != lastLayerVertices.end(); iter++)
+		{
+			// traverse all neighbors and check if they were already previously inserted
+			int vtx = *iter;
+			int deg = m_lpMeshGraph->GetNumNeighbors(vtx);
+			for (int k = 0; k < deg; k++)
+			{
+				int vtxNeighbor = m_lpMeshGraph->GetNeighbor(vtx, k);
+
+				if (affectedVertices.find(vtxNeighbor) == affectedVertices.end())
+				{
+					// discovered new vertex
+					newAffectedVertices.insert(vtxNeighbor);
+				}
+			}
+		}
+
+		lastLayerVertices.clear();
+		for (set<int>::iterator iter = newAffectedVertices.begin();iter != newAffectedVertices.end(); iter++)
+		{
+			// apply force
+			m_arrExtForces[3 * *iter + 0] += forceMagnitude * extForce[0];
+			m_arrExtForces[3 * *iter + 1] += forceMagnitude * extForce[1];
+			m_arrExtForces[3 * *iter + 2] += forceMagnitude * extForce[2];
+
+			// generate new layers
+			lastLayerVertices.insert(*iter);
+			affectedVertices.insert(*iter);
+		}
+	}
+
+ // apply any scripted force loads
+/*
+ if (timestepCounter < numForceLoads)
+ {
+ printf("  External forces read from the binary input file.\n");
+ for(int i=0; i<3*n; i++)
+ f_ext[i] += forceLoads[ELT(3*n, i, timestepCounter)];
+ }
+ */
+
+	// set forces to the integrator
+	m_lpIntegrator->SetExternalForces(m_arrExtForces);
+
+	return true;
 }
 
 void Deformable::draw()
@@ -236,6 +363,7 @@ void Deformable::draw()
 		m_lpDeformableMesh->Render();
 
 		//Vertices
+		if(m_bRenderVertices)
 		{
 			glDisable(GL_LIGHTING);
 			glColor3f(0.5, 0, 0);
@@ -280,25 +408,6 @@ void Deformable::draw()
 
 	glColor3f(0, 0, 0);
 
-	// render the currently pulled vertex
-	if (m_idxPulledVertex >= 0) {
-		glColor3f(0, 1, 0);
-		double pulledVertexPos[3];
-		m_lpDeformableMesh->GetSingleVertexPositionFromBuffer(
-				m_idxPulledVertex,
-				&pulledVertexPos[0],
-				&pulledVertexPos[1],
-				&pulledVertexPos[2]);
-
-		glEnable(GL_POLYGON_OFFSET_POINT);
-		glPolygonOffset(-1.0, -1.0);
-		glPointSize(8.0);
-		glBegin(GL_POINTS);
-		glVertex3f(pulledVertexPos[0], pulledVertexPos[1], pulledVertexPos[2]);
-		glEnd();
-		glDisable(GL_POLYGON_OFFSET_FILL);
-	}
-
 	// render model fixed vertices
 	if (m_bRenderFixedVertices) {
 		for (int i = 0; i < m_vFixedVertices.size(); i++) {
@@ -320,6 +429,24 @@ void Deformable::draw()
 		}
 	}
 
+	// render the currently pulled vertex
+	if (m_idxPulledVertex >= 0) {
+		glColor3f(0, 1, 0);
+		double pulledVertexPos[3];
+		m_lpDeformableMesh->GetSingleVertexPositionFromBuffer(
+				m_idxPulledVertex,
+				&pulledVertexPos[0],
+				&pulledVertexPos[1],
+				&pulledVertexPos[2]);
+
+		glEnable(GL_POLYGON_OFFSET_POINT);
+		glPolygonOffset(-1.0, -1.0);
+		glPointSize(8.0);
+		glBegin(GL_POINTS);
+		glVertex3f(pulledVertexPos[0], pulledVertexPos[1], pulledVertexPos[2]);
+		glEnd();
+		glDisable(GL_POLYGON_OFFSET_FILL);
+	}
 
 
 /*

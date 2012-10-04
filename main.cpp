@@ -13,6 +13,7 @@
 #include "PS_Graphics/PS_GLFuncs.h"
 #include "PS_Graphics/PS_GLSurface.h"
 #include "PS_Deformable/PS_Deformable.h"
+#include "PS_Deformable/PS_VegWriter.h"
 
 using namespace std;
 using namespace PS;
@@ -61,6 +62,7 @@ std::string g_strLine2;
 GLSurface* g_lpSurface = NULL;
 AppSettings g_appSettings;
 GLuint g_uiShader;
+svec2i g_dragStart;
 
 ////////////////////////////////////////////////
 //Function Prototype
@@ -70,6 +72,7 @@ void TimeStep(int t);
 void MousePress(int button, int state, int x, int y);
 void MouseMove(int x, int y);
 void MouseWheel(int button, int dir, int x, int y);
+bool ScreenToWorld(const svec3f& screenP, svec3f& worldP);
 
 void Keyboard(int key, int x, int y);
 void DrawText(const char* chrText, int x, int y);
@@ -177,7 +180,7 @@ void MousePress(int button, int state, int x, int y)
 {
 	if(button == GLUT_RIGHT_BUTTON)
 	{
-		if(state == GLUT_UP)
+		if(state == GLUT_DOWN)
 		{
 			GLdouble model[16];
 			glGetDoublev (GL_MODELVIEW_MATRIX, model);
@@ -202,20 +205,45 @@ void MousePress(int button, int state, int x, int y)
 						   &worldX, &worldY, &worldZ);
 
 			if (stencilValue == 1) {
-				//dragStartX = x;
-				//dragStartY = y;
-				//Vec3d pos(worldX, worldY, worldZ);
-				g_lpDeformable->toggleVertex(worldX, worldY, worldZ);
+				if(g_lpDeformable->pickFreeVertex(worldX, worldY, worldZ))
+				{
+					g_dragStart = svec2i(x, y);
+					g_lpDeformable->hapticStart();
+				}
 			}
 		}
+		else
+			g_lpDeformable->hapticEnd();
 	}
 
 	//Camera
 	g_arcBallCam.mousePress(button, state, x, y);
+
+	//Update selection
+	glutPostRedisplay();
 }
 
 void MouseMove(int x, int y)
 {
+	if(g_lpDeformable->isHapticInProgress())
+	{
+		//double forceX = (g_vMousePos[0] - dragStartX);
+		//double forceY = -(g_vMousePos[1] - dragStartY);
+
+		svec3f ptScreen(x - g_dragStart.x, g_dragStart.y - y, 0);
+		svec3f ptWorld;
+
+		g_arcBallCam.screenToWorld_OrientationOnly3D(ptScreen, ptWorld);
+		//ScreenToWorld(ptScreen, ptWorld);
+
+		double arrExt[3];
+		arrExt[0] = ptWorld.x;
+		arrExt[1] = ptWorld.y;
+		arrExt[2] = ptWorld.z;
+
+		g_lpDeformable->hapticSetCurrentForce(arrExt);
+	}
+
 	g_arcBallCam.mouseMove(x, y);
 	glutPostRedisplay();
 }
@@ -273,6 +301,25 @@ bool GetGPUInfo()
 	return true;
 }
 
+bool ScreenToWorld(const svec3f& screenP, svec3f& worldP)
+{
+    GLdouble ox, oy, oz;
+    GLdouble mv[16];
+    GLdouble pr[16];
+    GLint vp[4];
+
+    glGetDoublev(GL_MODELVIEW_MATRIX, mv);
+    glGetDoublev(GL_PROJECTION_MATRIX, pr);
+    glGetIntegerv(GL_VIEWPORT, vp);
+    if(gluUnProject(screenP.x, screenP.y, screenP.z, mv, pr, vp, &ox, &oy, &oz) == GL_TRUE)
+    {
+        worldP = svec3f(ox, oy, oz);
+        return true;
+    }
+
+    return false;
+}
+
 void Keyboard(int key, int x, int y)
 {
 	switch(key)
@@ -308,9 +355,14 @@ void TimeStep(int t)
 	glutTimerFunc(g_appSettings.millis, TimeStep, 0);
 }
 
+
+
+
 //Main Loop of Application
 int main(int argc, char* argv[])
 {
+	//VegWriter::WriteVegFile("/home/pourya/Desktop/disc/disc.1.node");
+
 	//Setup the event logger
 	PS::TheEventLogger::Instance().setWriteFlags(PS_LOG_WRITE_EVENTTYPE | PS_LOG_WRITE_TIMESTAMP | PS_LOG_WRITE_SOURCE | PS_LOG_WRITE_TO_SCREEN);
 	LogInfo("Starting FemMain Application");
@@ -319,7 +371,7 @@ int main(int argc, char* argv[])
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH | GLUT_STENCIL);
 	glutInitWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
-	glutCreateWindow("FEM Hydrocephalus Surgery Simulation - PhD Project - Pourya Shirazian");
+	glutCreateWindow("Deformable Tissue Modeling - PhD Project - Pourya Shirazian");
 	glutDisplayFunc(Draw);
 	glutReshapeFunc(Resize);
 	glutMouseFunc(MousePress);
@@ -358,7 +410,8 @@ int main(int argc, char* argv[])
 	glEnable(GL_STENCIL_TEST);
 	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
 
-	glClearColor(0.45f, 0.45f, 0.45f, 1.0f);
+	//glClearColor(0.45f, 0.45f, 0.45f, 1.0f);
+	glClearColor(1.0, 1.0, 1.0, 1.0);
 
 	//Compiling shaders
 	GLenum err = glewInit();
@@ -377,9 +430,12 @@ int main(int argc, char* argv[])
 	DAnsiStr strDeformableObj;
 	{
 		strDeformableVeg = ExtractOneLevelUp(ExtractFilePath(GetExePath()));
-		strDeformableVeg += DAnsiStr("AA_Models/beam3/beam3_tet.veg");
+		strDeformableVeg += DAnsiStr("AA_Models/disc/disc.1.veg");
+		//strDeformableVeg += DAnsiStr("AA_Models/beam3/beam3_tet.veg");
+
 		strDeformableObj = ExtractOneLevelUp(ExtractFilePath(GetExePath()));
-		strDeformableObj += DAnsiStr("AA_Models/beam3/beam3_tet.obj");
+		strDeformableObj += DAnsiStr("AA_Models/disc/disc_vega.obj");
+		//strDeformableObj += DAnsiStr("AA_Models/beam3/beam3_tet.obj");
 	}
 	g_lpDeformable = new Deformable(strDeformableVeg.cptr(), strDeformableObj.cptr());
 
