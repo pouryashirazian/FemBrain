@@ -27,11 +27,12 @@ using namespace std;
 class Deformable{
 public:
 	Deformable();
-	Deformable(const char* lpVegFilePath, const char* lpObjFilePath);
+	Deformable(const char* lpVegFilePath,
+				const char* lpObjFilePath,
+				std::vector<int>& vFixedVertices);
+
 	virtual ~Deformable();
 
-	void setup(const char* lpVegFilePath, const char* lpObjFilePath);
-	void cleanup();
 
 	void draw();
 	void timestep();
@@ -44,7 +45,6 @@ public:
 	void hapticEnd();
 	bool hapticUpdate();
 	void hapticSetCurrentForce(double extForce[3]);
-
 	bool isHapticInProgress() const {return m_bHapticForceInProgress;}
 
 
@@ -52,14 +52,34 @@ public:
 	bool renderVertices() const {return m_bRenderVertices;}
 	void setRenderVertices(bool bRender) { m_bRenderVertices = bRender;}
 
+	//Damping stiffness
+	void setDampingStiffnessCoeff(double s);
+	double getDampingStiffnessCoeff() const {return m_dampingStiffnessCoeff;}
+
+	//Damping Mass
+	void setDampingMassCoeff(double m);
+	double getDampingMassCoeff() const {return m_dampingMassCoeff;}
 
 private:
+	/*!
+	 * Setup procedure builds deformable model with the specified params
+	 */
+	void setup(const char* lpVegFilePath,
+			    const char* lpObjFilePath,
+			    std::vector<int>& vFixedVertices);
+
+	void cleanup();
 	void computeConstrainedDof(std::vector<int>& vArrOutputDof);
 private:
 	bool m_bHapticForceInProgress;
 	double m_hapticCompliance;
 	double m_hapticExtForce[3];
 	int m_hapticForceNeighorhoodSize;
+
+	double m_dampingStiffnessCoeff;
+	double m_dampingMassCoeff;
+	double m_timeStep;
+
 	Graph* m_lpMeshGraph;
 	//double* m_lpHapticForces;
 

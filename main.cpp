@@ -12,6 +12,7 @@
 #include "PS_Graphics/PS_ArcBallCamera.h"
 #include "PS_Graphics/PS_GLFuncs.h"
 #include "PS_Graphics/PS_GLSurface.h"
+#include "PS_Graphics/PS_SketchConfig.h"
 #include "PS_Deformable/PS_Deformable.h"
 #include "PS_Deformable/PS_VegWriter.h"
 
@@ -36,7 +37,6 @@ public:
 		this->bDrawWireFrame = false;
 		this->bPanCamera = false;
 		this->bShowElements = false;
-		this->pan = svec2f(0.0f, 0.0f);
 		this->millis = DEFAULT_TIMER_MILLIS;
 	}
 
@@ -47,8 +47,9 @@ public:
 	U32   millis;
 	int appWidth;
 	int appHeight;
-
-	svec2f pan;
+	svec3f worldDragStart;
+	svec3f worldDragEnd;
+	svec2i screenDragStart;
 };
 
 //Global Variables
@@ -62,7 +63,7 @@ std::string g_strLine2;
 GLSurface* g_lpSurface = NULL;
 AppSettings g_appSettings;
 GLuint g_uiShader;
-svec2i g_dragStart;
+
 
 ////////////////////////////////////////////////
 //Function Prototype
@@ -76,6 +77,10 @@ bool ScreenToWorld(const svec3f& screenP, svec3f& worldP);
 
 void Keyboard(int key, int x, int y);
 void DrawText(const char* chrText, int x, int y);
+
+//Settings
+void LoadSettings();
+void SaveSettings();
 ////////////////////////////////////////////////
 //Vertex Shader Code
 const char * g_lpVertexShaderCode = 
@@ -127,7 +132,26 @@ void Draw()
 	}
 	glUseProgram(0);
 	*/
+
+	//Draw Deformable Object
 	g_lpDeformable->draw();
+
+	//Draw Haptic Line
+	if(g_lpDeformable->isHapticInProgress())
+	{
+		svec3f s1 = g_appSettings.worldDragStart;
+		svec3f s2 = g_appSettings.worldDragEnd;
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+		glLineWidth(1.0);
+
+		glColor3f(1,0,0);
+		glBegin(GL_LINES);
+			glVertex3f(s1.x, s1.y, s1.z);
+			glVertex3f(s2.x, s2.y, s2.z);
+		glEnd();
+		glPopAttrib();
+	}
+
 	{
 		char chrMsg[1024];
 		sprintf(chrMsg,"Camera [Roll=%.1f, Tilt=%.1f, PanX=%.2f, PanY=%.2f",
@@ -207,7 +231,8 @@ void MousePress(int button, int state, int x, int y)
 			if (stencilValue == 1) {
 				if(g_lpDeformable->pickFreeVertex(worldX, worldY, worldZ))
 				{
-					g_dragStart = svec2i(x, y);
+					g_appSettings.worldDragStart = svec3f(worldX, worldY, worldZ);
+					g_appSettings.screenDragStart = svec2i(x, y);
 					g_lpDeformable->hapticStart();
 				}
 			}
@@ -227,14 +252,12 @@ void MouseMove(int x, int y)
 {
 	if(g_lpDeformable->isHapticInProgress())
 	{
-		//double forceX = (g_vMousePos[0] - dragStartX);
-		//double forceY = -(g_vMousePos[1] - dragStartY);
-
-		svec3f ptScreen(x - g_dragStart.x, g_dragStart.y - y, 0);
+		svec3f ptScreen(x - g_appSettings.screenDragStart.x,
+						y - g_appSettings.screenDragStart.y, 0);
 		svec3f ptWorld;
 
+		//ArcBall Camera
 		g_arcBallCam.screenToWorld_OrientationOnly3D(ptScreen, ptWorld);
-		//ScreenToWorld(ptScreen, ptWorld);
 
 		double arrExt[3];
 		arrExt[0] = ptWorld.x;
@@ -242,6 +265,7 @@ void MouseMove(int x, int y)
 		arrExt[2] = ptWorld.z;
 
 		g_lpDeformable->hapticSetCurrentForce(arrExt);
+		g_appSettings.worldDragEnd = ptWorld;
 	}
 
 	g_arcBallCam.mouseMove(x, y);
@@ -338,7 +362,10 @@ void Keyboard(int key, int x, int y)
 
 		case(GLUT_KEY_F11):
 		{
-			printf("Exiting...\n");
+			//Saving Settings and Exit
+			SaveSettings();
+
+			LogInfo("Exiting.");
 			glutLeaveMainLoop();
 			break;
 		}
@@ -355,7 +382,55 @@ void TimeStep(int t)
 	glutTimerFunc(g_appSettings.millis, TimeStep, 0);
 }
 
+void LoadSettings()
+{
+	LogInfo("Loading Settings from the ini file.");
 
+	CSketchConfig cfg(ChangeFileExt(GetExePath(), ".ini"), CSketchConfig::fmRead);
+	DAnsiStr strVegFile = cfg.readString("MODEL", "VEGFILE", "");
+	DAnsiStr strObjFile = cfg.readString("MODEL", "OBJFILE", "");
+	DAnsiStr strBlobFile = cfg.readString("MODEL", "BLOBTREEFILE", "");
+	int ctFixed = 	cfg.readInt("MODEL", "FIXEDVERTICESCOUNT", 0);
+	vector<int> vFixedVertices;
+	bool bres = cfg.readIntArray("MODEL", "FIXEDVERTICES", ctFixed, vFixedVertices);
+	if(!bres)
+		LogError("Unable to read specified number of fixed vertices!");
+	DAnsiStr strBlobTreeFile = cfg.readString("MODEL", "BLOBTREEFILE", "");
+
+	//Create Deformable Model
+	g_lpDeformable = new Deformable(strVegFile.cptr(),
+									strObjFile.cptr(),
+									vFixedVertices);
+
+	/*
+	g_lpBlobRender = new GPUPoly();
+	g_lpBlobRender->readModel(strFPModel.cptr());
+	g_lpBlobRender->runTandem(0.1);
+	*/
+
+	//Loading Camera
+	if(cfg.hasSection("CAMERA") >= 0)
+	{
+		g_arcBallCam.setRoll(cfg.readFloat("CAMERA", "ROLL"));
+		g_arcBallCam.setTilt(cfg.readFloat("CAMERA", "TILT"));
+		g_arcBallCam.setZoom(cfg.readFloat("CAMERA", "ZOOM"));
+		g_arcBallCam.setCenter(cfg.readVec3f("CAMERA", "CENTER"));
+		g_arcBallCam.setOrigin(cfg.readVec3f("CAMERA", "ORIGIN"));
+		g_arcBallCam.setPan(cfg.readVec2f("CAMERA", "PAN"));
+	}
+}
+
+void SaveSettings()
+{
+	LogInfo("Saving settings to ini file");
+	CSketchConfig cfg(ChangeFileExt(GetExePath(), ".ini"), CSketchConfig::fmReadWrite);
+	cfg.writeFloat("CAMERA", "ROLL", g_arcBallCam.getRoll());
+	cfg.writeFloat("CAMERA", "TILT", g_arcBallCam.getTilt());
+	cfg.writeFloat("CAMERA", "ZOOM", g_arcBallCam.getCurrentZoom());
+	cfg.writeVec3f("CAMERA", "CENTER", g_arcBallCam.getCenter());
+	cfg.writeVec3f("CAMERA", "ORIGIN", g_arcBallCam.getOrigin());
+	cfg.writeVec2f("CAMERA", "PAN", g_arcBallCam.getPan());
+}
 
 
 //Main Loop of Application
@@ -423,36 +498,8 @@ int main(int argc, char* argv[])
 	}
 	CompileShaderCode(g_lpVertexShaderCode, g_lpFragShaderCode, g_uiShader);
 
-	
-
-
-	DAnsiStr strDeformableVeg;
-	DAnsiStr strDeformableObj;
-	{
-		strDeformableVeg = ExtractOneLevelUp(ExtractFilePath(GetExePath()));
-		strDeformableVeg += DAnsiStr("AA_Models/disc/disc.1.veg");
-		//strDeformableVeg += DAnsiStr("AA_Models/beam3/beam3_tet.veg");
-
-		strDeformableObj = ExtractOneLevelUp(ExtractFilePath(GetExePath()));
-		strDeformableObj += DAnsiStr("AA_Models/disc/disc_vega.obj");
-		//strDeformableObj += DAnsiStr("AA_Models/beam3/beam3_tet.obj");
-	}
-	g_lpDeformable = new Deformable(strDeformableVeg.cptr(), strDeformableObj.cptr());
-
-
-
-
-	DAnsiStr strFPModel;
-	{
-		strFPModel = ExtractOneLevelUp(ExtractFilePath(GetExePath()));
-		strFPModel += "AA_Models/sphere.txt";
-	}
-
-	//
-	g_lpBlobRender = new GPUPoly();
-	g_lpBlobRender->readModel(strFPModel.cptr());
-	g_lpBlobRender->runTandem(0.1);
-
+	//Load Settings
+	LoadSettings();
 
 	//Surface
 	/*
@@ -462,7 +509,6 @@ int main(int argc, char* argv[])
     g_lpSurface->testDrawTriangle();
     g_lpSurface->detach();
     */
-
    // g_lpSurface->saveAsPPM("/home/pourya/Desktop/110.ppm");
 
 

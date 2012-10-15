@@ -9,12 +9,13 @@
 
 Deformable::Deformable()
 {
-	//this->setup();
 }
 
-Deformable::Deformable(const char* lpVegFilePath, const char* lpObjFilePath)
+Deformable::Deformable(const char* lpVegFilePath,
+						  const char* lpObjFilePath,
+						  std::vector<int>& vFixedVertices)
 {
-	this->setup(lpVegFilePath, lpObjFilePath);
+	this->setup(lpVegFilePath, lpObjFilePath, vFixedVertices);
 }
 
 Deformable::~Deformable()
@@ -46,7 +47,9 @@ void Deformable::cleanup()
 	SAFE_DELETE_ARRAY(m_arrExtForces);
 }
 
-void Deformable::setup(const char* lpVegFilePath, const char* lpObjFilePath)
+void Deformable::setup(const char* lpVegFilePath,
+						  const char* lpObjFilePath,
+						  std::vector<int>& vFixedVertices)
 {
 	m_lpDeformableMesh = new SceneObjectDeformable(const_cast<char*>(lpObjFilePath));
 	//m_lpDeformableMesh->EnableVertexSelection();
@@ -98,8 +101,11 @@ void Deformable::setup(const char* lpVegFilePath, const char* lpObjFilePath)
 	// With CG, this option is ignored.
 	int positiveDefiniteSolver = 0;
 
+	//Copy from the input fixed vertices
+	m_vFixedVertices.assign(vFixedVertices.begin(), vFixedVertices.end());
 	//(constrained DOFs are specified 0-indexed):
 	//DISC
+/*
 	m_vFixedVertices.push_back(2);
 	m_vFixedVertices.push_back(3);
 	m_vFixedVertices.push_back(4);
@@ -110,7 +116,7 @@ void Deformable::setup(const char* lpVegFilePath, const char* lpObjFilePath)
 	m_vFixedVertices.push_back(36);
 	m_vFixedVertices.push_back(37);
 
-
+*/
 
 	/*
 	//BEAM
@@ -130,10 +136,10 @@ void Deformable::setup(const char* lpVegFilePath, const char* lpObjFilePath)
 
 	// (tangential) Rayleigh damping
 	// "underwater"-like damping
-	double dampingMassCoef = 0.0;
+	m_dampingMassCoeff = 0.0;
 
 	// (primarily) high-frequency damping
-	double dampingStiffnessCoef = 0.01;
+	m_dampingStiffnessCoeff = 0.01;
 
 	// total number of DOFs
 	m_dof = 3 * m_lpTetMesh->getNumVertices();
@@ -141,20 +147,32 @@ void Deformable::setup(const char* lpVegFilePath, const char* lpObjFilePath)
 	m_arrExtForces = new double[m_dof];
 
 	//Time Step the model
-	double timestep = 0.0333;
+	m_timeStep = 0.0333;
 
 	// initialize the integrator
-	m_lpIntegrator = new ImplicitBackwardEulerSparse(m_dof, timestep,
+	m_lpIntegrator = new ImplicitBackwardEulerSparse(m_dof, m_timeStep,
 													 m_lpMassMatrix,
 													 m_lpDeformableForceModel,
 													 positiveDefiniteSolver,
 													 vConstainedDofs.size(),
 													 &vConstainedDofs[0],
-													 dampingMassCoef,
-													 dampingStiffnessCoef);
+													 m_dampingMassCoeff,
+													 m_dampingStiffnessCoeff);
 
 
 	m_ctTimeStep = 0;
+}
+
+void Deformable::setDampingStiffnessCoeff(double s)
+{
+	m_dampingStiffnessCoeff = s;
+	m_lpIntegrator->SetDampingStiffnessCoef(s);
+}
+
+void Deformable::setDampingMassCoeff(double m)
+{
+	m_dampingMassCoeff = m;
+	m_lpIntegrator->SetDampingMassCoef(m);
 }
 
 //Computes constrained dofs based on selected fixed vertices

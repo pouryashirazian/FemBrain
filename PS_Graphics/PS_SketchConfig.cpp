@@ -13,7 +13,52 @@ namespace PS{
 		m_fmode = fmMemoryStream;
 		setContentBuffer(inputContent);
 	}
+	//====================================================================================
+	svec2f CSketchConfig::readVec2f(DAnsiStr section, DAnsiStr variable)
+	{
+		DAnsiStr strVal;
+		svec2f res;
+		if(readValue(section, variable, strVal))
+		{
+			float f[2];
+			size_t pos;
+			int iComp = 0;
+			DAnsiStr strTemp;
 
+			if(strVal.firstChar() == '(')
+				strVal = strVal.substr(1);
+			else
+				return res;
+			while(strVal.lfind(',', pos))
+			{
+				strTemp = strVal.substr(0, pos);
+				strVal = strVal.substr(pos + 1);
+				strVal.removeStartEndSpaces();
+				f[iComp] = static_cast<float>(atof(strTemp.ptr()));
+				iComp++;
+			}
+
+			if(strVal.length() >= 1 && iComp < 2)
+			{
+				if(strVal.lastChar() == ')')
+				{
+					strTemp = strVal.substr(0, strVal.length() - 1);
+					strTemp.removeStartEndSpaces();
+					f[iComp] = static_cast<float>(atof(strTemp.ptr()));
+				}
+			}
+
+			res = svec2f(f[0], f[1]);
+		}
+		return res;
+	}
+
+	//====================================================================================
+	void CSketchConfig::writeVec2f(DAnsiStr section, DAnsiStr variable, const svec2f& val)
+	{
+		DAnsiStr strTemp = printToAStr("(%f, %f)", val.x, val.y);
+		writeValue(section, variable, strTemp);
+	}
 	//====================================================================================
 	svec3f CSketchConfig::readVec3f(DAnsiStr section, DAnsiStr variable)
 	{
@@ -55,7 +100,7 @@ namespace PS{
 	}
 
 	//====================================================================================
-	void CSketchConfig::writeVec3f(DAnsiStr section, DAnsiStr variable, svec3f val)
+	void CSketchConfig::writeVec3f(DAnsiStr section, DAnsiStr variable, const svec3f& val)
 	{
 		DAnsiStr strTemp = printToAStr("(%f, %f, %f)", val.x, val.y, val.z);
 		writeValue(section, variable, strTemp);
@@ -102,7 +147,7 @@ namespace PS{
 	}
 
 	//====================================================================================
-	void CSketchConfig::writeVec4f(DAnsiStr section, DAnsiStr variable, svec4f val)
+	void CSketchConfig::writeVec4f(DAnsiStr section, DAnsiStr variable, const svec4f& val)
 	{
 		DAnsiStr strTemp = printToAStr("(%f, %f, %f, %f)", val.x, val.y, val.z, val.w);
 		writeValue(section, variable, strTemp);

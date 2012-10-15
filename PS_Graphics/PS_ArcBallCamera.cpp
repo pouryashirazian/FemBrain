@@ -19,11 +19,11 @@ ArcBallCamera::ArcBallCamera()
 }
 
 //Constructor with valid values
-ArcBallCamera::ArcBallCamera(float o, float p, float r)
+ArcBallCamera::ArcBallCamera(float roll, float tilt, float zoom)
 {
-	setRoll(o);
-	setTilt(p);
-	setZoom(r);
+	setRoll(roll);
+	setTilt(tilt);
+	setZoom(zoom);
 	setOrigin(svec3f(0.0f, 0.0f, 0.0f));
 	setCenter(svec3f(0.0f, 0.0f, 0.0f));
 

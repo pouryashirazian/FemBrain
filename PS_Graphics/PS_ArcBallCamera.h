@@ -42,7 +42,7 @@ public:
 	ArcBallCamera();
 
 	//Constructor with valid values
-	ArcBallCamera(float o, float p, float r);
+	ArcBallCamera(float roll, float tilt, float zoom);
 
 	//Look Matrix
 	void look();

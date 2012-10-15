@@ -27,11 +27,15 @@ namespace PS{
 
 		}
 
+		//Read and Write Vectors
+		svec2f readVec2f(DAnsiStr section, DAnsiStr variable);
+		void writeVec2f(DAnsiStr section, DAnsiStr variable, const svec2f& val);
+
 		svec3f readVec3f(DAnsiStr section, DAnsiStr variable);
-		void writeVec3f(DAnsiStr section, DAnsiStr variable, svec3f val);
+		void writeVec3f(DAnsiStr section, DAnsiStr variable, const svec3f& val);
 
 		svec4f readVec4f(DAnsiStr section, DAnsiStr variable);
-		void writeVec4f(DAnsiStr section, DAnsiStr variable, svec4f val);
+		void writeVec4f(DAnsiStr section, DAnsiStr variable, const svec4f& val);
 	};
 
 
