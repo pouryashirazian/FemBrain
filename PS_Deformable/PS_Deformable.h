@@ -44,6 +44,7 @@ public:
 	void hapticStart();
 	void hapticEnd();
 	bool hapticUpdate();
+	bool hapticUpdateDisplace();
 	void hapticSetCurrentForce(double extForce[3]);
 	bool isHapticInProgress() const {return m_bHapticForceInProgress;}
 

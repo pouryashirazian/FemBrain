@@ -47,6 +47,7 @@ void Deformable::cleanup()
 	SAFE_DELETE_ARRAY(m_arrExtForces);
 }
 
+//Setup
 void Deformable::setup(const char* lpVegFilePath,
 						  const char* lpObjFilePath,
 						  std::vector<int>& vFixedVertices)
@@ -199,35 +200,37 @@ void Deformable::computeConstrainedDof(std::vector<int>& vArrFixedDof)
 //TimeStep the animation
 void Deformable::timestep()
 {
+	//Apply forces
+		/*
+		if (m_ctTimeStep % 100 == 0) // set some force at the first timestep
+		{
+			LogInfoArg1("Apply force at timestep %d",m_ctTimeStep);
+			memset(m_arrExtForces, 0, sizeof(double) * m_dof);
+
+			// apply force of -500 N to vertex 12, in y-direction, 3*12+1 = 37
+			m_idxPulledVertex = 12;
+			m_arrExtForces[37] = -500;
+
+			m_lpIntegrator->SetExternalForces(m_arrExtForces);
+		}
+		*/
+
 	// important: must always clear forces, as they remain in effect unless changed
 	m_lpIntegrator->SetExternalForcesToZero();
 
-	this->hapticUpdate();
-
-	//Apply forces
-	/*
-	if (m_ctTimeStep % 100 == 0) // set some force at the first timestep
-	{
-		LogInfoArg1("Apply force at timestep %d",m_ctTimeStep);
-		memset(m_arrExtForces, 0, sizeof(double) * m_dof);
-
-		// apply force of -500 N to vertex 12, in y-direction, 3*12+1 = 37
-		m_idxPulledVertex = 12;
-		m_arrExtForces[37] = -500;
-
-		m_lpIntegrator->SetExternalForces(m_arrExtForces);
-	}
-	*/
+	//Update the haptic external forces applied
+	//this->hapticUpdate();
+	this->hapticUpdateDisplace();
 
 	//Time Step
 	m_lpIntegrator->DoTimestep();
 
-	//Increment time step
-	m_ctTimeStep++;
-
 	m_lpIntegrator->GetqState(m_arrDisplacements);
 
 	m_lpDeformableMesh->SetVertexDeformations(m_arrDisplacements);
+
+	//Increment time step
+	m_ctTimeStep++;
 
 	glutPostRedisplay();
 }
@@ -260,12 +263,6 @@ void Deformable::hapticEnd()
 {
 	m_bHapticForceInProgress = false;
 	m_idxPulledVertex = -1;
-}
-
-void Deformable::hapticSetCurrentForce(double extForce[3])
-{
-	for(int i=0; i<3; i++)
-		m_hapticExtForce[i] = extForce[i];
 }
 
 //Apply External Forces to the integrator
@@ -348,6 +345,98 @@ bool Deformable::hapticUpdate()
 	m_lpIntegrator->SetExternalForces(m_arrExtForces);
 
 	return true;
+}
+
+
+bool Deformable::hapticUpdateDisplace()
+{
+	if (m_idxPulledVertex < 0)
+		return false;
+	if (!m_bHapticForceInProgress)
+		return false;
+
+	double extDisplace[3];
+	for (int j = 0; j < 3; j++)
+		extDisplace[j] = m_hapticCompliance * m_hapticExtForce[j];
+
+	//Reset External Force
+	memset(m_arrDisplacements, 0, sizeof(double) * m_dof);
+
+	m_arrDisplacements[3 * m_idxPulledVertex + 0] += 0.01;
+
+	//Distribute force over the neighboring vertices
+	/*
+	//Register force on the pulled vertex
+	m_arrDisplacements[3 * m_idxPulledVertex + 0] += extDisplace[0];
+	m_arrDisplacements[3 * m_idxPulledVertex + 1] += extDisplace[1];
+	m_arrDisplacements[3 * m_idxPulledVertex + 2] += extDisplace[2];
+
+	set<int> affectedVertices;
+	set<int> lastLayerVertices;
+	affectedVertices.insert(m_idxPulledVertex);
+	lastLayerVertices.insert(m_idxPulledVertex);
+
+	for (int j = 1; j < m_hapticForceNeighorhoodSize; j++)
+	{
+		// linear kernel
+		double displaceMagnitude = 1.0 * (m_hapticForceNeighorhoodSize - j)
+				/ static_cast<double>(m_hapticForceNeighorhoodSize);
+
+		set<int> newAffectedVertices;
+		for (set<int>::iterator iter = lastLayerVertices.begin();
+				iter != lastLayerVertices.end(); iter++) {
+			// traverse all neighbors and check if they were already previously inserted
+			int vtx = *iter;
+			int deg = m_lpMeshGraph->GetNumNeighbors(vtx);
+			for (int k = 0; k < deg; k++) {
+				int vtxNeighbor = m_lpMeshGraph->GetNeighbor(vtx, k);
+
+				if (affectedVertices.find(vtxNeighbor)
+						== affectedVertices.end()) {
+					// discovered new vertex
+					newAffectedVertices.insert(vtxNeighbor);
+				}
+			}
+		}
+
+		lastLayerVertices.clear();
+		for (set<int>::iterator iter = newAffectedVertices.begin();
+				iter != newAffectedVertices.end(); iter++)
+		{
+			// apply force
+			m_arrDisplacements[3 * *iter + 0] += displaceMagnitude * extDisplace[0];
+			m_arrDisplacements[3 * *iter + 1] += displaceMagnitude * extDisplace[1];
+			m_arrDisplacements[3 * *iter + 2] += displaceMagnitude * extDisplace[2];
+
+			// generate new layers
+			lastLayerVertices.insert(*iter);
+			affectedVertices.insert(*iter);
+		}
+	}
+
+*/
+	//Set forces to the integrator
+	memset(m_arrExtForces, 0, sizeof(double) * m_dof);
+	m_lpDeformableForceModel->GetInternalForce(m_arrDisplacements, m_arrExtForces);
+
+	//minus
+	printf("Ext Forces: ");
+	for(U32 i=0; i < m_dof; i++)
+	{
+		m_arrExtForces[i] = -1.0 * m_arrExtForces[i];
+		printf("%.2f, ", m_arrExtForces[i]);
+	}
+	printf("\n");
+
+	m_lpIntegrator->SetExternalForces(m_arrExtForces);
+
+	return true;
+}
+
+void Deformable::hapticSetCurrentForce(double extForce[3])
+{
+	for(int i=0; i<3; i++)
+		m_hapticExtForce[i] = extForce[i];
 }
 
 void Deformable::draw()

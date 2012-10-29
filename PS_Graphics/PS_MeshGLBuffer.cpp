@@ -8,6 +8,11 @@
 #include "PS_MeshGLBuffer.h"
 #include "GL/glew.h"
 
+GLMeshBuffer::GLMeshBuffer()
+{
+	bIsValid = false;
+}
+
 GLMeshBuffer::~GLMeshBuffer()
 {
 	cleanup();

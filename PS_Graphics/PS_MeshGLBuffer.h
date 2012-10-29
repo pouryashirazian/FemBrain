@@ -13,9 +13,8 @@
 //Vertex Buffer Objects To Draw
 class GLMeshBuffer{
 public:
-	GLMeshBuffer() {}
-	//GLMeshBuffer();
-	~GLMeshBuffer();
+	GLMeshBuffer();
+	virtual ~GLMeshBuffer();
 
 	//Releases all buffer objects for rendering
 	void cleanup();

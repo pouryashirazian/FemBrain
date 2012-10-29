@@ -51,7 +51,6 @@
 									<listOptionValue builtIn="false" value="GLEW"/>
 									<listOptionValue builtIn="false" value="glut"/>
 									<listOptionValue builtIn="false" value="GLU"/>
-									<listOptionValue builtIn="false" value="GL"/>
 									<listOptionValue builtIn="false" value="rt"/>
 									<listOptionValue builtIn="false" value="tbb"/>
 									<listOptionValue builtIn="false" value="OpenCL"/>

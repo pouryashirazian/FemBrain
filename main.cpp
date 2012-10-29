@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include <string>
+#include <vector>
 #include <fstream>
 
 #include "PS_Base/PS_MathBase.h"
@@ -28,6 +29,11 @@ using namespace PS::HPC;
 #define ZFAR 100.0
 #define DEFAULT_TIMER_MILLIS 33
 
+#define INDEX_CAMERA_INFO 0
+#define INDEX_HAPTIC_INFO 1
+#define INDEX_GPU_INFO 	   2
+
+
 //Application Settings
 class AppSettings{
 public:
@@ -38,6 +44,7 @@ public:
 		this->bPanCamera = false;
 		this->bShowElements = false;
 		this->millis = DEFAULT_TIMER_MILLIS;
+		this->axis = 0;
 	}
 
 public:
@@ -47,9 +54,12 @@ public:
 	U32   millis;
 	int appWidth;
 	int appHeight;
+
+	int axis;
 	svec3f worldDragStart;
 	svec3f worldDragEnd;
 	svec2i screenDragStart;
+	svec2i screenDragEnd;
 };
 
 //Global Variables
@@ -57,8 +67,8 @@ PS::ArcBallCamera g_arcBallCam;
 PS::HPC::GPUPoly* g_lpBlobRender = NULL;
 Deformable* g_lpDeformable = NULL;
 
-std::string g_strLine1;
-std::string g_strLine2;
+//Info Lines
+std::vector<std::string> g_infoLines;
 
 GLSurface* g_lpSurface = NULL;
 AppSettings g_appSettings;
@@ -77,6 +87,7 @@ bool ScreenToWorld(const svec3f& screenP, svec3f& worldP);
 
 void Keyboard(int key, int x, int y);
 void DrawText(const char* chrText, int x, int y);
+string GetGPUInfo();
 
 //Settings
 void LoadSettings();
@@ -139,27 +150,53 @@ void Draw()
 	//Draw Haptic Line
 	if(g_lpDeformable->isHapticInProgress())
 	{
-		svec3f s1 = g_appSettings.worldDragStart;
-		svec3f s2 = g_appSettings.worldDragEnd;
+		GLint vp[4];
+		glGetIntegerv(GL_VIEWPORT, vp);
+		//svec3f s1 = g_appSettings.worldDragStart;
+		//svec3f s2 = g_appSettings.worldDragEnd;
+		svec2i s1 = g_appSettings.screenDragStart;
+		svec2i s2 = g_appSettings.screenDragEnd;
+
+		glMatrixMode(GL_PROJECTION);
+		glPushMatrix();
+		glLoadIdentity();
+		glOrtho(0.0, vp[2], vp[3], 0.0, -1.0, 1.0);
+
+		glMatrixMode(GL_MODELVIEW);
+		glPushMatrix();
+		glLoadIdentity();
+
+		glColor3f(1,0,0);
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
 		glLineWidth(1.0);
 
-		glColor3f(1,0,0);
 		glBegin(GL_LINES);
-			glVertex3f(s1.x, s1.y, s1.z);
-			glVertex3f(s2.x, s2.y, s2.z);
+			glVertex2f(s1.x, s1.y);
+			glVertex2f(s2.x, s2.y);
 		glEnd();
 		glPopAttrib();
+
+		glMatrixMode(GL_MODELVIEW);
+		glPopMatrix();
+		glMatrixMode(GL_PROJECTION);
+		glPopMatrix();
 	}
 
+	//Write Camera Info
 	{
 		char chrMsg[1024];
-		sprintf(chrMsg,"Camera [Roll=%.1f, Tilt=%.1f, PanX=%.2f, PanY=%.2f",
+		sprintf(chrMsg,"Camera [Roll=%.1f, Tilt=%.1f, PanX=%.2f, PanY=%.2f]",
 				g_arcBallCam.getRoll(),
 				g_arcBallCam.getTilt(),
 				g_arcBallCam.getPan().x,
 				g_arcBallCam.getPan().y);
-		DrawText(chrMsg, 10, 20);
+		g_infoLines[INDEX_CAMERA_INFO] = string(chrMsg);
+	}
+
+	//Write Model Info
+	{
+		for(size_t i=0; i<g_infoLines.size(); i++)
+			DrawText(g_infoLines[i].c_str(), 10, 20 + i * 15);
 	}
 
 	glutSwapBuffers();
@@ -167,21 +204,21 @@ void Draw()
 
 void DrawText(const char* chrText, int x, int y)
 {
-	//GLint vp[4];
-	//glGetIntegerv(GL_VIEWPORT, vp);
+	GLint vp[4];
+	glGetIntegerv(GL_VIEWPORT, vp);
 
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
 	glLoadIdentity();
-	//glOrtho(0, vp[2], 0, vp[3], -1, 1);
+	glOrtho(0, vp[2], vp[3], 0, -1, 1);
 
 
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
 	glLoadIdentity();
 
-	float clFont[] = { 1, 0, 0, 1 };
-	DrawString(chrText, x, WINDOW_HEIGHT - y, clFont, GLUT_BITMAP_9_BY_15);
+	float clFont[] = { 0, 0, 1, 1 };
+	DrawString(chrText, x,  y, clFont, GLUT_BITMAP_8_BY_13);
 
 	glMatrixMode(GL_MODELVIEW);
 	glPopMatrix();
@@ -256,6 +293,18 @@ void MouseMove(int x, int y)
 						y - g_appSettings.screenDragStart.y, 0);
 		svec3f ptWorld;
 
+		string strAxis = "X";
+		if(g_appSettings.axis == 0)
+			strAxis = "X";
+		else if(g_appSettings.axis == 1)
+			strAxis = "Y";
+		else
+			strAxis = "Z";
+
+		char buffer[1024];
+		sprintf(buffer, "HAPTIC LEN=%.2f, AXIS=%s", vlength3f(ptScreen), strAxis.c_str());
+		g_infoLines[INDEX_HAPTIC_INFO] = string(buffer);
+
 		//ArcBall Camera
 		g_arcBallCam.screenToWorld_OrientationOnly3D(ptScreen, ptWorld);
 
@@ -266,6 +315,7 @@ void MouseMove(int x, int y)
 
 		g_lpDeformable->hapticSetCurrentForce(arrExt);
 		g_appSettings.worldDragEnd = ptWorld;
+		g_appSettings.screenDragEnd = svec2i(x, y);
 	}
 
 	g_arcBallCam.mouseMove(x, y);
@@ -302,7 +352,7 @@ string QueryOGL(GLenum name)
 	}
 }
 
-bool GetGPUInfo()
+string GetGPUInfo()
 {
 	string strVendorName = QueryOGL(GL_VENDOR);
 	string strRenderer   = QueryOGL(GL_RENDERER);
@@ -311,18 +361,19 @@ bool GetGPUInfo()
 	cout << "GPU VENDOR: " << strVendorName << endl;
 	cout << "GPU RENDERER: " << strRenderer << endl;
 	cout << "GPU VERSION: " << strVersion << endl;
-
 	
 	LogInfoArg1("GPU VENDOR: %s", strVendorName.c_str());
 	LogInfoArg1("GPU RENDERER: %s", strRenderer.c_str());
 	LogInfoArg1("GPU VERSION: %s", strVersion.c_str());
+
+
 	if(strcmp(strVendorName.c_str(), "Intel") == 0)
 	{
 		cout << "WARNING: Integrated GPU is being used!" << endl;
 		LogWarning("Non-Discrete GPU selected for rendering!");
 	}
 	//cout << "GPU EXTENSIONS: " << strExtensions << endl;
-	return true;
+	return  string("GPU: ") + strVendorName + ", " + strRenderer + ", " + strVersion;
 }
 
 bool ScreenToWorld(const svec3f& screenP, svec3f& worldP)
@@ -357,6 +408,14 @@ void Keyboard(int key, int x, int y)
 
 		case(GLUT_KEY_F3):
 		{
+
+			break;
+		}
+
+		case(GLUT_KEY_F4):
+		{
+			g_appSettings.axis = (g_appSettings.axis + 1) % 3;
+			LogInfoArg1("Change haptic axis to %d", g_appSettings.axis);
 			break;
 		}
 
@@ -418,6 +477,12 @@ void LoadSettings()
 		g_arcBallCam.setOrigin(cfg.readVec3f("CAMERA", "ORIGIN"));
 		g_arcBallCam.setPan(cfg.readVec2f("CAMERA", "PAN"));
 	}
+
+	//DISPLAY INFO
+	g_infoLines.push_back(string("CAMERA"));
+	g_infoLines.push_back(string("HAPTIC"));
+	g_infoLines.push_back(GetGPUInfo());
+
 }
 
 void SaveSettings()
