@@ -289,33 +289,50 @@ void MouseMove(int x, int y)
 {
 	if(g_lpDeformable->isHapticInProgress())
 	{
-		svec3f ptScreen(x - g_appSettings.screenDragStart.x,
-						y - g_appSettings.screenDragStart.y, 0);
-		svec3f ptWorld;
-
+		svec3f ptDelta(x - g_appSettings.screenDragStart.x,
+					   g_appSettings.screenDragStart.y - y, 0);
+		//for(int i=0; i<3 && i != g_appSettings.axis; i++)
+			//vsetElement3f(ptDelta, i, 0.0f);
 		string strAxis = "X";
 		if(g_appSettings.axis == 0)
+		{
 			strAxis = "X";
+			ptDelta.y = 0.0f;
+		}
 		else if(g_appSettings.axis == 1)
+		{
 			strAxis = "Y";
+			ptDelta.x = 0.0f;
+		}
 		else
+		{
 			strAxis = "Z";
+			ptDelta.y = 0.0f;
+			ptDelta.z = ptDelta.x;
+			ptDelta.x = 0.0f;
+		}
+
+		//Scale
+		ptDelta = vscale3f(0.0001f, ptDelta);
 
 		char buffer[1024];
-		sprintf(buffer, "HAPTIC LEN=%.2f, AXIS=%s", vlength3f(ptScreen), strAxis.c_str());
+		sprintf(buffer, "HAPTIC DELTA VECTOR=(%.4f, %.4f, %.4f), AXIS=%s", ptDelta.x, ptDelta.y, ptDelta.z, strAxis.c_str());
 		g_infoLines[INDEX_HAPTIC_INFO] = string(buffer);
+		g_appSettings.screenDragEnd = svec2i(x, y);
+
+		g_lpDeformable->hapticSetCurrentDisplacement(ptDelta.x, ptDelta.y, ptDelta.z);
 
 		//ArcBall Camera
+		/*
+		svec3f ptWorld;
 		g_arcBallCam.screenToWorld_OrientationOnly3D(ptScreen, ptWorld);
-
 		double arrExt[3];
 		arrExt[0] = ptWorld.x;
 		arrExt[1] = ptWorld.y;
 		arrExt[2] = ptWorld.z;
-
 		g_lpDeformable->hapticSetCurrentForce(arrExt);
 		g_appSettings.worldDragEnd = ptWorld;
-		g_appSettings.screenDragEnd = svec2i(x, y);
+		*/
 	}
 
 	g_arcBallCam.mouseMove(x, y);

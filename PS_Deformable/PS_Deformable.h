@@ -43,9 +43,10 @@ public:
 	//Haptic Interaction
 	void hapticStart();
 	void hapticEnd();
-	bool hapticUpdate();
+	bool hapticUpdateForce();
 	bool hapticUpdateDisplace();
 	void hapticSetCurrentForce(double extForce[3]);
+	void hapticSetCurrentDisplacement(double dx, double dy, double dz);
 	bool isHapticInProgress() const {return m_bHapticForceInProgress;}
 
 
@@ -75,6 +76,7 @@ private:
 	bool m_bHapticForceInProgress;
 	double m_hapticCompliance;
 	double m_hapticExtForce[3];
+	double m_hapticExtDisplacements[3];
 	int m_hapticForceNeighorhoodSize;
 
 	double m_dampingStiffnessCoeff;

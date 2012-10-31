@@ -166,12 +166,12 @@ inline svec4f vsetAll4f(float val)
 	return svec4f(val, val, val, val);
 }
 
-inline svec3f vload3f(float* lpArray)
+inline svec3f vload3f(const float* lpArray)
 {
 	return svec3f(lpArray[0], lpArray[1], lpArray[2]);
 }
 
-inline svec4f vload4f(float* lpArray)
+inline svec4f vload4f(const float* lpArray)
 {
 	return svec4f(lpArray[0], lpArray[1], lpArray[2], lpArray[3]);
 }

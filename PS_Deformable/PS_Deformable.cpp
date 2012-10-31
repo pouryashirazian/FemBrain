@@ -266,7 +266,7 @@ void Deformable::hapticEnd()
 }
 
 //Apply External Forces to the integrator
-bool Deformable::hapticUpdate()
+bool Deformable::hapticUpdateForce()
 {
 	if (m_idxPulledVertex < 0)
 		return false;
@@ -347,7 +347,7 @@ bool Deformable::hapticUpdate()
 	return true;
 }
 
-
+//Update model based on displacements induced on model
 bool Deformable::hapticUpdateDisplace()
 {
 	if (m_idxPulledVertex < 0)
@@ -355,14 +355,12 @@ bool Deformable::hapticUpdateDisplace()
 	if (!m_bHapticForceInProgress)
 		return false;
 
-	double extDisplace[3];
-	for (int j = 0; j < 3; j++)
-		extDisplace[j] = m_hapticCompliance * m_hapticExtForce[j];
 
 	//Reset External Force
 	memset(m_arrDisplacements, 0, sizeof(double) * m_dof);
 
-	m_arrDisplacements[3 * m_idxPulledVertex + 0] += 0.01;
+	for(int i=0; i<3; i++)
+		m_arrDisplacements[3 * m_idxPulledVertex + i] += m_hapticExtDisplacements[i];
 
 	//Distribute force over the neighboring vertices
 	/*
@@ -415,19 +413,13 @@ bool Deformable::hapticUpdateDisplace()
 	}
 
 */
-	//Set forces to the integrator
+	//Compute external forces to be applied. Input: displacements, Output: forces
 	memset(m_arrExtForces, 0, sizeof(double) * m_dof);
 	m_lpDeformableForceModel->GetInternalForce(m_arrDisplacements, m_arrExtForces);
 
-	//minus
-	printf("Ext Forces: ");
-	for(U32 i=0; i < m_dof; i++)
-	{
-		m_arrExtForces[i] = -1.0 * m_arrExtForces[i];
-		printf("%.2f, ", m_arrExtForces[i]);
-	}
-	printf("\n");
-
+	//Negate forces
+	//for(U32 i=0; i < m_dof; i++)
+		//m_arrExtForces[i] = -1.0 * m_arrExtForces[i];
 	m_lpIntegrator->SetExternalForces(m_arrExtForces);
 
 	return true;
@@ -438,6 +430,14 @@ void Deformable::hapticSetCurrentForce(double extForce[3])
 	for(int i=0; i<3; i++)
 		m_hapticExtForce[i] = extForce[i];
 }
+
+void Deformable::hapticSetCurrentDisplacement(double dx, double dy, double dz)
+{
+	m_hapticExtDisplacements[0] = dx;
+	m_hapticExtDisplacements[1] = dy;
+	m_hapticExtDisplacements[2] = dz;
+}
+
 
 void Deformable::draw()
 {
