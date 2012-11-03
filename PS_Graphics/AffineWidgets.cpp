@@ -6,20 +6,20 @@ GLfloat g_vertices[][3] = { { -1.0, -1.0, 1.0 }, { -1.0, 1.0, 1.0 }, { 1.0, 1.0,
 		1.0 }, { 1.0, -1.0, 1.0 }, { -1.0, -1.0, -1.0 }, { -1.0, 1.0, -1.0 }, {
 		1.0, 1.0, -1.0 }, { 1.0, -1.0, -1.0 } };
 
-svec3f CUIWidget::maskDisplacement(svec3f v, UITRANSFORMAXIS axis) {
+vec3f AbstractWidget::maskDisplacement(vec3f v, UITRANSFORMAXIS axis) {
 	if (axis == uiaFree)
 		return v;
 	else if (axis == uiaX)
-		return svec3f(v.x, 0.0f, 0.0f);
+		return vec3f(v.x, 0.0f, 0.0f);
 	else if (axis == uiaY)
-		return svec3f(0.0f, v.y, 0.0f);
+		return vec3f(0.0f, v.y, 0.0f);
 	else if (axis == uiaZ)
-		return svec3f(0.0f, 0.0f, v.z);
+		return vec3f(0.0f, 0.0f, v.z);
 	else
 		return v;
 }
 
-void CUIWidget::drawCubePolygon(int a, int b, int c, int d) {
+void AbstractWidget::drawCubePolygon(int a, int b, int c, int d) {
 	glBegin(GL_POLYGON);
 	glVertex3fv(g_vertices[a]);
 	glVertex3fv(g_vertices[b]);
@@ -28,34 +28,34 @@ void CUIWidget::drawCubePolygon(int a, int b, int c, int d) {
 	glEnd();
 }
 
-svec4f CUIWidget::maskColor(UITRANSFORMAXIS axis) {
+vec4f AbstractWidget::maskColor(UITRANSFORMAXIS axis) {
 	static const GLfloat red[] = { 1.0f, 0.0f, 0.0f, 1.0f };
 	static const GLfloat green[] = { 0.0f, 1.0f, 0.0f, 1.0f };
 	static const GLfloat blue[] = { 0.0f, 0.0f, 1.0f, 1.0f };
-	static const GLfloat white[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-	svec4f result;
+	static const GLfloat black[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+	vec4f result;
 
-	if (TheUITransform.axis == axis)
-		result = vload4f(white);
+	if (TheUITransform::Instance().axis == axis)
+		result = vec4f(black);
 	else {
 		if (axis == uiaX)
-			result = vload4f(red);
+			result = vec4f(red);
 		else if (axis == uiaY)
-			result = vload4f(green);
+			result = vec4f(green);
 		else if (axis == uiaZ)
-			result = vload4f(blue);
+			result = vec4f(blue);
 	}
 
 	return result;
 }
 
-void CUIWidget::maskColorSetGLFront(UITRANSFORMAXIS axis) {
-	svec4f color = maskColor(axis);
+void AbstractWidget::maskColorSetGLFront(UITRANSFORMAXIS axis) {
+	vec4f color = maskColor(axis);
 	glColor4f(color.x, color.y, color.z, color.w);
 }
 
 /////////////////////////////////////////////////////////////////
-void CMapRotate::createWidget() {
+void RotationWidget::createWidget() {
 	if (glIsList(m_glList))
 		glDeleteLists(m_glList, 1);
 
@@ -63,11 +63,11 @@ void CMapRotate::createWidget() {
 	glNewList(m_glList, GL_COMPILE);
 
 	//Draw end points
-	svec3f v;
+	vec3f v;
 	float theta;
 
 	int n = 31;
-	svec3f origin(0, 0, 0);
+	vec3f origin(0, 0, 0);
 
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 
@@ -83,7 +83,7 @@ void CMapRotate::createWidget() {
 		v.y = m_length.y * sin(theta);
 		v.z = m_length.z * cos(theta);
 
-		v = vadd3f(v, origin);
+		v = v + origin;
 		glVertex3f(v.x, v.y, v.z);
 	}
 	glEnd();
@@ -97,7 +97,7 @@ void CMapRotate::createWidget() {
 		v.y = 0.0f;
 		v.z = m_length.z * sin(theta);
 
-		v = vadd3f(v, origin);
+		v = v + origin;
 		glVertex3f(v.x, v.y, v.z);
 	}
 	glEnd();
@@ -111,7 +111,7 @@ void CMapRotate::createWidget() {
 		v.y = m_length.y * sin(theta);
 		v.z = 0.0f;
 
-		v = vadd3f(v, origin);
+		v = v + origin;
 		glVertex3f(v.x, v.y, v.z);
 	}
 	glEnd();
@@ -121,12 +121,12 @@ void CMapRotate::createWidget() {
 	glEndList();
 }
 
-CMapRotate::~CMapRotate() {
+RotationWidget::~RotationWidget() {
 	if (glIsList(m_glList))
 		glDeleteLists(m_glList, 1);
 }
 
-void CMapRotate::draw() {
+void RotationWidget::draw() {
 	glPushMatrix();
 	glTranslatef(m_pos.x, m_pos.y, m_pos.z);
 	glCallList(m_glList);
@@ -134,27 +134,27 @@ void CMapRotate::draw() {
 }
 
 /////////////////////////////////////////////////////////////////
-void CMapScale::createWidget() {
-	svec3f ptEnd[3];
-	svec3f origin = svec3f(0, 0, 0);
+void ScaleWidget::createWidget() {
+	vec3f ptEnd[3];
+	vec3f origin = vec3f(0, 0, 0);
 
-	ptEnd[0] = vscale3f(m_length.x, svec3f(1.0f, 0.0f, 0.0f));
-	ptEnd[1] = vscale3f(m_length.y, svec3f(0.0f, 1.0f, 0.0f));
-	ptEnd[2] = vscale3f(m_length.z, svec3f(0.0f, 0.0f, 1.0f));
+	ptEnd[0] = vec3f(1.0f, 0.0f, 0.0f) * m_length.x;
+	ptEnd[1] = vec3f(0.0f, 1.0f, 0.0f) * m_length.y;
+	ptEnd[2] = vec3f(0.0f, 0.0f, 1.0f) * m_length.z;
 
 	//Octree
-	m_axisBoxesLo[0] = svec3f(0, -AXIS_SELECTION_RADIUS,
+	m_axisBoxesLo[0] = vec3f(0, -AXIS_SELECTION_RADIUS,
 			-AXIS_SELECTION_RADIUS);
-	m_axisBoxesLo[1] = svec3f(-AXIS_SELECTION_RADIUS, 0,
+	m_axisBoxesLo[1] = vec3f(-AXIS_SELECTION_RADIUS, 0,
 			-AXIS_SELECTION_RADIUS);
-	m_axisBoxesLo[2] = svec3f(-AXIS_SELECTION_RADIUS, -AXIS_SELECTION_RADIUS,
+	m_axisBoxesLo[2] = vec3f(-AXIS_SELECTION_RADIUS, -AXIS_SELECTION_RADIUS,
 			0);
 
-	m_axisBoxesHi[0] = svec3f(ptEnd[0].x, AXIS_SELECTION_RADIUS,
+	m_axisBoxesHi[0] = vec3f(ptEnd[0].x, AXIS_SELECTION_RADIUS,
 			AXIS_SELECTION_RADIUS);
-	m_axisBoxesHi[1] = svec3f(AXIS_SELECTION_RADIUS, ptEnd[1].y,
+	m_axisBoxesHi[1] = vec3f(AXIS_SELECTION_RADIUS, ptEnd[1].y,
 			AXIS_SELECTION_RADIUS);
-	m_axisBoxesHi[2] = svec3f(AXIS_SELECTION_RADIUS, AXIS_SELECTION_RADIUS,
+	m_axisBoxesHi[2] = vec3f(AXIS_SELECTION_RADIUS, AXIS_SELECTION_RADIUS,
 			ptEnd[2].z);
 
 	if (glIsList(m_glList))
@@ -233,26 +233,26 @@ void CMapScale::createWidget() {
 	glEndList();
 }
 
-CMapScale::~CMapScale() {
+ScaleWidget::~ScaleWidget() {
 	if (glIsList(m_glList))
 		glDeleteLists(m_glList, 1);
 }
 
-void CMapScale::draw() {
+void ScaleWidget::draw() {
 	glPushMatrix();
 	glTranslatef(m_pos.x, m_pos.y, m_pos.z);
 	glCallList(m_glList);
 	glPopMatrix();
 }
 
-UITRANSFORMAXIS CMapScale::selectAxis(const Ray& ray, float zNear, float zFar) {
+UITRANSFORMAXIS ScaleWidget::selectAxis(const Ray& ray, float zNear, float zFar) {
 	AABB box;
 
 	for (int i = 0; i < 3; i++) {
 		box.set(m_axisBoxesLo[i], m_axisBoxesHi[i]);
 		box.translate(m_pos);
 		if (box.intersect(ray, zNear, zFar)) {
-			TheUITransform.axis = (UITRANSFORMAXIS) i;
+			TheUITransform::Instance().axis = (UITRANSFORMAXIS) i;
 			this->createWidget();
 			return (UITRANSFORMAXIS) i;
 		}
@@ -262,32 +262,32 @@ UITRANSFORMAXIS CMapScale::selectAxis(const Ray& ray, float zNear, float zFar) {
 }
 
 //////////////////////////////////////////////////////////////////
-void CMapTranslate::createWidget() {
-	svec3f ptEnd[3];
-	svec3f origin(0, 0, 0);
+void TranslateWidget::createWidget() {
+	vec3f ptEnd[3];
+	vec3f origin(0, 0, 0);
 
 	if (glIsList(m_glList))
 		glDeleteLists(m_glList, 1);
 
 	m_glList = glGenLists(1);
 	glNewList(m_glList, GL_COMPILE);
-	ptEnd[0] = vscale3f(m_length.x, svec3f(1.0f, 0.0f, 0.0f));
-	ptEnd[1] = vscale3f(m_length.y, svec3f(0.0f, 1.0f, 0.0f));
-	ptEnd[2] = vscale3f(m_length.z, svec3f(0.0f, 0.0f, 1.0f));
+	ptEnd[0] = vec3f(1.0f, 0.0f, 0.0f) * m_length.x;
+	ptEnd[1] = vec3f(0.0f, 1.0f, 0.0f) * m_length.y;
+	ptEnd[2] = vec3f(0.0f, 0.0f, 1.0f) * m_length.z;
 
 	//Octree
-	m_axisBoxesLo[0] = svec3f(0, -AXIS_SELECTION_RADIUS,
+	m_axisBoxesLo[0] = vec3f(0, -AXIS_SELECTION_RADIUS,
 			-AXIS_SELECTION_RADIUS);
-	m_axisBoxesLo[1] = svec3f(-AXIS_SELECTION_RADIUS, 0,
+	m_axisBoxesLo[1] = vec3f(-AXIS_SELECTION_RADIUS, 0,
 			-AXIS_SELECTION_RADIUS);
-	m_axisBoxesLo[2] = svec3f(-AXIS_SELECTION_RADIUS, -AXIS_SELECTION_RADIUS,
+	m_axisBoxesLo[2] = vec3f(-AXIS_SELECTION_RADIUS, -AXIS_SELECTION_RADIUS,
 			0);
 
-	m_axisBoxesHi[0] = svec3f(ptEnd[0].x, AXIS_SELECTION_RADIUS,
+	m_axisBoxesHi[0] = vec3f(ptEnd[0].x, AXIS_SELECTION_RADIUS,
 			AXIS_SELECTION_RADIUS);
-	m_axisBoxesHi[1] = svec3f(AXIS_SELECTION_RADIUS, ptEnd[1].y,
+	m_axisBoxesHi[1] = vec3f(AXIS_SELECTION_RADIUS, ptEnd[1].y,
 			AXIS_SELECTION_RADIUS);
-	m_axisBoxesHi[2] = svec3f(AXIS_SELECTION_RADIUS, AXIS_SELECTION_RADIUS,
+	m_axisBoxesHi[2] = vec3f(AXIS_SELECTION_RADIUS, AXIS_SELECTION_RADIUS,
 			ptEnd[2].z);
 
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
@@ -307,12 +307,12 @@ void CMapTranslate::createWidget() {
 	glEnd();
 
 	//Draw end points
-	svec3f v;
+	vec3f v;
 	float theta;
 	float r = 0.05f;
 
 	//X
-	v = ptEnd[0] + svec3f(0.1f, 0.0f, 0.0f);
+	v = ptEnd[0] + vec3f(0.1f, 0.0f, 0.0f);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glBegin(GL_TRIANGLE_FAN);
 	glColor4fv(maskColor(uiaX).ptr());
@@ -323,13 +323,13 @@ void CMapTranslate::createWidget() {
 		v.y = r * sin(theta);
 		v.z = r * cos(theta);
 
-		v += ptEnd[0];
+		v = v + ptEnd[0];
 		glVertex3fv(v.ptr());
 	}
 	glEnd();
 
 	//Y
-	v = ptEnd[1] + svec3f(0.0f, 0.1f, 0.0f);
+	v = ptEnd[1] + vec3f(0.0f, 0.1f, 0.0f);
 	glBegin(GL_TRIANGLE_FAN);
 	glColor4fv(maskColor(uiaY).ptr());
 	glVertex3fv(v.ptr());
@@ -338,13 +338,13 @@ void CMapTranslate::createWidget() {
 		v.x = r * cos(theta);
 		v.y = 0.0f;
 		v.z = r * sin(theta);
-		v += ptEnd[1];
+		v = v + ptEnd[1];
 		glVertex3fv(v.ptr());
 	}
 	glEnd();
 
 	//Z
-	v = ptEnd[2] + svec3f(0.0f, 0.0f, 0.1f);
+	v = ptEnd[2] + vec3f(0.0f, 0.0f, 0.1f);
 	glBegin(GL_TRIANGLE_FAN);
 	glColor4fv(maskColor(uiaZ).ptr());
 	glVertex3fv(v.ptr());
@@ -354,7 +354,7 @@ void CMapTranslate::createWidget() {
 		v.y = r * sin(theta);
 		v.z = 0.0f;
 
-		v += ptEnd[2];
+		v = v + ptEnd[2];
 		glVertex3fv(v.ptr());
 	}
 	glEnd();
@@ -364,28 +364,25 @@ void CMapTranslate::createWidget() {
 	glEndList();
 }
 
-CMapTranslate::~CMapTranslate() {
+TranslateWidget::~TranslateWidget() {
 	if (glIsList(m_glList))
 		glDeleteLists(m_glList, 1);
 
 }
 
-void CMapTranslate::draw() {
-	glPushMatrix();
-	glTranslatef(m_pos.x, m_pos.y, m_pos.z);
+void TranslateWidget::draw() {
 	glCallList(m_glList);
-	glPopMatrix();
 }
 
-UITRANSFORMAXIS CMapTranslate::selectAxis(const CRay& ray, float zNear,
+UITRANSFORMAXIS TranslateWidget::selectAxis(const Ray& ray, float zNear,
 		float zFar) {
-	COctree oct;
+	AABB box;
 
 	for (int i = 0; i < 3; i++) {
-		oct.set(m_axisBoxesLo[i], m_axisBoxesHi[i]);
-		oct.translate(m_pos);
-		if (oct.intersect(ray, zNear, zFar)) {
-			TheUITransform.axis = (UITRANSFORMAXIS) i;
+		box.set(m_axisBoxesLo[i], m_axisBoxesHi[i]);
+		box.translate(m_pos);
+		if (box.intersect(ray, zNear, zFar)) {
+			TheUITransform::Instance().axis = (UITRANSFORMAXIS) i;
 			this->createWidget();
 			return (UITRANSFORMAXIS) i;
 		}

@@ -6,7 +6,8 @@
 #ifndef PS_VECTOR_H
 #define PS_VECTOR_H
 
-#include "PS_MathBase.h"
+#include "../PS_Base/PS_MathBase.h"
+
 namespace PS{
 namespace MATH{
 
@@ -33,6 +34,7 @@ public:
 
     inline T element(int i) const;
     inline void setElement(int i, T v);
+    T* ptr() {return &e[0];}
 
 
     //Static Functions
@@ -205,6 +207,7 @@ public:
 
     inline T element(int i) const;
     inline void setElement(int i, T v);
+    T* ptr() {return &e[0];}
 
 
     //Static Functions
@@ -399,6 +402,7 @@ public:
     inline Vec3<T> getVec3() const;
     inline T element(int i) const;
     inline void setElement(int i, T v);
+    T* ptr() {return &e[0];}
 
     /*!
       * The dot product of two 4D vectors

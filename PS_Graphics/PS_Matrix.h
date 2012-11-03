@@ -77,15 +77,15 @@ public:
     bool isOrthogonal() const;
 
     //Static Ops
-    friend inline bool isEqual(const Matrix& a, const Matrix& b);
-    friend inline Matrix mul(const Matrix& a, const Matrix& b);
-    friend inline Matrix mul(const Matrix& a, T s);
+    static inline bool isEqual(const Matrix& a, const Matrix& b);
+    static inline Matrix mul(const Matrix& a, const Matrix& b);
+    static inline Matrix mul(const Matrix& a, T s);
 
-    friend inline Matrix mulEntrywise(const Matrix& a, const Matrix& b);
-    friend inline T mulFrobeniousInner(const Matrix& a, const Matrix& b);
+    static inline Matrix mulEntrywise(const Matrix& a, const Matrix& b);
+    static inline T mulFrobeniousInner(const Matrix& a, const Matrix& b);
 
-    friend inline Matrix add(const Matrix& a, const Matrix& b);
-    friend inline Matrix sub(const Matrix& a, const Matrix& b);
+    static inline Matrix add(const Matrix& a, const Matrix& b);
+    static inline Matrix sub(const Matrix& a, const Matrix& b);
 
     //Determinant of a 2x2 matrix
     static inline T matrixDet2(const T m[4][4],

@@ -14,6 +14,8 @@
 #include "PS_Graphics/PS_GLFuncs.h"
 #include "PS_Graphics/PS_GLSurface.h"
 #include "PS_Graphics/PS_SketchConfig.h"
+#include "PS_Graphics/AffineWidgets.h"
+
 #include "PS_Deformable/PS_Deformable.h"
 #include "PS_Deformable/PS_VegWriter.h"
 
@@ -44,7 +46,6 @@ public:
 		this->bPanCamera = false;
 		this->bShowElements = false;
 		this->millis = DEFAULT_TIMER_MILLIS;
-		this->axis = 0;
 	}
 
 public:
@@ -55,7 +56,6 @@ public:
 	int appWidth;
 	int appHeight;
 
-	int axis;
 	svec3f worldDragStart;
 	svec3f worldDragEnd;
 	svec2i screenDragStart;
@@ -63,6 +63,7 @@ public:
 };
 
 //Global Variables
+TranslateWidget*	g_lpTranslateWidget = NULL;
 PS::ArcBallCamera g_arcBallCam;
 PS::HPC::GPUPoly* g_lpBlobRender = NULL;
 Deformable* g_lpDeformable = NULL;
@@ -144,6 +145,8 @@ void Draw()
 	glUseProgram(0);
 	*/
 
+
+
 	//Draw Deformable Object
 	g_lpDeformable->draw();
 
@@ -169,6 +172,8 @@ void Draw()
 		glColor3f(1,0,0);
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
 		glLineWidth(1.0);
+
+
 
 		glBegin(GL_LINES);
 			glVertex2f(s1.x, s1.y);
@@ -197,6 +202,19 @@ void Draw()
 	{
 		for(size_t i=0; i<g_infoLines.size(); i++)
 			DrawText(g_infoLines[i].c_str(), 10, 20 + i * 15);
+	}
+
+	if(g_lpDeformable->isHapticInProgress())
+	{
+		glMatrixMode(GL_MODELVIEW);
+		glPushMatrix();
+			glTranslatef(g_appSettings.worldDragStart.x,
+						   g_appSettings.worldDragStart.y,
+						   g_appSettings.worldDragStart.z);
+			glScalef(0.2, 0.2, 0.2);
+
+			g_lpTranslateWidget->draw();
+		glPopMatrix();
 	}
 
 	glutSwapBuffers();
@@ -294,23 +312,27 @@ void MouseMove(int x, int y)
 		//for(int i=0; i<3 && i != g_appSettings.axis; i++)
 			//vsetElement3f(ptDelta, i, 0.0f);
 		string strAxis = "X";
-		if(g_appSettings.axis == 0)
+		if(TheUITransform::Instance().axis == uiaX)
 		{
 			strAxis = "X";
 			ptDelta.y = 0.0f;
+			ptDelta.z = 0.0f;
 		}
-		else if(g_appSettings.axis == 1)
+		else if(TheUITransform::Instance().axis == uiaY)
 		{
 			strAxis = "Y";
 			ptDelta.x = 0.0f;
+			ptDelta.z = 0.0f;
 		}
-		else
+		else if(TheUITransform::Instance().axis == uiaZ)
 		{
 			strAxis = "Z";
 			ptDelta.y = 0.0f;
-			ptDelta.z = ptDelta.x;
 			ptDelta.x = 0.0f;
+			ptDelta.z = ptDelta.x;
 		}
+		else
+			strAxis = "FREE";
 
 		//Scale
 		ptDelta = vscale3f(0.0001f, ptDelta);
@@ -431,8 +453,11 @@ void Keyboard(int key, int x, int y)
 
 		case(GLUT_KEY_F4):
 		{
-			g_appSettings.axis = (g_appSettings.axis + 1) % 3;
-			LogInfoArg1("Change haptic axis to %d", g_appSettings.axis);
+			//Set UIAxis
+			TheUITransform::Instance().axis = (TheUITransform::Instance().axis + 1) % 4;
+			LogInfoArg1("Change haptic axis to %d", TheUITransform::Instance().axis);
+			g_lpTranslateWidget->createWidget();
+
 			break;
 		}
 
@@ -472,6 +497,10 @@ void LoadSettings()
 	if(!bres)
 		LogError("Unable to read specified number of fixed vertices!");
 	DAnsiStr strBlobTreeFile = cfg.readString("MODEL", "BLOBTREEFILE", "");
+
+	//Translation Widget
+	TheUITransform::Instance().axis = uiaX;
+	g_lpTranslateWidget = new TranslateWidget();
 
 	//Create Deformable Model
 	g_lpDeformable = new Deformable(strVegFile.cptr(),

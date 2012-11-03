@@ -14,7 +14,7 @@ namespace PS{
 		}
 
 		Scan::~Scan() {
-			cl_int ciErrNum  = clReleaseMemObject(m_dstBuffer);
+			clReleaseMemObject(m_dstBuffer);
 		}
 
 		void Scan::init(ComputeDevice* lpDevice)

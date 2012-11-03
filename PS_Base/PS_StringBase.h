@@ -12,10 +12,10 @@
 #include <stdlib.h>
 #include "PS_MathBase.h"
 
-#ifdef WIN32
+#ifdef PS_OS_WINDOWS
 	#include <tchar.h>
 	#include "Windows.h"
-#elif defined(__linux__)
+#elif PS_OS_LINUX
 	#include "string.h"
 #endif
 

@@ -41,14 +41,14 @@ void ArcBallCamera::setRoll(float rollHDeg)
 void ArcBallCamera::setTilt(float tiltVDeg)
 {
 	float tiltVRad = DEGTORAD(tiltVDeg);
-	Clampf(tiltVRad, verticalAngleMin, verticalAngleMax);
+	Clamp<float>(tiltVRad, verticalAngleMin, verticalAngleMax);
 	m_phi = tiltVRad;
 }
 
 //Zoom or CCamera distance from scene is clamped.
 void ArcBallCamera::setZoom(float r)
 {
-	Clampf(r, zoomMin, zoomMax);
+	Clamp<float>(r, zoomMin, zoomMax);
 	m_rho = r;
 }
 

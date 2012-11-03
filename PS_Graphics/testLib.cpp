@@ -2,8 +2,8 @@
 #include <iostream>
 #include "PS_Matrix.h"
 #include "PS_Vector.h"
-#include <QMatrix4x4>
-
+//#include <QMatrix4x4>
+#include <stdio.h>
 using namespace std;
 using namespace PS::MATH;
 
@@ -18,7 +18,7 @@ void VecPrint(const vec4f& v){
 void VecPrint(const vec4d& v){
     printf("[%.2f, %.2f, %.2f, %.2f] \n", v.x, v.y, v.z, v.w);
 }
-
+/*
 void QMtxPrint(const QMatrix4x4& m)
 {
     const double* data = m.data();
@@ -32,6 +32,7 @@ void QMtxPrint(const QMatrix4x4& m)
         printf("\n");
     }
 }
+*/
 
 void runTests()
 {    
@@ -120,6 +121,7 @@ void runTests()
     MtxPrint(m.inverted());
 
 
+    /*
     printf("Ground Truth = \n");
     QMatrix4x4 gt(arrV);
     QMtxPrint(gt);
@@ -130,5 +132,5 @@ void runTests()
     printf("Ground Truth Inverted = \n");
     QMatrix4x4 gtInv = gt.inverted();
     QMtxPrint(gtInv);
-
+	*/
 }
