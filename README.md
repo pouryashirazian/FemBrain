@@ -1,5 +1,6 @@
 FemBrain
-========
+Last Updated: Nov 2, 2012
+==============
 
 Finite Element Simulation of Brain Tissues modeled with BlobTree implicit surface models.
 
