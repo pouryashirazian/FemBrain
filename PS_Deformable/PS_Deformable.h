@@ -10,7 +10,8 @@
 
 #include <vector>
 #include "../PS_Base/PS_MathBase.h"
-#include "../PS_Graphics/PS_MeshGLBuffer.h"
+#include "../PS_Graphics/PS_GLMeshBuffer.h"
+#include "../PS_Graphics/PS_Vector.h"
 
 #include "corotationalLinearFEM.h"
 #include "corotationalLinearFEMForceModel.h"
@@ -20,6 +21,7 @@
 #include "graph.h"
 
 using namespace std;
+using namespace PS::MATH;
 
 /*!
  *	Deformable model
@@ -38,10 +40,11 @@ public:
 	void timestep();
 
 	//Pick a vertex
-	bool pickFreeVertex(double worldX, double worldY, double worldZ);
+	int pickVertex(double worldX, double worldY, double worldZ, double* arrFoundVertex = NULL);
 
 	//Haptic Interaction
-	void hapticStart();
+	bool hapticStart(int index);
+	bool hapticStart(double worldX, double worldY, double worldZ);
 	void hapticEnd();
 	bool hapticUpdateForce();
 	bool hapticUpdateDisplace();
@@ -62,6 +65,14 @@ public:
 	void setDampingMassCoeff(double m);
 	double getDampingMassCoeff() const {return m_dampingMassCoeff;}
 
+	bool addFixedVertex(int index);
+	bool removeFixedVertex(int index);
+
+	/*!
+	 * Return: Outputs number of dofs
+	 */
+	static int FixedVerticesToFixedDOF(std::vector<int>& arrInFixedVertices,
+										    std::vector<int>& arrOutFixedDOF);
 private:
 	/*!
 	 * Setup procedure builds deformable model with the specified params
@@ -71,7 +82,7 @@ private:
 			    std::vector<int>& vFixedVertices);
 
 	void cleanup();
-	void computeConstrainedDof(std::vector<int>& vArrOutputDof);
+
 private:
 	bool m_bHapticForceInProgress;
 	double m_hapticCompliance;
@@ -85,8 +96,7 @@ private:
 
 	Graph* m_lpMeshGraph;
 	//double* m_lpHapticForces;
-
-	GLMeshBuffer m_meshBuffer;
+	//GLMeshBuffer m_meshBuffer;
 
 	//Tetrahedra input mesh
 	TetMesh* m_lpTetMesh;
@@ -115,7 +125,10 @@ private:
 
 	//Fixed Vertices
 	vector<int> m_vFixedVertices;
+	vector<int> m_vFixedDofs;
 	int m_idxPulledVertex;
+
+	int m_positiveDefiniteSolver;
 
 	bool m_bRenderFixedVertices;
 	bool m_bRenderVertices;

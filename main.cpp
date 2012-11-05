@@ -15,9 +15,11 @@
 #include "PS_Graphics/PS_GLSurface.h"
 #include "PS_Graphics/PS_SketchConfig.h"
 #include "PS_Graphics/AffineWidgets.h"
+#include "PS_Graphics/PS_Vector.h"
 
 #include "PS_Deformable/PS_Deformable.h"
 #include "PS_Deformable/PS_VegWriter.h"
+#include "PS_Deformable/Avatar.h"
 
 using namespace std;
 using namespace PS;
@@ -36,6 +38,8 @@ using namespace PS::HPC;
 #define INDEX_GPU_INFO 	   2
 
 
+enum HAPTICMODES {hmForce, hmAddFixed, hmRemoveFixed, hmCount};
+
 //Application Settings
 class AppSettings{
 public:
@@ -46,6 +50,7 @@ public:
 		this->bPanCamera = false;
 		this->bShowElements = false;
 		this->millis = DEFAULT_TIMER_MILLIS;
+		this->hapticMode = 0;
 	}
 
 public:
@@ -55,14 +60,16 @@ public:
 	U32   millis;
 	int appWidth;
 	int appHeight;
+	int hapticMode;
 
-	svec3f worldDragStart;
-	svec3f worldDragEnd;
-	svec2i screenDragStart;
-	svec2i screenDragEnd;
+	vec3d worldDragStart;
+	vec3d worldDragEnd;
+	vec2i screenDragStart;
+	vec2i screenDragEnd;
 };
 
 //Global Variables
+AvatarCube* g_lpAvatar = NULL;
 TranslateWidget*	g_lpTranslateWidget = NULL;
 PS::ArcBallCamera g_arcBallCam;
 PS::HPC::GPUPoly* g_lpBlobRender = NULL;
@@ -79,6 +86,7 @@ GLuint g_uiShader;
 ////////////////////////////////////////////////
 //Function Prototype
 void Draw();
+void DrawBox(const vec3f& lo, const vec3f& hi, const vec3f& color, float lineWidth);
 void Resize(int w, int h);
 void TimeStep(int t);
 void MousePress(int button, int state, int x, int y);
@@ -118,6 +126,8 @@ const char* g_lpFragShaderCode =
 	"gl_FragColor = gl_FrontLightModelProduct.sceneColor + Iamb + Idif + Ispec;	}";
 
 ////////////////////////////////////////////////////////////////////////////////////////
+
+
 void Draw()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -148,7 +158,28 @@ void Draw()
 
 
 	//Draw Deformable Object
+	if(g_lpAvatar)
+		g_lpAvatar->draw();
+
+	if (g_lpDeformable->isHapticInProgress())
+	{
+		glMatrixMode(GL_MODELVIEW);
+		glPushMatrix();
+
+
+
+/*
+		glTranslated(g_appSettings.worldDragStart.x,
+					   g_appSettings.worldDragStart.y,
+					   g_appSettings.worldDragStart.z);
+*/
+
+		//glScalef(0.2, 0.2, 0.2);
+		//g_lpTranslateWidget->draw();
+		glPopMatrix();
+	}
 	g_lpDeformable->draw();
+
 
 	//Draw Haptic Line
 	if(g_lpDeformable->isHapticInProgress())
@@ -157,8 +188,8 @@ void Draw()
 		glGetIntegerv(GL_VIEWPORT, vp);
 		//svec3f s1 = g_appSettings.worldDragStart;
 		//svec3f s2 = g_appSettings.worldDragEnd;
-		svec2i s1 = g_appSettings.screenDragStart;
-		svec2i s2 = g_appSettings.screenDragEnd;
+		vec2i s1 = g_appSettings.screenDragStart;
+		vec2i s2 = g_appSettings.screenDragEnd;
 
 		glMatrixMode(GL_PROJECTION);
 		glPushMatrix();
@@ -204,20 +235,32 @@ void Draw()
 			DrawText(g_infoLines[i].c_str(), 10, 20 + i * 15);
 	}
 
-	if(g_lpDeformable->isHapticInProgress())
-	{
-		glMatrixMode(GL_MODELVIEW);
-		glPushMatrix();
-			glTranslatef(g_appSettings.worldDragStart.x,
-						   g_appSettings.worldDragStart.y,
-						   g_appSettings.worldDragStart.z);
-			glScalef(0.2, 0.2, 0.2);
-
-			g_lpTranslateWidget->draw();
-		glPopMatrix();
-	}
-
 	glutSwapBuffers();
+}
+
+void DrawBox(const vec3f& lo, const vec3f& hi, const vec3f& color, float lineWidth)
+{
+	float l = lo.x; float r = hi.x;
+	float b = lo.y; float t = hi.y;
+	float n = lo.z; float f = hi.z;
+
+	GLfloat vertices [][3] = {{l, b, f}, {l, t, f}, {r, t, f},
+							  {r, b, f}, {l, b, n}, {l, t, n},
+							  {r, t, n}, {r, b, n}};
+
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+		glColor3f(color.x, color.y, color.z);
+		glLineWidth(lineWidth);
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		glBegin(GL_QUADS);
+			glVertex3fv(vertices[0]); glVertex3fv(vertices[3]); glVertex3fv(vertices[2]); glVertex3fv(vertices[1]);
+			glVertex3fv(vertices[4]); glVertex3fv(vertices[5]); glVertex3fv(vertices[6]); glVertex3fv(vertices[7]);
+			glVertex3fv(vertices[3]); glVertex3fv(vertices[0]); glVertex3fv(vertices[4]); glVertex3fv(vertices[7]);
+			glVertex3fv(vertices[1]); glVertex3fv(vertices[2]); glVertex3fv(vertices[6]); glVertex3fv(vertices[5]);
+			glVertex3fv(vertices[2]); glVertex3fv(vertices[3]); glVertex3fv(vertices[7]); glVertex3fv(vertices[6]);
+			glVertex3fv(vertices[5]); glVertex3fv(vertices[4]); glVertex3fv(vertices[0]); glVertex3fv(vertices[1]);
+		glEnd();
+	glPopAttrib();
 }
 
 void DrawText(const char* chrText, int x, int y)
@@ -283,12 +326,26 @@ void MousePress(int button, int state, int x, int y)
 			gluUnProject(winX, winY, zValue, model, proj, view,
 						   &worldX, &worldY, &worldZ);
 
-			if (stencilValue == 1) {
-				if(g_lpDeformable->pickFreeVertex(worldX, worldY, worldZ))
+			if (stencilValue == 1)
+			{
+				double closestVertex[3];
+				int idxVertex = g_lpDeformable->pickVertex(worldX, worldY, worldZ, &closestVertex[0]);
+
+				if(g_appSettings.hapticMode == hmForce)
 				{
-					g_appSettings.worldDragStart = svec3f(worldX, worldY, worldZ);
-					g_appSettings.screenDragStart = svec2i(x, y);
-					g_lpDeformable->hapticStart();
+					if(g_lpDeformable->hapticStart(idxVertex))
+					{
+						g_appSettings.worldDragStart = vec3d(&closestVertex[0]);
+						g_appSettings.screenDragStart = vec2i(x, y);
+					}
+				}
+				else if(g_appSettings.hapticMode == hmAddFixed)
+				{
+
+				}
+				else if(g_appSettings.hapticMode == hmRemoveFixed)
+				{
+
 				}
 			}
 		}
@@ -307,7 +364,7 @@ void MouseMove(int x, int y)
 {
 	if(g_lpDeformable->isHapticInProgress())
 	{
-		svec3f ptDelta(x - g_appSettings.screenDragStart.x,
+		vec3f ptDelta(x - g_appSettings.screenDragStart.x,
 					   g_appSettings.screenDragStart.y - y, 0);
 		//for(int i=0; i<3 && i != g_appSettings.axis; i++)
 			//vsetElement3f(ptDelta, i, 0.0f);
@@ -335,26 +392,14 @@ void MouseMove(int x, int y)
 			strAxis = "FREE";
 
 		//Scale
-		ptDelta = vscale3f(0.0001f, ptDelta);
+		ptDelta = ptDelta * 0.0001;
 
 		char buffer[1024];
 		sprintf(buffer, "HAPTIC DELTA VECTOR=(%.4f, %.4f, %.4f), AXIS=%s", ptDelta.x, ptDelta.y, ptDelta.z, strAxis.c_str());
 		g_infoLines[INDEX_HAPTIC_INFO] = string(buffer);
-		g_appSettings.screenDragEnd = svec2i(x, y);
+		g_appSettings.screenDragEnd = vec2i(x, y);
 
 		g_lpDeformable->hapticSetCurrentDisplacement(ptDelta.x, ptDelta.y, ptDelta.z);
-
-		//ArcBall Camera
-		/*
-		svec3f ptWorld;
-		g_arcBallCam.screenToWorld_OrientationOnly3D(ptScreen, ptWorld);
-		double arrExt[3];
-		arrExt[0] = ptWorld.x;
-		arrExt[1] = ptWorld.y;
-		arrExt[2] = ptWorld.z;
-		g_lpDeformable->hapticSetCurrentForce(arrExt);
-		g_appSettings.worldDragEnd = ptWorld;
-		*/
 	}
 
 	g_arcBallCam.mouseMove(x, y);
@@ -374,6 +419,7 @@ void Close()
 	SAFE_DELETE(g_lpSurface);
 	SAFE_DELETE(g_lpBlobRender);
 	SAFE_DELETE(g_lpDeformable);
+	SAFE_DELETE(g_lpAvatar);
 
 	PS::TheEventLogger::Instance().flush();
 }
@@ -447,7 +493,17 @@ void Keyboard(int key, int x, int y)
 
 		case(GLUT_KEY_F3):
 		{
+			g_appSettings.hapticMode ++;
+			g_appSettings.hapticMode = g_appSettings.hapticMode % (int)hmCount;
+			DAnsiStr strMode = "Force";
 
+			if(g_appSettings.hapticMode == hmForce)
+				strMode = "FORCE";
+			else if(g_appSettings.hapticMode == hmAddFixed)
+				strMode = "ADDFIXED";
+			else if(g_appSettings.hapticMode == hmRemoveFixed)
+				strMode = "REMFIXED";
+			LogInfoArg2("Haptic mode: %d, %s", g_appSettings.hapticMode, strMode.cptr());
 			break;
 		}
 
@@ -496,7 +552,6 @@ void LoadSettings()
 	bool bres = cfg.readIntArray("MODEL", "FIXEDVERTICES", ctFixed, vFixedVertices);
 	if(!bres)
 		LogError("Unable to read specified number of fixed vertices!");
-	DAnsiStr strBlobTreeFile = cfg.readString("MODEL", "BLOBTREEFILE", "");
 
 	//Translation Widget
 	TheUITransform::Instance().axis = uiaX;
@@ -506,6 +561,10 @@ void LoadSettings()
 	g_lpDeformable = new Deformable(strVegFile.cptr(),
 									strObjFile.cptr(),
 									vFixedVertices);
+
+	g_lpAvatar = new AvatarCube();
+	g_lpAvatar->setShaderEffectProgram(g_uiShader);
+	//g_lpAvatar->setEffectType(setFixedFunction);
 
 	/*
 	g_lpBlobRender = new GPUPoly();

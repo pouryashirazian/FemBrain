@@ -193,7 +193,7 @@ public:
     Vec3() {}
     Vec3(T x_, T y_, T z_):x(x_), y(y_), z(z_) {}
     Vec3(const Vec3& rhs):x(rhs.x), y(rhs.y), z(rhs.z) {}
-    Vec3(T *lpValues)
+    Vec3(const T *lpValues)
     {
         this->x = lpValues[0];
         this->y = lpValues[1];

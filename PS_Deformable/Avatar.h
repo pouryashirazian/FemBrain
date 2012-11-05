@@ -1,19 +1,19 @@
 #ifndef AVATAR_H
 #define AVATAR_H
 
-#include "../PS_Graphics/PS_MeshGLBuffer.h"
+#include "../PS_Graphics/PS_GLMeshBuffer.h"
 
-class Avatar{
+/*!
+ * Synopsis: Haptics Avatar
+ */
+class AvatarCube : public GLMeshBuffer{
 public:
-	Avatar();
-	virtual ~Avatar();
-
-	void setup();
-
-	void draw();
+	AvatarCube();
+	virtual ~AvatarCube();
 
 private:
-	GLMeshBuffer m_glBuffer;
+	void setup();
+
 
 };
 

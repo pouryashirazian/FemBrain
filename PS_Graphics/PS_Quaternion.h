@@ -8,10 +8,9 @@
 
 #include <math.h>
 
-#include "PS_VectorMath.h"
-#include "PS_MATRIX4.h"
+#include "PS_Vector.h"
+#include "PS_Matrix.h"
 
-using namespace PS::FUNCTIONALMATH;
 
 namespace PS{
 namespace MATH{
@@ -28,7 +27,7 @@ public:
     	this->w = rhs.w;
     }
 
-    Quaternion(const svec3f& q_, float w_)
+    Quaternion(const vec3f& q_, float w_)
     {
     	this->q = q_;
     	this->w = w_;
@@ -37,11 +36,11 @@ public:
     ~Quaternion(){}
 
 	void identity() {
-		q = svec3f(0, 0, 0);
+		q = vec3f(0, 0, 0);
 		w = 1;
 	}
 
-    svec3f transform(const svec3f& p) const
+    vec3f transform(const vec3f& p) const
     {
         Quaternion input(p, 0.0f);
         Quaternion inv = inverted();
@@ -51,7 +50,7 @@ public:
         return res.q;
     }
 
-    svec3f transform(const Quaternion& inv, svec3f p)
+    vec3f transform(const Quaternion& inv, vec3f p)
     {
         Quaternion input(p, 0.0f);
         Quaternion res = multiply(input);
@@ -61,15 +60,15 @@ public:
 
 
     //Convert from quaternion to a rotation matrix and vice versa
-    void fromMatrix(const MAT44& mtx);
-    void toMatrix(MAT44 &mtx) const;
+    void fromMatrix(const mat44& mtx);
+    void toMatrix(mat44 &mtx) const;
 
     //Convert To/From Euler
     void fromEuler(float roll, float pitch, float yaw);
     void toEuler(float& roll, float& pitch, float& yaw) const;
 
     // Convert angle/axis into quaternion, and return rotation matrix.
-    void fromAngleAxis(float radians,const svec3f &axis)
+    void fromAngleAxis(float radians,const vec3f &axis)
     {
         float halftheta    = radians*0.5f;
         float sinHalfTheta = (float)sin( halftheta );
@@ -96,7 +95,7 @@ public:
             square = 1.0f;
         float coeff = 1.0f/square;
 
-        q = vscale3f(- coeff, q);
+        q = q * (- coeff);
         w = w * coeff;
     }
 
@@ -127,14 +126,14 @@ public:
     /*!
      * Get Axis and Angle
      */
-    void getAxisAngle(svec3f &axis, float& angleDeg) const
+    void getAxisAngle(vec3f &axis, float& angleDeg) const
     {
         angleDeg = RADTODEG(acos(w) * 2.0f);
         float sa = sqrt(1.0f - w*w);
         if (sa)
-            axis = svec3f(q.x/sa, q.y/sa, q.z/sa);
+            axis = vec3f(q.x/sa, q.y/sa, q.z/sa);
         else
-            axis = svec3f(1,0,0);
+            axis = vec3f(1,0,0);
     }
 
 
@@ -171,7 +170,7 @@ public:
 
 public:
     //x/y/z components of quaternion.
-    svec3f q;
+    vec3f q;
 
     // w component of quaternion.
     float w;

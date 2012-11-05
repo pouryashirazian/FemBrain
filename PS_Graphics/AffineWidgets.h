@@ -131,6 +131,9 @@ public:
 
 
 private:
+    U32 m_vbo;
+
+
     U32 m_glList;
     vec3f m_axisBoxesLo[3];
     vec3f m_axisBoxesHi[3];

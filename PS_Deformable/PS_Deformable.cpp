@@ -100,40 +100,14 @@ void Deformable::setup(const char* lpVegFilePath,
 	// This option only affects PARDISO and SPOOLES solvers, where it is best
 	// to keep it at 0, which implies a symmetric, non-PD solve.
 	// With CG, this option is ignored.
-	int positiveDefiniteSolver = 0;
+	m_positiveDefiniteSolver = 0;
 
 	//Copy from the input fixed vertices
 	m_vFixedVertices.assign(vFixedVertices.begin(), vFixedVertices.end());
-	//(constrained DOFs are specified 0-indexed):
-	//DISC
-/*
-	m_vFixedVertices.push_back(2);
-	m_vFixedVertices.push_back(3);
-	m_vFixedVertices.push_back(4);
-	m_vFixedVertices.push_back(5);
 
-	m_vFixedVertices.push_back(34);
-	m_vFixedVertices.push_back(35);
-	m_vFixedVertices.push_back(36);
-	m_vFixedVertices.push_back(37);
 
-*/
-
-	/*
-	//BEAM
-	m_vFixedVertices.push_back(206);
-	m_vFixedVertices.push_back(207);
-	m_vFixedVertices.push_back(154);
-	m_vFixedVertices.push_back(155);
-
-	m_vFixedVertices.push_back(102);
-	m_vFixedVertices.push_back(103);
-	m_vFixedVertices.push_back(50);
-	m_vFixedVertices.push_back(51);
-	*/
-
-	vector<int> vConstainedDofs;
-	computeConstrainedDof(vConstainedDofs);
+	m_vFixedDofs.resize(0);
+	FixedVerticesToFixedDOF(m_vFixedVertices, m_vFixedDofs);
 
 	// (tangential) Rayleigh damping
 	// "underwater"-like damping
@@ -150,16 +124,15 @@ void Deformable::setup(const char* lpVegFilePath,
 	//Time Step the model
 	m_timeStep = 0.0333;
 
-	// initialize the integrator
+	// initialize the Integrator
 	m_lpIntegrator = new ImplicitBackwardEulerSparse(m_dof, m_timeStep,
 													 m_lpMassMatrix,
 													 m_lpDeformableForceModel,
-													 positiveDefiniteSolver,
-													 vConstainedDofs.size(),
-													 &vConstainedDofs[0],
+													 m_positiveDefiniteSolver,
+													 m_vFixedDofs.size(),
+													 &m_vFixedDofs[0],
 													 m_dampingMassCoeff,
 													 m_dampingStiffnessCoeff);
-
 
 	m_ctTimeStep = 0;
 }
@@ -177,23 +150,26 @@ void Deformable::setDampingMassCoeff(double m)
 }
 
 //Computes constrained dofs based on selected fixed vertices
-void Deformable::computeConstrainedDof(std::vector<int>& vArrFixedDof)
+int Deformable::FixedVerticesToFixedDOF(std::vector<int>& arrInFixedVertices,
+	  								 	     std::vector<int>& arrOutFixedDOF)
+
 {
-	if(m_vFixedVertices.size() == 0)
-		return;
+	if(arrInFixedVertices.size() == 0)
+		return 0;
 
 	//Fixed Vertices
-	std::sort(m_vFixedVertices.begin(), m_vFixedVertices.end());
+	std::sort(arrInFixedVertices.begin(), arrInFixedVertices.end());
 
-	//4,10,14
-	vArrFixedDof.resize(m_vFixedVertices.size() * 3);
-	for(U32 i=0; i < m_vFixedVertices.size(); i++)
+	arrOutFixedDOF.resize(arrInFixedVertices.size() * 3);
+	for(U32 i=0; i < arrInFixedVertices.size(); i++)
 	{
-		int start = m_vFixedVertices[i] * 3;
-		vArrFixedDof[i*3] = start;
-		vArrFixedDof[i*3 + 1] = start + 1;
-		vArrFixedDof[i*3 + 2] = start + 2;
+		int start = arrInFixedVertices[i] * 3;
+		arrOutFixedDOF[i*3] = start;
+		arrOutFixedDOF[i*3 + 1] = start + 1;
+		arrOutFixedDOF[i*3 + 2] = start + 2;
 	}
+
+	return arrOutFixedDOF.size();
 }
 
 
@@ -214,6 +190,8 @@ void Deformable::timestep()
 			m_lpIntegrator->SetExternalForces(m_arrExtForces);
 		}
 		*/
+	if(m_lpIntegrator == NULL)
+		return;
 
 	// important: must always clear forces, as they remain in effect unless changed
 	m_lpIntegrator->SetExternalForcesToZero();
@@ -235,28 +213,99 @@ void Deformable::timestep()
 	glutPostRedisplay();
 }
 
-bool Deformable::pickFreeVertex(double worldX, double worldY, double worldZ)
+int Deformable::pickVertex(double worldX, double worldY, double worldZ, double* arrFoundVertex)
 {
 	Vec3d wPos(worldX, worldY, worldZ);
-	m_idxPulledVertex = m_lpDeformableMesh->FindClosestVertex(wPos);
-	LogInfoArg1("Clicked on vertex: %d (0-indexed).", m_idxPulledVertex);
-
-	if(m_vFixedVertices.size() > 0)
+	double dist;
+	double arrVPos[3];
+	int index = m_lpDeformableMesh->FindClosestVertex(wPos, &dist, &arrVPos[0]);
+	if(arrFoundVertex)
 	{
-		for(U32 i=0; i < m_vFixedVertices.size(); i++)
+		for(int i=0; i < 3; i++)
+			arrFoundVertex[i] = arrVPos[i];
+	}
+	LogInfoArg2("Clicked on vertex: %d (0-indexed). Dist: %.2f", index, dist);
+	return index;
+}
+
+bool Deformable::addFixedVertex(int index){
+	for(U32 i=0; i< m_vFixedVertices.size(); i++)
+	{
+		if(m_vFixedVertices[i] == index)
+			return false;
+	}
+
+	m_vFixedVertices.push_back(index);
+	FixedVerticesToFixedDOF(m_vFixedVertices, m_vFixedDofs);
+
+	SAFE_DELETE(m_lpIntegrator);
+
+	// initialize the Integrator
+	m_lpIntegrator = new ImplicitBackwardEulerSparse(m_dof, m_timeStep,
+													 m_lpMassMatrix,
+													 m_lpDeformableForceModel,
+													 m_positiveDefiniteSolver,
+													 m_vFixedDofs.size(),
+													 &m_vFixedDofs[0],
+													 m_dampingMassCoeff,
+													 m_dampingStiffnessCoeff);
+	return true;
+}
+
+bool Deformable::removeFixedVertex(int index){
+
+	bool bChanged = false;
+	for(U32 i=0; i< m_vFixedVertices.size(); i++)
+	{
+		if(m_vFixedVertices[i] == index)
 		{
-			if(m_vFixedVertices[i] == m_idxPulledVertex)
+			m_vFixedVertices.erase(m_vFixedVertices.begin() + i);
+			bChanged = true;
+			break;
+		}
+	}
+
+	if(!bChanged)
+		return false;
+
+
+	//Update DOFS
+	FixedVerticesToFixedDOF(m_vFixedVertices, m_vFixedDofs);
+
+	//Rebuilt Integrator
+	SAFE_DELETE(m_lpIntegrator);
+
+	// initialize the Integrator
+	m_lpIntegrator = new ImplicitBackwardEulerSparse(m_dof, m_timeStep,
+													 m_lpMassMatrix,
+													 m_lpDeformableForceModel,
+													 m_positiveDefiniteSolver,
+													 m_vFixedDofs.size(),
+													 &m_vFixedDofs[0],
+													 m_dampingMassCoeff,
+													 m_dampingStiffnessCoeff);
+	return true;
+}
+
+bool Deformable::hapticStart(int index)
+{
+	m_idxPulledVertex = index;
+	m_bHapticForceInProgress = true;
+	return true;
+}
+
+bool Deformable::hapticStart(double worldX, double worldY, double worldZ)
+{
+	m_idxPulledVertex = pickVertex(worldX, worldY, worldZ);
+	if (m_vFixedVertices.size() > 0) {
+		for (U32 i = 0; i < m_vFixedVertices.size(); i++) {
+			if (m_vFixedVertices[i] == m_idxPulledVertex)
 				return false;
 		}
 	}
 
 	m_bHapticForceInProgress = true;
 	return true;
-}
-
-void Deformable::hapticStart()
-{
-	m_bHapticForceInProgress = true;
 }
 
 void Deformable::hapticEnd()
@@ -293,91 +342,9 @@ bool Deformable::hapticUpdateForce()
 	affectedVertices.insert(m_idxPulledVertex);
 	lastLayerVertices.insert(m_idxPulledVertex);
 
-	for (int j = 1; j < m_hapticForceNeighorhoodSize; j++)
-	{
+	for (int j = 1; j < m_hapticForceNeighorhoodSize; j++) {
 		// linear kernel
 		double forceMagnitude = 1.0 * (m_hapticForceNeighorhoodSize - j)
-				/ static_cast<double>(m_hapticForceNeighorhoodSize);
-
-		set<int> newAffectedVertices;
-		for (set<int>::iterator iter = lastLayerVertices.begin(); iter != lastLayerVertices.end(); iter++)
-		{
-			// traverse all neighbors and check if they were already previously inserted
-			int vtx = *iter;
-			int deg = m_lpMeshGraph->GetNumNeighbors(vtx);
-			for (int k = 0; k < deg; k++)
-			{
-				int vtxNeighbor = m_lpMeshGraph->GetNeighbor(vtx, k);
-
-				if (affectedVertices.find(vtxNeighbor) == affectedVertices.end())
-				{
-					// discovered new vertex
-					newAffectedVertices.insert(vtxNeighbor);
-				}
-			}
-		}
-
-		lastLayerVertices.clear();
-		for (set<int>::iterator iter = newAffectedVertices.begin();iter != newAffectedVertices.end(); iter++)
-		{
-			// apply force
-			m_arrExtForces[3 * *iter + 0] += forceMagnitude * extForce[0];
-			m_arrExtForces[3 * *iter + 1] += forceMagnitude * extForce[1];
-			m_arrExtForces[3 * *iter + 2] += forceMagnitude * extForce[2];
-
-			// generate new layers
-			lastLayerVertices.insert(*iter);
-			affectedVertices.insert(*iter);
-		}
-	}
-
- // apply any scripted force loads
-/*
- if (timestepCounter < numForceLoads)
- {
- printf("  External forces read from the binary input file.\n");
- for(int i=0; i<3*n; i++)
- f_ext[i] += forceLoads[ELT(3*n, i, timestepCounter)];
- }
- */
-
-	// set forces to the integrator
-	m_lpIntegrator->SetExternalForces(m_arrExtForces);
-
-	return true;
-}
-
-//Update model based on displacements induced on model
-bool Deformable::hapticUpdateDisplace()
-{
-	if (m_idxPulledVertex < 0)
-		return false;
-	if (!m_bHapticForceInProgress)
-		return false;
-
-
-	//Reset External Force
-	memset(m_arrDisplacements, 0, sizeof(double) * m_dof);
-
-	for(int i=0; i<3; i++)
-		m_arrDisplacements[3 * m_idxPulledVertex + i] += m_hapticExtDisplacements[i];
-
-	//Distribute force over the neighboring vertices
-	/*
-	//Register force on the pulled vertex
-	m_arrDisplacements[3 * m_idxPulledVertex + 0] += extDisplace[0];
-	m_arrDisplacements[3 * m_idxPulledVertex + 1] += extDisplace[1];
-	m_arrDisplacements[3 * m_idxPulledVertex + 2] += extDisplace[2];
-
-	set<int> affectedVertices;
-	set<int> lastLayerVertices;
-	affectedVertices.insert(m_idxPulledVertex);
-	lastLayerVertices.insert(m_idxPulledVertex);
-
-	for (int j = 1; j < m_hapticForceNeighorhoodSize; j++)
-	{
-		// linear kernel
-		double displaceMagnitude = 1.0 * (m_hapticForceNeighorhoodSize - j)
 				/ static_cast<double>(m_hapticForceNeighorhoodSize);
 
 		set<int> newAffectedVertices;
@@ -399,12 +366,11 @@ bool Deformable::hapticUpdateDisplace()
 
 		lastLayerVertices.clear();
 		for (set<int>::iterator iter = newAffectedVertices.begin();
-				iter != newAffectedVertices.end(); iter++)
-		{
+				iter != newAffectedVertices.end(); iter++) {
 			// apply force
-			m_arrDisplacements[3 * *iter + 0] += displaceMagnitude * extDisplace[0];
-			m_arrDisplacements[3 * *iter + 1] += displaceMagnitude * extDisplace[1];
-			m_arrDisplacements[3 * *iter + 2] += displaceMagnitude * extDisplace[2];
+			m_arrExtForces[3 * *iter + 0] += forceMagnitude * extForce[0];
+			m_arrExtForces[3 * *iter + 1] += forceMagnitude * extForce[1];
+			m_arrExtForces[3 * *iter + 2] += forceMagnitude * extForce[2];
 
 			// generate new layers
 			lastLayerVertices.insert(*iter);
@@ -412,7 +378,79 @@ bool Deformable::hapticUpdateDisplace()
 		}
 	}
 
-*/
+	// set forces to the integrator
+	m_lpIntegrator->SetExternalForces(m_arrExtForces);
+
+	return true;
+}
+
+//Update model based on displacements induced on model
+bool Deformable::hapticUpdateDisplace()
+{
+	if (m_idxPulledVertex < 0)
+		return false;
+	if (!m_bHapticForceInProgress)
+		return false;
+
+
+	//Reset Displacements Vector
+	memset(m_arrDisplacements, 0, sizeof(double) * m_dof);
+
+	for(int i=0; i<3; i++)
+		m_arrDisplacements[3 * m_idxPulledVertex + i] += m_hapticExtDisplacements[i];
+
+	//Distribute force over the neighboring vertices
+
+	set<int> affectedVertices;
+	set<int> lastLayerVertices;
+	affectedVertices.insert(m_idxPulledVertex);
+	lastLayerVertices.insert(m_idxPulledVertex);
+
+	for (int j = 1; j < m_hapticForceNeighorhoodSize; j++)
+	{
+		// linear kernel
+		double displaceMagnitude = 1.0 * (m_hapticForceNeighorhoodSize - j)
+				/ static_cast<double>(m_hapticForceNeighorhoodSize);
+
+		set<int> newAffectedVertices;
+		for (set<int>::iterator iter = lastLayerVertices.begin();
+				iter != lastLayerVertices.end(); iter++)
+		{
+			// traverse all neighbors and check if they were already previously inserted
+			int vtx = *iter;
+			int deg = m_lpMeshGraph->GetNumNeighbors(vtx);
+			for (int k = 0; k < deg; k++) {
+				int vtxNeighbor = m_lpMeshGraph->GetNeighbor(vtx, k);
+
+				//If the vertex was not in the set of affected vertices then
+				//Add it to the new set
+				if (affectedVertices.find(vtxNeighbor)
+						== affectedVertices.end()) {
+					// discovered new vertex
+					newAffectedVertices.insert(vtxNeighbor);
+				}
+			}
+		}
+
+		//LastLayerVertices only keeps the last circle of vertices, so clear it now
+		lastLayerVertices.clear();
+
+		//Apply forces to the newly affected vertices
+		for (set<int>::iterator iter = newAffectedVertices.begin();
+				iter != newAffectedVertices.end(); iter++)
+		{
+			// apply force
+			m_arrDisplacements[3 * *iter + 0] += displaceMagnitude * m_hapticExtDisplacements[0];
+			m_arrDisplacements[3 * *iter + 1] += displaceMagnitude * m_hapticExtDisplacements[1];
+			m_arrDisplacements[3 * *iter + 2] += displaceMagnitude * m_hapticExtDisplacements[2];
+
+			// generate new layers
+			lastLayerVertices.insert(*iter);
+			affectedVertices.insert(*iter);
+		}
+	}
+
+
 	//Compute external forces to be applied. Input: displacements, Output: forces
 	memset(m_arrExtForces, 0, sizeof(double) * m_dof);
 	m_lpDeformableForceModel->GetInternalForce(m_arrDisplacements, m_arrExtForces);

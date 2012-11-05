@@ -25,7 +25,7 @@ void Quaternion::normalize()
     w *= dist;
 }
 
-void Quaternion::fromMatrix(const MAT44& mtx)
+void Quaternion::fromMatrix(const mat44& mtx)
 {
     float tr = mtx.e[0][0] + mtx.e[1][1] + mtx.e[2][2];
     // check the diagonal
@@ -72,7 +72,7 @@ void Quaternion::fromMatrix(const MAT44& mtx)
 }
 
 // quaternion must be normalized and matrix t in column-major format
-void Quaternion::toMatrix(MAT44& mtx) const
+void Quaternion::toMatrix(mat44& mtx) const
 {
     float xx = q.x*q.x;
     float yy = q.y*q.y;

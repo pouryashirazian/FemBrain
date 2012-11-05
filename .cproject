@@ -28,7 +28,7 @@
 								<option id="gnu.cpp.compiler.option.include.paths.2115444334" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="/opt/AMDAPP/include"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/GLUI/src/include"/>
-									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/GLEW/lib"/>
+									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/GLEW/include"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/TBB/include"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/LOKI/include"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/AA_VegaFem/include}&quot;"/>
@@ -60,6 +60,7 @@
 									<listOptionValue builtIn="false" value="/opt/AMDAPP/lib/x86"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/TBB/build/linux_ia32_gcc_cc4.6_libc2.15_kernel3.2.0_release"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/BOARD/lib"/>
+									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/GLEW/lib"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.907987824" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>

@@ -263,6 +263,88 @@ UITRANSFORMAXIS ScaleWidget::selectAxis(const Ray& ray, float zNear, float zFar)
 
 //////////////////////////////////////////////////////////////////
 void TranslateWidget::createWidget() {
+/*
+	vec3f ptEnd[3];
+	ptEnd[0] = vec3f(1.0f, 0.0f, 0.0f);
+	ptEnd[1] = vec3f(0.0f, 1.0f, 0.0f);
+	ptEnd[2] = vec3f(0.0f, 0.0f, 1.0f);
+
+	std::vector<float> arrVertices;
+	std::vector<float> arrColors;
+
+	float r = 0.2;
+	vec4f clX = maskColor(uiaX);
+	for(int i=0; i<8; i++)
+	{
+		float theta = static_cast<float>(i) * (TwoPi / 8.0f);
+		vec3f v1, v2;
+		v1.x = 0.0f;
+		v1.y = r * sin(theta);
+		v1.z = r * cos(theta);
+
+		v2.x = 1.0f;
+		v2.y = r * sin(theta);
+		v2.z = r * cos(theta);
+
+		arrVertices
+	}
+*/
+
+	//X
+	/*
+	vec3f ptEnd[3];
+	vec3f v;
+	float theta;
+	float r = 0.2;
+	v = ptEnd[0] + vec3f(0.1f, 0.0f, 0.0f);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	glBegin(GL_TRIANGLE_FAN);
+		glColor4fv(maskColor(uiaX).ptr());
+		glVertex3fv(v.ptr());
+		for (int i = 0; i <= 8; i++) {
+			theta = static_cast<float>(i) * (TwoPi / 8.0f);
+			v.x = 0.0f;
+			v.y = r * sin(theta);
+			v.z = r * cos(theta);
+
+			v = v + ptEnd[0];
+			glVertex3fv(v.ptr());
+		}
+	glEnd();
+
+	//Y
+	v = ptEnd[1] + vec3f(0.0f, 0.1f, 0.0f);
+	glBegin(GL_TRIANGLE_FAN);
+		glColor4fv(maskColor(uiaY).ptr());
+		glVertex3fv(v.ptr());
+		for (int i = 0; i <= 8; i++) {
+			theta = static_cast<float>(i) * (TwoPi / 8.0f);
+			v.x = r * cos(theta);
+			v.y = 0.0f;
+			v.z = r * sin(theta);
+			v = v + ptEnd[1];
+			glVertex3fv(v.ptr());
+		}
+	glEnd();
+
+	//Z
+	v = ptEnd[2] + vec3f(0.0f, 0.0f, 0.1f);
+	glBegin(GL_TRIANGLE_FAN);
+		glColor4fv(maskColor(uiaZ).ptr());
+		glVertex3fv(v.ptr());
+		for (int i = 0; i <= 8; i++) {
+			theta = static_cast<float>(i) * (TwoPi / 8.0f);
+			v.x = r * cos(theta);
+			v.y = r * sin(theta);
+			v.z = 0.0f;
+
+			v = v + ptEnd[2];
+			glVertex3fv(v.ptr());
+		}
+	glEnd();
+
+*/
+
 	vec3f ptEnd[3];
 	vec3f origin(0, 0, 0);
 
@@ -293,17 +375,17 @@ void TranslateWidget::createWidget() {
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glLineWidth(3.0f);
 	glBegin(GL_LINES);
-	glColor4fv(maskColor(uiaX).ptr());
-	glVertex3fv(origin.ptr());
-	glVertex3fv(ptEnd[0].ptr());
+		glColor4fv(maskColor(uiaX).ptr());
+		glVertex3fv(origin.ptr());
+		glVertex3fv(ptEnd[0].ptr());
 
-	glColor4fv(maskColor(uiaY).ptr());
-	glVertex3fv(origin.ptr());
-	glVertex3fv(ptEnd[1].ptr());
+		glColor4fv(maskColor(uiaY).ptr());
+		glVertex3fv(origin.ptr());
+		glVertex3fv(ptEnd[1].ptr());
 
-	glColor4fv(maskColor(uiaZ).ptr());
-	glVertex3fv(origin.ptr());
-	glVertex3fv(ptEnd[2].ptr());
+		glColor4fv(maskColor(uiaZ).ptr());
+		glVertex3fv(origin.ptr());
+		glVertex3fv(ptEnd[2].ptr());
 	glEnd();
 
 	//Draw end points
@@ -315,48 +397,48 @@ void TranslateWidget::createWidget() {
 	v = ptEnd[0] + vec3f(0.1f, 0.0f, 0.0f);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glBegin(GL_TRIANGLE_FAN);
-	glColor4fv(maskColor(uiaX).ptr());
-	glVertex3fv(v.ptr());
-	for (int i = 0; i <= 8; i++) {
-		theta = static_cast<float>(i) * (TwoPi / 8.0f);
-		v.x = 0.0f;
-		v.y = r * sin(theta);
-		v.z = r * cos(theta);
-
-		v = v + ptEnd[0];
+		glColor4fv(maskColor(uiaX).ptr());
 		glVertex3fv(v.ptr());
-	}
+		for (int i = 0; i <= 8; i++) {
+			theta = static_cast<float>(i) * (TwoPi / 8.0f);
+			v.x = 0.0f;
+			v.y = r * sin(theta);
+			v.z = r * cos(theta);
+
+			v = v + ptEnd[0];
+			glVertex3fv(v.ptr());
+		}
 	glEnd();
 
 	//Y
 	v = ptEnd[1] + vec3f(0.0f, 0.1f, 0.0f);
 	glBegin(GL_TRIANGLE_FAN);
-	glColor4fv(maskColor(uiaY).ptr());
-	glVertex3fv(v.ptr());
-	for (int i = 0; i <= 8; i++) {
-		theta = static_cast<float>(i) * (TwoPi / 8.0f);
-		v.x = r * cos(theta);
-		v.y = 0.0f;
-		v.z = r * sin(theta);
-		v = v + ptEnd[1];
+		glColor4fv(maskColor(uiaY).ptr());
 		glVertex3fv(v.ptr());
-	}
+		for (int i = 0; i <= 8; i++) {
+			theta = static_cast<float>(i) * (TwoPi / 8.0f);
+			v.x = r * cos(theta);
+			v.y = 0.0f;
+			v.z = r * sin(theta);
+			v = v + ptEnd[1];
+			glVertex3fv(v.ptr());
+		}
 	glEnd();
 
 	//Z
 	v = ptEnd[2] + vec3f(0.0f, 0.0f, 0.1f);
 	glBegin(GL_TRIANGLE_FAN);
-	glColor4fv(maskColor(uiaZ).ptr());
-	glVertex3fv(v.ptr());
-	for (int i = 0; i <= 8; i++) {
-		theta = static_cast<float>(i) * (TwoPi / 8.0f);
-		v.x = r * cos(theta);
-		v.y = r * sin(theta);
-		v.z = 0.0f;
-
-		v = v + ptEnd[2];
+		glColor4fv(maskColor(uiaZ).ptr());
 		glVertex3fv(v.ptr());
-	}
+		for (int i = 0; i <= 8; i++) {
+			theta = static_cast<float>(i) * (TwoPi / 8.0f);
+			v.x = r * cos(theta);
+			v.y = r * sin(theta);
+			v.z = 0.0f;
+
+			v = v + ptEnd[2];
+			glVertex3fv(v.ptr());
+		}
 	glEnd();
 
 	glPopAttrib();
@@ -371,7 +453,85 @@ TranslateWidget::~TranslateWidget() {
 }
 
 void TranslateWidget::draw() {
-	glCallList(m_glList);
+	//glCallList(m_glList);
+	vec3f ptEnd[3];
+	vec3f origin(0, 0, 0);
+	ptEnd[0] = vec3f(1.0f, 0.0f, 0.0f);
+	ptEnd[1] = vec3f(0.0f, 1.0f, 0.0f);
+	ptEnd[2] = vec3f(0.0f, 0.0f, 1.0f);
+
+
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+
+	glLineWidth(3.0f);
+	glBegin(GL_LINES);
+		glColor4fv(maskColor(uiaX).ptr());
+		glVertex3fv(origin.ptr());
+		glVertex3fv(ptEnd[0].ptr());
+
+		glColor4fv(maskColor(uiaY).ptr());
+		glVertex3fv(origin.ptr());
+		glVertex3fv(ptEnd[1].ptr());
+
+		glColor4fv(maskColor(uiaZ).ptr());
+		glVertex3fv(origin.ptr());
+		glVertex3fv(ptEnd[2].ptr());
+	glEnd();
+
+	//Draw end points
+	vec3f v;
+	float theta;
+	float r = 0.05f;
+
+	//X
+	v = ptEnd[0] + vec3f(0.1f, 0.0f, 0.0f);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	glBegin(GL_TRIANGLE_FAN);
+		glColor4fv(maskColor(uiaX).ptr());
+		glVertex3fv(v.ptr());
+		for (int i = 0; i <= 8; i++) {
+			theta = static_cast<float>(i) * (TwoPi / 8.0f);
+			v.x = 0.0f;
+			v.y = r * sin(theta);
+			v.z = r * cos(theta);
+
+			v = v + ptEnd[0];
+			glVertex3fv(v.ptr());
+		}
+	glEnd();
+
+	//Y
+	v = ptEnd[1] + vec3f(0.0f, 0.1f, 0.0f);
+	glBegin(GL_TRIANGLE_FAN);
+		glColor4fv(maskColor(uiaY).ptr());
+		glVertex3fv(v.ptr());
+		for (int i = 0; i <= 8; i++) {
+			theta = static_cast<float>(i) * (TwoPi / 8.0f);
+			v.x = r * cos(theta);
+			v.y = 0.0f;
+			v.z = r * sin(theta);
+			v = v + ptEnd[1];
+			glVertex3fv(v.ptr());
+		}
+	glEnd();
+
+	//Z
+	v = ptEnd[2] + vec3f(0.0f, 0.0f, 0.1f);
+	glBegin(GL_TRIANGLE_FAN);
+		glColor4fv(maskColor(uiaZ).ptr());
+		glVertex3fv(v.ptr());
+		for (int i = 0; i <= 8; i++) {
+			theta = static_cast<float>(i) * (TwoPi / 8.0f);
+			v.x = r * cos(theta);
+			v.y = r * sin(theta);
+			v.z = 0.0f;
+
+			v = v + ptEnd[2];
+			glVertex3fv(v.ptr());
+		}
+	glEnd();
+
+	glPopAttrib();
 }
 
 UITRANSFORMAXIS TranslateWidget::selectAxis(const Ray& ray, float zNear,
