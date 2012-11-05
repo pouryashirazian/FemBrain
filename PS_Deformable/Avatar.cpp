@@ -11,17 +11,24 @@ using namespace PS::MATH;
 
 AvatarCube::AvatarCube()
 {
-	this->setup();
+	vec3f lo = vec3f(-0.5, -0.5, -0.5);
+	vec3f hi = vec3f(0.5, 0.5, 0.5);
+
+	this->setup(lo, hi);
+}
+
+AvatarCube::AvatarCube(const vec3f& lo, const vec3f& hi)
+{
+	setup(lo, hi);
 }
 
 AvatarCube::~AvatarCube(){
-	//this->cleanup();
+
 }
 
-void AvatarCube::setup() {
-	vec3f lo = vec3f(-0.5, -0.5, -0.5);
-	vec3f hi = vec3f(0.5, 0.5, 0.5);
-	vec3f center = (hi + lo) * 0.5;
+void AvatarCube::setup(const vec3f& lo, const vec3f& hi)
+{
+	//vec3f center = (hi + lo) * 0.5;
 
 	float l = lo.x;
 	float r = hi.x;
@@ -33,8 +40,8 @@ void AvatarCube::setup() {
 	float vertices[][3] = { { l, b, f }, { l, t, f }, { r, t, f },
 			{ r, b, f }, { l, b, n }, { l, t, n }, { r, t, n }, { r, b, n } };
 
-	float normals[][3] = { { -1, -1,-1 }, { -1, 1, -1 }, { 1, 1, -1 }, { 1, -1, -1 },
-							{ -l, -1, 1 }, { -1, 1, 1 }, { 1, 1, 1 }, { 1, -1, 1 } };
+	float normals[][3] = { { -1, -1, 1 }, { -1, 1, 1 }, { 1, 1, 1 }, { 1, -1, 1 },
+							{ -l, -1, -1 }, { -1, 1, -1 }, { 1, 1, -1 }, { 1, -1, -1 } };
 
 
 	const int ctVertices = 8;

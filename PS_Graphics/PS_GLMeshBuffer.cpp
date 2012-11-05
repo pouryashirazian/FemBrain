@@ -77,6 +77,18 @@ void GLMeshBuffer::setupVertexAttribs(const vector<float>& arrAttribs, int step,
 	else if(attribKind == vatNormal)
 	{
 		m_isValidNormal = true;
+		vector<float> arrNormalizedNormals;
+		arrNormalizedNormals.resize(arrAttribs.size());
+		U32 ctNormals = arrAttribs.size() / 3;
+		for(U32 i=0; i<ctNormals; i++)
+		{
+			vec3f n = vec3f(&arrAttribs[i * 3]);
+			n.normalize();
+			arrNormalizedNormals[i * 3 + 0] = n.x;
+			arrNormalizedNormals[i * 3 + 1] = n.y;
+			arrNormalizedNormals[i * 3 + 2] = n.z;
+		}
+
 		glGenBuffers(1, &vboNormal);
 		glBindBuffer(GL_ARRAY_BUFFER, vboNormal);
 		glBufferData(GL_ARRAY_BUFFER, arrAttribs.size() * sizeof(float), &arrAttribs[0], GL_STATIC_DRAW);

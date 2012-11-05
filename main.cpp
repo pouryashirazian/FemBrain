@@ -62,6 +62,7 @@ public:
 	int appHeight;
 	int hapticMode;
 
+	vec3d worldAvatarPos;
 	vec3d worldDragStart;
 	vec3d worldDragEnd;
 	vec2i screenDragStart;
@@ -159,7 +160,15 @@ void Draw()
 
 	//Draw Deformable Object
 	if(g_lpAvatar)
+	{
+		glPushMatrix();
+		glScalef(0.2, 0.2, 0.2);
+		vec3d wpos = g_appSettings.worldAvatarPos;
+		glTranslated(wpos.x, wpos.y, wpos.z);
 		g_lpAvatar->draw();
+
+		glPopMatrix();
+	}
 
 	if (g_lpDeformable->isHapticInProgress())
 	{
@@ -298,34 +307,45 @@ void Resize(int w, int h)
 	glLoadIdentity();
 }
 
+int ConvertScreenToWorld(int x, int y, vec3d& world)
+{
+	GLdouble model[16];
+	glGetDoublev(GL_MODELVIEW_MATRIX, model);
+
+	GLdouble proj[16];
+	glGetDoublev(GL_PROJECTION_MATRIX, proj);
+
+	GLint view[4];
+	glGetIntegerv(GL_VIEWPORT, view);
+
+	int winX = x;
+	int winY = view[3] - 1 - y;
+
+	float zValue;
+	glReadPixels(winX, winY, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &zValue);
+
+	GLubyte stencilValue;
+	glReadPixels(winX, winY, 1, 1, GL_STENCIL_INDEX, GL_UNSIGNED_BYTE,
+			&stencilValue);
+
+	GLdouble worldX, worldY, worldZ;
+	gluUnProject(winX, winY, zValue, model, proj, view,
+					&worldX, &worldY, &worldZ);
+
+	world = vec3d(worldX, worldY, worldZ);
+
+	return stencilValue;
+}
+
 void MousePress(int button, int state, int x, int y)
 {
 	if(button == GLUT_RIGHT_BUTTON)
 	{
 		if(state == GLUT_DOWN)
 		{
-			GLdouble model[16];
-			glGetDoublev (GL_MODELVIEW_MATRIX, model);
+			int stencilValue = ConvertScreenToWorld(x, y, g_appSettings.worldAvatarPos);
 
-			GLdouble proj[16];
-			glGetDoublev (GL_PROJECTION_MATRIX, proj);
-
-			GLint view[4];
-			glGetIntegerv (GL_VIEWPORT, view);
-
-			int winX = x;
-			int winY = view[3] - 1 - y;
-
-			float zValue;
-			glReadPixels(winX, winY, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &zValue);
-
-			GLubyte stencilValue;
-			glReadPixels(winX, winY, 1, 1, GL_STENCIL_INDEX, GL_UNSIGNED_BYTE, &stencilValue);
-
-			GLdouble worldX, worldY, worldZ;
-			gluUnProject(winX, winY, zValue, model, proj, view,
-						   &worldX, &worldY, &worldZ);
-
+			/*
 			if (stencilValue == 1)
 			{
 				double closestVertex[3];
@@ -348,6 +368,7 @@ void MousePress(int button, int state, int x, int y)
 
 				}
 			}
+			*/
 		}
 		else
 			g_lpDeformable->hapticEnd();
@@ -362,6 +383,8 @@ void MousePress(int button, int state, int x, int y)
 
 void MouseMove(int x, int y)
 {
+	ConvertScreenToWorld(x, y, g_appSettings.worldAvatarPos);
+	/*
 	if(g_lpDeformable->isHapticInProgress())
 	{
 		vec3f ptDelta(x - g_appSettings.screenDragStart.x,
@@ -401,6 +424,7 @@ void MouseMove(int x, int y)
 
 		g_lpDeformable->hapticSetCurrentDisplacement(ptDelta.x, ptDelta.y, ptDelta.z);
 	}
+	*/
 
 	g_arcBallCam.mouseMove(x, y);
 	glutPostRedisplay();

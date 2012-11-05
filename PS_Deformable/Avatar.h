@@ -9,10 +9,11 @@
 class AvatarCube : public GLMeshBuffer{
 public:
 	AvatarCube();
+	AvatarCube(const vec3f& lo, const vec3f& hi);
 	virtual ~AvatarCube();
 
 private:
-	void setup();
+	void setup(const vec3f& lo, const vec3f& hi);
 
 
 };

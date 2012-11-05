@@ -55,6 +55,8 @@ public:
 
 	//Effect
 	void setShaderEffectProgram(U32 glEffect);
+	U32 getShaderEffectProgram() const {return m_uShaderEffectProgram;}
+
 	void setEffectType(ShaderEffectType effect) { m_effectType = effect;}
 	ShaderEffectType getEffectType() const {return m_effectType;}
 
