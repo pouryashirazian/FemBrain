@@ -11,6 +11,8 @@
 namespace PS{
 namespace MATH{
 
+typedef float psreal;
+
 /*!
   * 2D Vector arithmetic
   */
@@ -175,10 +177,9 @@ Vec2<T> Vec2<T>::maxP(const Vec2& a, const Vec2& b)
     return result;
 }
 
-
-typedef Vec2<float> vec2;
-typedef Vec2<float> vec2f;
 typedef Vec2<double> vec2d;
+typedef Vec2<float> vec2f;
+typedef Vec2<psreal> vec2;
 typedef Vec2<int> vec2i;
 typedef Vec2<bool> vec2b;
 
@@ -372,10 +373,9 @@ Vec3<T> Vec3<T>::maxP(const Vec3& a, const Vec3& b)
     return result;
 }
 
-
-typedef Vec3<float> vec3;
-typedef Vec3<float> vec3f;
 typedef Vec3<double> vec3d;
+typedef Vec3<float> vec3f;
+typedef Vec3<psreal> vec3;
 typedef Vec3<int>   vec3i;
 typedef Vec3<bool>  vec3b;
 
@@ -502,11 +502,9 @@ Vec4<T> Vec4<T>::operator-(const Vec4<T>& rhs) const
     return result;
 }
 
-
-
-typedef Vec4<float> vec4;
-typedef Vec4<float> vec4f;
 typedef Vec4<double> vec4d;
+typedef Vec4<float> vec4f;
+typedef Vec4<psreal> vec4;
 typedef Vec4<int>  vec4i;
 typedef Vec4<bool> vec4b;
 }

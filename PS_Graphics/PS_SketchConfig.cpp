@@ -14,10 +14,10 @@ namespace PS{
 		setContentBuffer(inputContent);
 	}
 	//====================================================================================
-	svec2f CSketchConfig::readVec2f(DAnsiStr section, DAnsiStr variable)
+	vec2f CSketchConfig::readVec2f(DAnsiStr section, DAnsiStr variable)
 	{
 		DAnsiStr strVal;
-		svec2f res;
+		vec2f res;
 		if(readValue(section, variable, strVal))
 		{
 			float f[2];
@@ -48,22 +48,22 @@ namespace PS{
 				}
 			}
 
-			res = svec2f(f[0], f[1]);
+			res = vec2f(f[0], f[1]);
 		}
 		return res;
 	}
 
 	//====================================================================================
-	void CSketchConfig::writeVec2f(DAnsiStr section, DAnsiStr variable, const svec2f& val)
+	void CSketchConfig::writeVec2f(DAnsiStr section, DAnsiStr variable, const vec2f& val)
 	{
 		DAnsiStr strTemp = printToAStr("(%f, %f)", val.x, val.y);
 		writeValue(section, variable, strTemp);
 	}
 	//====================================================================================
-	svec3f CSketchConfig::readVec3f(DAnsiStr section, DAnsiStr variable)
+	vec3f CSketchConfig::readVec3f(DAnsiStr section, DAnsiStr variable)
 	{
 		DAnsiStr strVal;
-		svec3f res;
+		vec3f res;
 		if(readValue(section, variable, strVal))
 		{
 			float f[4];
@@ -94,23 +94,23 @@ namespace PS{
 				}
 			}
 
-			res = svec3f(f[0], f[1], f[2]);
+			res = vec3f(f[0], f[1], f[2]);
 		}
 		return res;
 	}
 
 	//====================================================================================
-	void CSketchConfig::writeVec3f(DAnsiStr section, DAnsiStr variable, const svec3f& val)
+	void CSketchConfig::writeVec3f(DAnsiStr section, DAnsiStr variable, const vec3f& val)
 	{
 		DAnsiStr strTemp = printToAStr("(%f, %f, %f)", val.x, val.y, val.z);
 		writeValue(section, variable, strTemp);
 	}
 
 	//====================================================================================
-	svec4f CSketchConfig::readVec4f(DAnsiStr section, DAnsiStr variable)
+	vec4f CSketchConfig::readVec4f(DAnsiStr section, DAnsiStr variable)
 	{
 		DAnsiStr strVal;
-		svec4f res;
+		vec4f res;
 		if(readValue(section, variable, strVal))
 		{
 			float f[4];
@@ -141,13 +141,13 @@ namespace PS{
 				}
 			}
 
-			res = svec4f(f[0], f[1], f[2], f[3]);
+			res = vec4f(f[0], f[1], f[2], f[3]);
 		}
 		return res;
 	}
 
 	//====================================================================================
-	void CSketchConfig::writeVec4f(DAnsiStr section, DAnsiStr variable, const svec4f& val)
+	void CSketchConfig::writeVec4f(DAnsiStr section, DAnsiStr variable, const vec4f& val)
 	{
 		DAnsiStr strTemp = printToAStr("(%f, %f, %f, %f)", val.x, val.y, val.z, val.w);
 		writeValue(section, variable, strTemp);

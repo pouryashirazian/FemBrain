@@ -18,12 +18,12 @@ enum UITRANSFORMAXIS {uiaX, uiaY, uiaZ, uiaFree, uiaCount};
 struct UITRANSFORM{
     UITRANSFORMTYPE type;
     int    axis;
-    vec3f  translate;
-    vec3f  scale;
+    vec3  translate;
+    vec3  scale;
     quat   rotate;
     U32		nStep;
-    vec3f mouseDown;
-    vec3f mouseMove;
+    vec3 mouseDown;
+    vec3 mouseMove;
 };
 
 typedef SingletonHolder<UITRANSFORM, CreateUsingNew, PhoenixSingleton> TheUITransform;
@@ -41,19 +41,19 @@ public:
     }
 
     void  drawCubePolygon(int a, int b, int c, int d);
-    vec3f maskDisplacement(vec3f v, UITRANSFORMAXIS axis);
-    vec4f maskColor( UITRANSFORMAXIS axis );
+    vec3 maskDisplacement(vec3 v, UITRANSFORMAXIS axis);
+    vec4 maskColor( UITRANSFORMAXIS axis );
     void maskColorSetGLFront( UITRANSFORMAXIS axis );
 
 
-    void setPos(const vec3f& pos) {m_pos = pos;}
-    vec3f getPos() const {return m_pos;}
+    void setPos(const vec3& pos) {m_pos = pos;}
+    vec3 getPos() const {return m_pos;}
 
-    void setLength(const vec3f& len) {m_length = len;}
-    vec3f getLength() const {return m_length;}
+    void setLength(const vec3& len) {m_length = len;}
+    vec3 getLength() const {return m_length;}
 protected:
-    vec3f m_pos;
-    vec3f m_length;
+    vec3 m_pos;
+    vec3 m_length;
 };
 
 
@@ -65,8 +65,8 @@ class RotationWidget : public AbstractWidget
 public:
     RotationWidget()
     {
-        m_pos = vec3f(0,0,0);
-        m_length = vec3f(0.5f, 0.5f, 0.5f);
+        m_pos = vec3(0,0,0);
+        m_length = vec3(0.5f, 0.5f, 0.5f);
         this->createWidget();
     }
 
@@ -89,8 +89,8 @@ class ScaleWidget : public AbstractWidget
 public:
     ScaleWidget()
     {
-        m_pos = vec3f(0,0,0);
-        m_length = vec3f(1,1,1);
+        m_pos = vec3(0,0,0);
+        m_length = vec3(1,1,1);
         this->createWidget();
     }
 
@@ -103,8 +103,8 @@ public:
     UITRANSFORMAXIS selectAxis(const Ray& ray, float zNear, float zFar);
 private:
     U32 m_glList;
-    vec3f m_axisBoxesLo[3];
-    vec3f m_axisBoxesHi[3];
+    vec3 m_axisBoxesLo[3];
+    vec3 m_axisBoxesHi[3];
 };
 
 
@@ -117,8 +117,8 @@ class TranslateWidget : public AbstractWidget
 public:
     TranslateWidget()
     {
-        m_pos = vec3f(0,0,0);
-        m_length = vec3f(1,1,1);
+        m_pos = vec3(0,0,0);
+        m_length = vec3(1,1,1);
         this->createWidget();
     }
 
@@ -135,8 +135,8 @@ private:
 
 
     U32 m_glList;
-    vec3f m_axisBoxesLo[3];
-    vec3f m_axisBoxesHi[3];
+    vec3 m_axisBoxesLo[3];
+    vec3 m_axisBoxesHi[3];
 };
 
 #endif

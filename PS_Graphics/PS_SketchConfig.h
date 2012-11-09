@@ -4,8 +4,9 @@
 
 #include <vector>
 #include "../PS_Base/PS_AppConfig.h"
-#include "PS_VectorMath.h"
-using namespace PS::FUNCTIONALMATH;
+#include "PS_Vector.h"
+
+using namespace PS::MATH;
 using namespace std;
 
 namespace PS{
@@ -28,14 +29,14 @@ namespace PS{
 		}
 
 		//Read and Write Vectors
-		svec2f readVec2f(DAnsiStr section, DAnsiStr variable);
-		void writeVec2f(DAnsiStr section, DAnsiStr variable, const svec2f& val);
+		vec2f readVec2f(DAnsiStr section, DAnsiStr variable);
+		void writeVec2f(DAnsiStr section, DAnsiStr variable, const vec2f& val);
 
-		svec3f readVec3f(DAnsiStr section, DAnsiStr variable);
-		void writeVec3f(DAnsiStr section, DAnsiStr variable, const svec3f& val);
+		vec3f readVec3f(DAnsiStr section, DAnsiStr variable);
+		void writeVec3f(DAnsiStr section, DAnsiStr variable, const vec3f& val);
 
-		svec4f readVec4f(DAnsiStr section, DAnsiStr variable);
-		void writeVec4f(DAnsiStr section, DAnsiStr variable, const svec4f& val);
+		vec4f readVec4f(DAnsiStr section, DAnsiStr variable);
+		void writeVec4f(DAnsiStr section, DAnsiStr variable, const vec4f& val);
 	};
 
 

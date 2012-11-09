@@ -9,7 +9,8 @@
 #define PS_MESHGLBUFFER_H_
 
 #include "../PS_Base/PS_MathBase.h"
-#include "../PS_Graphics/PS_Vector.h"
+#include "PS_Vector.h"
+#include "PS_GLFuncs.h"
 #include <vector>
 
 using namespace std;
@@ -39,7 +40,10 @@ enum FaceType {ftLines = 0x0001, ftLineLoop = 0x0002, ftLineStrip = 0x0003,
 
 enum ShaderEffectType {setFixedFunction, setCustom};
 
-//Vertex Buffer Objects To Draw
+/*!
+ * Synopsis: GLMeshBuffer Simplifies drawing geometries using GPU Buffers.
+ * Types of buffer objects are: Vertex, Color, TexCoord, Normal and Index
+ */
 class GLMeshBuffer{
 public:
 	static const U32 INVALID_GLBUFFER = ~0;
@@ -60,9 +64,11 @@ public:
 	void setEffectType(ShaderEffectType effect) { m_effectType = effect;}
 	ShaderEffectType getEffectType() const {return m_effectType;}
 
+	bool getWireFrameMode() const {return m_bWireFrame;}
+	void setWireFrameMode(bool bSet) { m_bWireFrame = bSet;}
 
 	//Draw
-	virtual void draw(bool bWireFrameMode = false);
+	virtual void draw();
 
 protected:
 	//Releases all buffer objects for rendering
@@ -80,6 +86,7 @@ protected:
 
 
 private:
+	bool m_bWireFrame;
 	U32 m_uShaderEffectProgram;
 	ShaderEffectType m_effectType;
 

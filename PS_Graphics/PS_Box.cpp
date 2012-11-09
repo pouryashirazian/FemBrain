@@ -1,5 +1,19 @@
 #include "PS_Box.h"
 
+namespace PS{
+
+namespace MATH{
+
+
+bool AABB::contains(const vec3& p) const {
+	if(((p.x >= lower.x) && (p.x <= upper.x))&&
+	  ((p.y >= lower.y) && (p.y <= upper.y))&&
+ 	  ((p.z >= lower.z) && (p.z <= upper.z)))
+		return true;
+	else
+		return false;
+}
+
 bool AABB::intersect(const AABB& rhs) const {
     if ((lower.x >= rhs.upper.x) || (upper.x <= rhs.lower.x))
         return false;
@@ -34,4 +48,7 @@ bool AABB::intersect(const Ray& ray, float t0, float t1) const
 	if (tzmax < tmax)
 		tmax = tzmax;
 	return ((tmin < t1) && (tmax > t0));
+}
+
+}
 }

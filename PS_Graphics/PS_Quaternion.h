@@ -27,7 +27,7 @@ public:
     	this->w = rhs.w;
     }
 
-    Quaternion(const vec3f& q_, float w_)
+    Quaternion(const vec3& q_, float w_)
     {
     	this->q = q_;
     	this->w = w_;
@@ -36,11 +36,11 @@ public:
     ~Quaternion(){}
 
 	void identity() {
-		q = vec3f(0, 0, 0);
+		q = vec3(0, 0, 0);
 		w = 1;
 	}
 
-    vec3f transform(const vec3f& p) const
+    vec3 transform(const vec3& p) const
     {
         Quaternion input(p, 0.0f);
         Quaternion inv = inverted();
@@ -50,7 +50,7 @@ public:
         return res.q;
     }
 
-    vec3f transform(const Quaternion& inv, vec3f p)
+    vec3 transform(const Quaternion& inv, vec3 p)
     {
         Quaternion input(p, 0.0f);
         Quaternion res = multiply(input);
@@ -68,7 +68,7 @@ public:
     void toEuler(float& roll, float& pitch, float& yaw) const;
 
     // Convert angle/axis into quaternion, and return rotation matrix.
-    void fromAngleAxis(float radians,const vec3f &axis)
+    void fromAngleAxis(float radians,const vec3 &axis)
     {
         float halftheta    = radians*0.5f;
         float sinHalfTheta = (float)sin( halftheta );
@@ -126,14 +126,14 @@ public:
     /*!
      * Get Axis and Angle
      */
-    void getAxisAngle(vec3f &axis, float& angleDeg) const
+    void getAxisAngle(vec3 &axis, float& angleDeg) const
     {
         angleDeg = RADTODEG(acos(w) * 2.0f);
         float sa = sqrt(1.0f - w*w);
         if (sa)
-            axis = vec3f(q.x/sa, q.y/sa, q.z/sa);
+            axis = vec3(q.x/sa, q.y/sa, q.z/sa);
         else
-            axis = vec3f(1,0,0);
+            axis = vec3(1,0,0);
     }
 
 
@@ -170,7 +170,7 @@ public:
 
 public:
     //x/y/z components of quaternion.
-    vec3f q;
+    vec3 q;
 
     // w component of quaternion.
     float w;

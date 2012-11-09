@@ -26,8 +26,8 @@ using namespace PS;
 using namespace PS::FILESTRINGUTILS;
 using namespace PS::HPC;
 
-#define WINDOW_WIDTH 800
-#define WINDOW_HEIGHT 600
+#define WINDOW_WIDTH 1024
+#define WINDOW_HEIGHT 800
 #define FOVY 45.0
 #define ZNEAR 0.01
 #define ZFAR 100.0
@@ -38,7 +38,7 @@ using namespace PS::HPC;
 #define INDEX_GPU_INFO 	   2
 
 
-enum HAPTICMODES {hmForce, hmAddFixed, hmRemoveFixed, hmCount};
+enum HAPTICMODES {hmDynamic, hmAddFixed, hmRemoveFixed, hmCount};
 
 //Application Settings
 class AppSettings{
@@ -70,7 +70,7 @@ public:
 };
 
 //Global Variables
-AvatarCube* g_lpAvatar = NULL;
+AvatarCube* g_lpAvatarCube = NULL;
 TranslateWidget*	g_lpTranslateWidget = NULL;
 PS::ArcBallCamera g_arcBallCam;
 PS::HPC::GPUPoly* g_lpBlobRender = NULL;
@@ -157,37 +157,23 @@ void Draw()
 	*/
 
 
-
-	//Draw Deformable Object
-	if(g_lpAvatar)
-	{
-		glPushMatrix();
-		glScalef(0.2, 0.2, 0.2);
-		vec3d wpos = g_appSettings.worldAvatarPos;
-		glTranslated(wpos.x, wpos.y, wpos.z);
-		g_lpAvatar->draw();
-
-		glPopMatrix();
-	}
-
-	if (g_lpDeformable->isHapticInProgress())
-	{
-		glMatrixMode(GL_MODELVIEW);
-		glPushMatrix();
-
-
-
-/*
-		glTranslated(g_appSettings.worldDragStart.x,
-					   g_appSettings.worldDragStart.y,
-					   g_appSettings.worldDragStart.z);
-*/
-
-		//glScalef(0.2, 0.2, 0.2);
-		//g_lpTranslateWidget->draw();
-		glPopMatrix();
-	}
+	//Draw Deformable Model
 	g_lpDeformable->draw();
+
+	//Draw Interaction Avatar
+	if(g_appSettings.hapticMode == hmDynamic && g_lpAvatarCube)
+	{
+		vec3d wpos = g_appSettings.worldAvatarPos;
+		glPushMatrix();
+			glTranslated(wpos.x, wpos.y, wpos.z);
+			g_lpAvatarCube->draw();
+
+			glScalef(0.4, 0.4, 0.4);
+			glDisable(GL_DEPTH_TEST);
+			g_lpTranslateWidget->draw();
+			glEnable(GL_DEPTH_TEST);
+		glPopMatrix();
+	}
 
 
 	//Draw Haptic Line
@@ -212,8 +198,6 @@ void Draw()
 		glColor3f(1,0,0);
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
 		glLineWidth(1.0);
-
-
 
 		glBegin(GL_LINES);
 			glVertex2f(s1.x, s1.y);
@@ -341,11 +325,32 @@ void MousePress(int button, int state, int x, int y)
 {
 	if(button == GLUT_RIGHT_BUTTON)
 	{
+		if((state == GLUT_DOWN) && (g_appSettings.hapticMode == hmDynamic))
+		{
+			g_appSettings.screenDragStart = vec2i(x, y);
+			g_appSettings.screenDragEnd = vec2i(x, y);
+
+			g_lpDeformable->hapticStart(0);
+		}
+		else
+			g_lpDeformable->hapticEnd();
+	}
+	else if(button == GLUT_LEFT_BUTTON){
 		if(state == GLUT_DOWN)
 		{
-			int stencilValue = ConvertScreenToWorld(x, y, g_appSettings.worldAvatarPos);
+			vec3d wpos;
+			int stencilValue = ConvertScreenToWorld(x, y, wpos);
+			if (stencilValue == 1)
+			{
+				vec3d closestVertex;
+				int idxVertex = g_lpDeformable->pickVertex(wpos, closestVertex);
+				g_lpDeformable->setPulledVertex(idxVertex);
+				LogInfoArg1("Selected Vertex Index = %d ", idxVertex);
+			}
+		}
 
-			/*
+/*
+			int stencilValue = ConvertScreenToWorld(x, y, g_appSettings.worldAvatarPos);
 			if (stencilValue == 1)
 			{
 				double closestVertex[3];
@@ -368,10 +373,8 @@ void MousePress(int button, int state, int x, int y)
 
 				}
 			}
-			*/
-		}
-		else
-			g_lpDeformable->hapticEnd();
+*/
+
 	}
 
 	//Camera
@@ -383,7 +386,57 @@ void MousePress(int button, int state, int x, int y)
 
 void MouseMove(int x, int y)
 {
-	ConvertScreenToWorld(x, y, g_appSettings.worldAvatarPos);
+	if(g_lpDeformable->isHapticInProgress() && g_appSettings.hapticMode == hmDynamic)
+	{
+		vec3d ptPrevAvatarPos = g_appSettings.worldAvatarPos;
+
+		double dx = x - g_appSettings.screenDragStart.x;
+		double dy = g_appSettings.screenDragStart.y - y;
+		dx *= 0.001;
+		dy *= 0.001;
+
+		g_appSettings.screenDragStart = vec2i(x, y);
+
+		string strAxis;
+		switch(TheUITransform::Instance().axis)
+		{
+		case uiaX:
+			g_appSettings.worldAvatarPos.x += dx;
+			strAxis = "X";
+			break;
+		case uiaY:
+			g_appSettings.worldAvatarPos.y += dy;
+			strAxis = "Y";
+			break;
+		case uiaZ:
+			g_appSettings.worldAvatarPos.z += dx;
+			strAxis = "Z";
+			break;
+
+		case uiaFree:
+			g_appSettings.worldAvatarPos = g_appSettings.worldAvatarPos + vec3d(dx, dy, 0.0);
+			strAxis = "FREE";
+			break;
+		}
+
+		vec3d wpos = g_appSettings.worldAvatarPos;
+
+		char buffer[1024];
+		sprintf(buffer, "HAPTIC DELTA=(%.4f, %.4f), AVATAR=(%.4f, %0.4f, %.4f), AXIS=%s PRESS F4 To Change.",
+				 dx, dy, wpos.x, wpos.y, wpos.z, strAxis.c_str());
+		g_infoLines[INDEX_HAPTIC_INFO] = string(buffer);
+
+		vec3d lower = g_lpAvatarCube->lower() + wpos;
+		vec3d upper = g_lpAvatarCube->upper() + wpos;
+
+		vector<vec3d> arrVertices;
+		vector<int> arrIndices;
+		g_lpDeformable->pickVertices(lower, upper, arrVertices, arrIndices);
+		for(U32 i=0; i<arrIndices.size() ;i++)
+			printf("Collision Index = %d \n", arrIndices[i]);
+
+		//g_lpDeformable->hapticSetCurrentDisplacement(ptDelta.x, ptDelta.y, ptDelta.z);
+	}
 	/*
 	if(g_lpDeformable->isHapticInProgress())
 	{
@@ -443,7 +496,7 @@ void Close()
 	SAFE_DELETE(g_lpSurface);
 	SAFE_DELETE(g_lpBlobRender);
 	SAFE_DELETE(g_lpDeformable);
-	SAFE_DELETE(g_lpAvatar);
+	SAFE_DELETE(g_lpAvatarCube);
 
 	PS::TheEventLogger::Instance().flush();
 }
@@ -521,7 +574,7 @@ void Keyboard(int key, int x, int y)
 			g_appSettings.hapticMode = g_appSettings.hapticMode % (int)hmCount;
 			DAnsiStr strMode = "Force";
 
-			if(g_appSettings.hapticMode == hmForce)
+			if(g_appSettings.hapticMode == hmDynamic)
 				strMode = "FORCE";
 			else if(g_appSettings.hapticMode == hmAddFixed)
 				strMode = "ADDFIXED";
@@ -568,9 +621,14 @@ void LoadSettings()
 	LogInfo("Loading Settings from the ini file.");
 
 	CSketchConfig cfg(ChangeFileExt(GetExePath(), ".ini"), CSketchConfig::fmRead);
+	vec3f pos = cfg.readVec3f("AVATAR", "POS");
+	g_appSettings.worldAvatarPos = vec3d(pos.x, pos.y, pos.z);
+
 	DAnsiStr strVegFile = cfg.readString("MODEL", "VEGFILE", "");
 	DAnsiStr strObjFile = cfg.readString("MODEL", "OBJFILE", "");
 	DAnsiStr strBlobFile = cfg.readString("MODEL", "BLOBTREEFILE", "");
+
+
 	int ctFixed = 	cfg.readInt("MODEL", "FIXEDVERTICESCOUNT", 0);
 	vector<int> vFixedVertices;
 	bool bres = cfg.readIntArray("MODEL", "FIXEDVERTICES", ctFixed, vFixedVertices);
@@ -586,8 +644,8 @@ void LoadSettings()
 									strObjFile.cptr(),
 									vFixedVertices);
 
-	g_lpAvatar = new AvatarCube();
-	g_lpAvatar->setShaderEffectProgram(g_uiShader);
+	g_lpAvatarCube = new AvatarCube(vec3d(-0.1,-0.2,-0.1), vec3d(0.1, 0.2, 0.1));
+	//g_lpAvatar->setShaderEffectProgram(g_uiShader);
 	//g_lpAvatar->setEffectType(setFixedFunction);
 
 	/*

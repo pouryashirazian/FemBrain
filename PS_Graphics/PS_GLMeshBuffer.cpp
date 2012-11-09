@@ -14,6 +14,7 @@ GLMeshBuffer::GLMeshBuffer()
 	m_isValidColor = m_isValidIndex = m_isValidNormal = m_isValidTexCoord = m_isValidVertex = false;
 	m_ctFaceElements = m_ctVertices = 0;
 	m_faceMode = GL_TRIANGLES;
+	m_bWireFrame = false;
 
 	m_stepVertex = 3;
 	m_stepColor = 3;
@@ -153,13 +154,13 @@ void GLMeshBuffer::setShaderEffectProgram(U32 glEffect)
 }
 
 
-void GLMeshBuffer::draw(bool bWireFrameMode)
+void GLMeshBuffer::draw()
 {
 	if(m_effectType == setCustom && m_uShaderEffectProgram != INVALID_GLBUFFER)
 		glUseProgram(m_uShaderEffectProgram);
 
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
-	if(bWireFrameMode)
+	if(m_bWireFrame)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	else
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);

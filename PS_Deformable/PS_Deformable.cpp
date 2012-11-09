@@ -1,5 +1,6 @@
 #include "PS_Deformable.h"
 #include "../PS_Base/PS_Logger.h"
+#include "../PS_Graphics/PS_Box.h"
 #include "volumetricMeshLoader.h"
 #include "generateMeshGraph.h"
 #include <algorithm>
@@ -197,7 +198,6 @@ void Deformable::timestep()
 	m_lpIntegrator->SetExternalForcesToZero();
 
 	//Update the haptic external forces applied
-	//this->hapticUpdate();
 	this->hapticUpdateDisplace();
 
 	//Time Step
@@ -213,22 +213,63 @@ void Deformable::timestep()
 	glutPostRedisplay();
 }
 
-int Deformable::pickVertex(double worldX, double worldY, double worldZ, double* arrFoundVertex)
+int Deformable::pickVertex(const vec3d& wpos, vec3d& vertex)
 {
-	Vec3d wPos(worldX, worldY, worldZ);
+	Vec3d world(wpos.x, wpos.y, wpos.z);
 	double dist;
 	double arrVPos[3];
-	int index = m_lpDeformableMesh->FindClosestVertex(wPos, &dist, &arrVPos[0]);
-	if(arrFoundVertex)
-	{
-		for(int i=0; i < 3; i++)
-			arrFoundVertex[i] = arrVPos[i];
-	}
+	int index = m_lpDeformableMesh->FindClosestVertex(world, &dist, &arrVPos[0]);
+	vertex = vec3d(&arrVPos[0]);
 	LogInfoArg2("Clicked on vertex: %d (0-indexed). Dist: %.2f", index, dist);
 	return index;
 }
 
-bool Deformable::addFixedVertex(int index){
+int Deformable::pickVertices(const vec3d& boxLo, const vec3d& boxHi,
+								 vector<vec3d>& arrFoundCoords, vector<int>& arrFoundIndices) const
+{
+	arrFoundCoords.resize(0);
+	arrFoundIndices.resize(0);
+	ObjMesh* lpMesh = m_lpDeformableMesh->GetMesh();
+	U32 ctVertices = lpMesh->getNumVertices();
+	for(U32 i=0; i<ctVertices;i++)
+	{
+		Vec3d v = lpMesh->getPosition(i);
+		vec3d vv = vec3d(v[0], v[1], v[2]);
+
+		if(Contains<double>(boxLo, boxHi, vv))
+		{
+			arrFoundCoords.push_back(vv);
+			arrFoundIndices.push_back(i);
+		}
+	}
+
+	return (int)arrFoundCoords.size();
+}
+
+int Deformable::pickVertices(const vec3d& boxLo, const vec3d& boxHi)
+{
+	m_vArrHapticIndices.resize(0);
+	m_vArrHapticVertices.resize(0);
+
+	ObjMesh* lpMesh = m_lpDeformableMesh->GetMesh();
+	U32 ctVertices = lpMesh->getNumVertices();
+	for(U32 i=0; i<ctVertices;i++)
+	{
+		Vec3d v = lpMesh->getPosition(i);
+		vec3d vv = vec3d(v[0], v[1], v[2]);
+
+		if(Contains<double>(boxLo, boxHi, vv))
+		{
+			m_vArrHapticVertices.push_back(vv);
+			m_vArrHapticIndices.push_back(i);
+		}
+	}
+
+	return (int)m_vArrHapticVertices.size();
+}
+
+bool Deformable::addFixedVertex(int index)
+{
 	for(U32 i=0; i< m_vFixedVertices.size(); i++)
 	{
 		if(m_vFixedVertices[i] == index)
@@ -294,9 +335,10 @@ bool Deformable::hapticStart(int index)
 	return true;
 }
 
-bool Deformable::hapticStart(double worldX, double worldY, double worldZ)
+bool Deformable::hapticStart(const vec3d& wpos)
 {
-	m_idxPulledVertex = pickVertex(worldX, worldY, worldZ);
+	vec3d vertex;
+	m_idxPulledVertex = pickVertex(wpos, vertex);
 	if (m_vFixedVertices.size() > 0) {
 		for (U32 i = 0; i < m_vFixedVertices.size(); i++) {
 			if (m_vFixedVertices[i] == m_idxPulledVertex)
@@ -384,7 +426,9 @@ bool Deformable::hapticUpdateForce()
 	return true;
 }
 
-//Update model based on displacements induced on model
+/*!
+ * Update model based on displacements induced on model.
+ */
 bool Deformable::hapticUpdateDisplace()
 {
 	if (m_idxPulledVertex < 0)
@@ -400,7 +444,6 @@ bool Deformable::hapticUpdateDisplace()
 		m_arrDisplacements[3 * m_idxPulledVertex + i] += m_hapticExtDisplacements[i];
 
 	//Distribute force over the neighboring vertices
-
 	set<int> affectedVertices;
 	set<int> lastLayerVertices;
 	affectedVertices.insert(m_idxPulledVertex);
@@ -463,12 +506,18 @@ bool Deformable::hapticUpdateDisplace()
 	return true;
 }
 
+/*!
+ * Set force
+ */
 void Deformable::hapticSetCurrentForce(double extForce[3])
 {
 	for(int i=0; i<3; i++)
 		m_hapticExtForce[i] = extForce[i];
 }
 
+/*!
+ * Set displacements
+ */
 void Deformable::hapticSetCurrentDisplacement(double dx, double dy, double dz)
 {
 	m_hapticExtDisplacements[0] = dx;
@@ -476,7 +525,9 @@ void Deformable::hapticSetCurrentDisplacement(double dx, double dy, double dz)
 	m_hapticExtDisplacements[2] = dz;
 }
 
-
+/*!
+ * Draw deformable model
+ */
 void Deformable::draw()
 {
 	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
@@ -555,7 +606,7 @@ void Deformable::draw()
 
 	// render model fixed vertices
 	if (m_bRenderFixedVertices) {
-		for (int i = 0; i < m_vFixedVertices.size(); i++) {
+		for (int i = 0; i < (int)m_vFixedVertices.size(); i++) {
 			glColor3f(1, 0, 0);
 			double fixedVertexPos[3];
 			m_lpDeformableMesh->GetSingleVertexRestPosition(

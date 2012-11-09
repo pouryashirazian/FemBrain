@@ -11,13 +11,13 @@ using namespace PS::MATH;
 
 AvatarCube::AvatarCube()
 {
-	vec3f lo = vec3f(-0.5, -0.5, -0.5);
-	vec3f hi = vec3f(0.5, 0.5, 0.5);
+	vec3d lo = vec3d(-0.5, -0.5, -0.5);
+	vec3d hi = vec3d(0.5, 0.5, 0.5);
 
 	this->setup(lo, hi);
 }
 
-AvatarCube::AvatarCube(const vec3f& lo, const vec3f& hi)
+AvatarCube::AvatarCube(const vec3d& lo, const vec3d& hi)
 {
 	setup(lo, hi);
 }
@@ -26,9 +26,50 @@ AvatarCube::~AvatarCube(){
 
 }
 
-void AvatarCube::setup(const vec3f& lo, const vec3f& hi)
+void AvatarCube::setup(const vec3d& lo, const vec3d& hi)
 {
+	this->m_lo = lo;
+	this->m_hi = hi;
 	//vec3f center = (hi + lo) * 0.5;
+	//Vertex Shader Code
+	const char * vshaderFill =
+		"varying vec3 N;"
+		"varying vec3 V; "
+		"void main(void) {"
+		"gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;"
+		"gl_FrontColor = gl_Color;"
+		"N = normalize(gl_NormalMatrix * gl_Normal);"
+		"V = vec3(gl_ModelViewMatrix * gl_Vertex); }";
+
+	//Fragment Shader Code
+	const char* fShaderFill =
+		"varying vec3 N;"
+		"varying vec3 V;"
+		"void main(void) {"
+		"vec3 L = normalize(gl_LightSource[0].position.xyz - V);"
+		"vec3 E = normalize(-V);"
+		"vec3 R = normalize(-reflect(L, N));"
+		"vec4 Iamb = 0.5 * gl_LightSource[0].ambient * gl_Color;"
+		"vec4 Idif = (gl_LightSource[0].diffuse * gl_Color) * max(dot(N,L), 0.0);"
+		"vec4 Ispec = (gl_LightSource[0].specular * (vec4(0.8, 0.8, 0.8, 0.8) + 0.2 * gl_Color)) * pow(max(dot(R, E), 0.0), 32.0);"
+		"gl_FragColor = gl_FrontLightModelProduct.sceneColor + Iamb + Idif + Ispec;	}";
+
+	const char* fShaderLine =
+		"varying vec3 N;"
+		"varying vec3 V;"
+		"void main(void) {"
+		"vec4 color = vec4(0,0,0,1);"
+		"vec3 L = normalize(gl_LightSource[0].position.xyz - V);"
+		"vec3 E = normalize(-V);"
+		"vec3 R = normalize(-reflect(L, N));"
+		"vec4 Iamb = 0.5 * gl_LightSource[0].ambient * color;"
+		"vec4 Idif = (gl_LightSource[0].diffuse * color) * max(dot(N,L), 0.0);"
+		"vec4 Ispec = (gl_LightSource[0].specular * (vec4(0.8, 0.8, 0.8, 0.8) + 0.2 * color)) * pow(max(dot(R, E), 0.0), 4.0);"
+		"gl_FragColor = gl_FrontLightModelProduct.sceneColor + Iamb + Idif + Ispec;	}";
+
+	CompileShaderCode(vshaderFill, fShaderFill, m_uShaderFill);
+	CompileShaderCode(vshaderFill, fShaderLine, m_uShaderLine);
+
 
 	float l = lo.x;
 	float r = hi.x;
@@ -102,45 +143,17 @@ void AvatarCube::setup(const vec3f& lo, const vec3f& hi)
 	setupVertexAttribs(arrNormals, 3, vatNormal);
 	setupPerVertexColor(clBlue, ctVertices, 4);
 	setupIndexBufferObject(arrIndices, ftQuads);
+}
 
-/*
-	glPushAttrib (GL_ALL_ATTRIB_BITS);
-	glColor3f(0, 0, 1);
-	//glLineWidth (lineWidth);
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	glBegin (GL_QUADS);
-		glVertex3fv(vertices[0]);
-		glVertex3fv(vertices[3]);
-		glVertex3fv(vertices[2]);
-		glVertex3fv(vertices[1]);
+void AvatarCube::draw()
+{
+	this->setWireFrameMode(false);
+	this->setShaderEffectProgram(m_uShaderFill);
+	GLMeshBuffer::draw();
 
-		glVertex3fv(vertices[4]);
-		glVertex3fv(vertices[5]);
-		glVertex3fv(vertices[6]);
-		glVertex3fv(vertices[7]);
-
-		glVertex3fv(vertices[3]);
-		glVertex3fv(vertices[0]);
-		glVertex3fv(vertices[4]);
-		glVertex3fv(vertices[7]);
-
-		glVertex3fv(vertices[1]);
-		glVertex3fv(vertices[2]);
-		glVertex3fv(vertices[6]);
-		glVertex3fv(vertices[5]);
-
-		glVertex3fv(vertices[2]);
-		glVertex3fv(vertices[3]);
-		glVertex3fv(vertices[7]);
-		glVertex3fv(vertices[6]);
-
-		glVertex3fv(vertices[5]);
-		glVertex3fv(vertices[4]);
-		glVertex3fv(vertices[0]);
-		glVertex3fv(vertices[1]);
-	glEnd();
-	glPopAttrib();
-*/
+	this->setWireFrameMode(true);
+	this->setShaderEffectProgram(m_uShaderLine);
+	GLMeshBuffer::draw();
 }
 
 

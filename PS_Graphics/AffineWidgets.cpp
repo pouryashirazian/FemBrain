@@ -376,7 +376,7 @@ void TranslateWidget::createWidget() {
 	glLineWidth(3.0f);
 	glBegin(GL_LINES);
 		glColor4fv(maskColor(uiaX).ptr());
-		glVertex3fv(origin.ptr());
+		glVertex4fv(origin.ptr());
 		glVertex3fv(ptEnd[0].ptr());
 
 		glColor4fv(maskColor(uiaY).ptr());
@@ -516,7 +516,7 @@ void TranslateWidget::draw() {
 	glEnd();
 
 	//Z
-	v = ptEnd[2] + vec3f(0.0f, 0.0f, 0.1f);
+	v = ptEnd[2] + vec3f(0.0, 0.0, 0.1);
 	glBegin(GL_TRIANGLE_FAN);
 		glColor4fv(maskColor(uiaZ).ptr());
 		glVertex3fv(v.ptr());

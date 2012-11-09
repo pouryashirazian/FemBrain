@@ -12,6 +12,7 @@
 #include "../PS_Base/PS_MathBase.h"
 #include "../PS_Graphics/PS_GLMeshBuffer.h"
 #include "../PS_Graphics/PS_Vector.h"
+#include "../PS_Graphics/PS_Box.h"
 
 #include "corotationalLinearFEM.h"
 #include "corotationalLinearFEMForceModel.h"
@@ -40,11 +41,15 @@ public:
 	void timestep();
 
 	//Pick a vertex
-	int pickVertex(double worldX, double worldY, double worldZ, double* arrFoundVertex = NULL);
+	int pickVertex(const vec3d& wpos, vec3d& vertex);
+	int pickVertices(const vec3d& boxLo, const vec3d& boxHi,
+					   vector<vec3d>& arrFoundCoords, vector<int>& arrFoundIndices) const;
+	int pickVertices(const vec3d& boxLo, const vec3d& boxHi);
 
 	//Haptic Interaction
+	void setPulledVertex(int index) { m_idxPulledVertex = index;}
 	bool hapticStart(int index);
-	bool hapticStart(double worldX, double worldY, double worldZ);
+	bool hapticStart(const vec3d& wpos);
 	void hapticEnd();
 	bool hapticUpdateForce();
 	bool hapticUpdateDisplace();
@@ -126,6 +131,9 @@ private:
 	//Fixed Vertices
 	vector<int> m_vFixedVertices;
 	vector<int> m_vFixedDofs;
+
+	vector<vec3d> m_vArrHapticVertices;
+	vector<int> m_vArrHapticIndices;
 	int m_idxPulledVertex;
 
 	int m_positiveDefiniteSolver;
