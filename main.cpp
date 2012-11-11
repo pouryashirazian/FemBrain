@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <fstream>
+#include <map>
 
 #include "PS_Base/PS_MathBase.h"
 #include "PS_Base/PS_Logger.h"
@@ -26,7 +27,7 @@ using namespace PS;
 using namespace PS::FILESTRINGUTILS;
 using namespace PS::HPC;
 
-#define WINDOW_WIDTH 1024
+#define WINDOW_WIDTH 1200
 #define WINDOW_HEIGHT 800
 #define FOVY 45.0
 #define ZNEAR 0.01
@@ -49,23 +50,23 @@ public:
 		this->bDrawWireFrame = false;
 		this->bPanCamera = false;
 		this->bShowElements = false;
+		this->bDrawAffineWidgets = true;
 		this->idxCollisionFace = -1;
 		this->millis = DEFAULT_TIMER_MILLIS;
 		this->hapticMode = 0;
-		this->toolThickness = 0.1;
 	}
 
 public:
 	bool bPanCamera;
 	bool bDrawWireFrame;
 	bool bShowElements;
+	bool bDrawAffineWidgets;
 
 	int idxCollisionFace;
 	U32   millis;
 	int appWidth;
 	int appHeight;
 	int hapticMode;
-	double toolThickness;
 
 	vec3d worldAvatarPos;
 	vec3d worldDragStart;
@@ -73,6 +74,8 @@ public:
 	vec2i screenDragStart;
 	vec2i screenDragEnd;
 };
+
+std::map<int, vec3d> g_hashVertices;
 
 //Global Variables
 AvatarCube* g_lpAvatarCube = NULL;
@@ -97,6 +100,7 @@ void Resize(int w, int h);
 void TimeStep(int t);
 void MousePress(int button, int state, int x, int y);
 void MouseMove(int x, int y);
+void MousePassiveMove(int x, int y);
 void MouseWheel(int button, int dir, int x, int y);
 bool ScreenToWorld(const svec3f& screenP, svec3f& worldP);
 
@@ -173,16 +177,19 @@ void Draw()
 			glTranslated(wpos.x, wpos.y, wpos.z);
 			g_lpAvatarCube->draw();
 
-			glScalef(0.4, 0.4, 0.4);
-			glDisable(GL_DEPTH_TEST);
-			g_lpTranslateWidget->draw();
-			glEnable(GL_DEPTH_TEST);
+			if(g_appSettings.bDrawAffineWidgets)
+			{
+				glScalef(0.4, 0.4, 0.4);
+				glDisable(GL_DEPTH_TEST);
+				g_lpTranslateWidget->draw();
+				glEnable(GL_DEPTH_TEST);
+			}
 		glPopMatrix();
 	}
 
 
 	//Draw Haptic Line
-	if(g_lpDeformable->isHapticInProgress())
+	if(g_lpDeformable->isHapticInProgress() && g_appSettings.bDrawAffineWidgets)
 	{
 		GLint vp[4];
 		glGetIntegerv(GL_VIEWPORT, vp);
@@ -330,15 +337,19 @@ void MousePress(int button, int state, int x, int y)
 {
 	if(button == GLUT_RIGHT_BUTTON)
 	{
-		if((state == GLUT_DOWN) && (g_appSettings.hapticMode == hmDynamic))
+		if(state == GLUT_DOWN)
 		{
-			g_appSettings.screenDragStart = vec2i(x, y);
-			g_appSettings.screenDragEnd = vec2i(x, y);
+			if(g_lpDeformable->isHapticInProgress())
+				g_lpDeformable->hapticEnd();
+			else if(g_appSettings.hapticMode == hmDynamic)
+			{
+				g_appSettings.screenDragStart = vec2i(x, y);
+				g_appSettings.screenDragEnd = vec2i(x, y);
+				g_lpDeformable->hapticStart(0);
 
-			g_lpDeformable->hapticStart(0);
+				g_hashVertices.clear();
+			}
 		}
-		else
-			g_lpDeformable->hapticEnd();
 	}
 	else if(button == GLUT_LEFT_BUTTON){
 		if(state == GLUT_DOWN)
@@ -392,19 +403,16 @@ void MousePress(int button, int state, int x, int y)
 /*!
  *
  */
-void MouseMove(int x, int y)
+void MousePassiveMove(int x, int y)
 {
 	if(g_lpDeformable->isHapticInProgress() && g_appSettings.hapticMode == hmDynamic)
 	{
-		vec3d ptPrevAvatarPos = g_appSettings.worldAvatarPos;
-
 		double dx = x - g_appSettings.screenDragStart.x;
 		double dy = g_appSettings.screenDragStart.y - y;
 		dx *= 0.001;
 		dy *= 0.001;
 
 		g_appSettings.screenDragStart = vec2i(x, y);
-
 		string strAxis;
 		switch(TheUITransform::Instance().axis)
 		{
@@ -436,51 +444,64 @@ void MouseMove(int x, int y)
 
 		vec3d lower = g_lpAvatarCube->lower() + wpos;
 		vec3d upper = g_lpAvatarCube->upper() + wpos;
+		vec3d n[6];
+		vec3d s[6];
+		//X. Left and Right
+		n[0] = vec3d(-1, 0, 0);
+		n[1] = vec3d(1, 0, 0);
 
-		vector<vec3d> arrVertices;
-		vector<int> arrIndices;
-		g_lpDeformable->pickVertices(lower, upper, arrVertices, arrIndices);
-		for(U32 i=0; i<arrIndices.size() ;i++)
-			printf("Collision Index = %d \n", arrIndices[i]);
+		//Y. Bottom and Top
+		n[2] = vec3d(0, -1, 0);
+		n[3] = vec3d(0, 1, 0);
+
+		//Z. Back and Front
+		n[4] = vec3d(0, 0, -1);
+		n[5] = vec3d(0, 0, 1);
+
+		//Sample Point to use
+		s[0] = lower;
+		s[1] = upper;
+		s[2] = lower;
+		s[3] = upper;
+		s[4] = lower;
+		s[5] = upper;
+
+		//Compute Displacements based on the original vertex position
+		int ctCollision = 0;
+		{
+			vector<vec3d> arrVertices;
+			vector<int> arrIndices;
+			g_lpDeformable->pickVertices(lower, upper, arrVertices, arrIndices);
+			for(U32 i=0; i<arrIndices.size(); i++)
+			{
+				printf("Collision Index = %d \n", arrIndices[i]);
+				//If it does not have the vertex then add it
+				if(g_hashVertices.find(arrIndices[i]) == g_hashVertices.end())
+					g_hashVertices.insert(std::pair<int, vec3d>(arrIndices[i], arrVertices[i]));
+				else
+					g_hashVertices[arrIndices[i]] = arrVertices[i];
+			}
+
+			ctCollision = (int)arrIndices.size();
+		}
 
 		//Collided Now
-		if(arrIndices.size() > 0)
+		if(ctCollision > 0)
 		{
 			//Set Affected Vertices
 			//Check against six faces of avatar to find the intersection
-			//Front Face Normal
-			vec3d n[6];
-			vec3d s[6];
 
-			//X. Left and Right
-			n[0] = vec3d(-1, 0, 0);
-			n[1] = vec3d(1, 0, 0);
-
-			//Y. Bottom and Top
-			n[2] = vec3d(0, -1, 0);
-			n[3] = vec3d(0, 1, 0);
-
-			//Z. Back and Front
-			n[4] = vec3d(0, 0, -1);
-			n[5] = vec3d(0, 0, 1);
-
-			//Sample Point to use
-			s[0] = lower;
-			s[1] = upper;
-			s[2] = lower;
-			s[3] = upper;
-			s[4] = lower;
-			s[5] = upper;
-
-			//Previously Detected Face?
+			//Previously Detected Face? If no then detect now
 			if(g_appSettings.idxCollisionFace < 0)
 			{
 				//Detect Collision Face
 				double minDot = GetMaxLimit<double>();
 				int idxMin = 0;
-				for(int i=0; i<(int)arrVertices.size(); i++)
+
+				//Iterate over vertices in collision
+				for(map<int, vec3d>::iterator it = g_hashVertices.begin(); it != g_hashVertices.end(); ++it)
 				{
-					vec3d p = arrVertices[i];
+					vec3d p = it->second;
 					for(int j=0; j<6; j++)
 					{
 						double dot = vec3d::dot(s[j] - p, n[j]);
@@ -495,17 +516,21 @@ void MouseMove(int x, int y)
 				}
 			}
 
+
+
 			//Compute Displacement
 			vector<vec3d> arrDisplacements;
-			arrDisplacements.resize(arrVertices.size());
+			vector<int> arrIndices;
 			int idxFace = g_appSettings.idxCollisionFace;
-			for(int i=0; i< (int)arrVertices.size(); i++)
+			for(std::map<int, vec3d>::iterator it = g_hashVertices.begin(); it != g_hashVertices.end(); ++it)
 			{
-				double dot = vec3d::dot(s[idxFace] - arrVertices[i], n[idxFace]);
+				vec3d v = it->second;
+				double dot = vec3d::dot(s[idxFace] - v, n[idxFace]);
 				string arrFaces [] = {"LEFT", "RIGHT", "BOTTOM", "TOP", "NEAR", "FAR"};
-				printf("Face[%d] = %s, dot = %.4f\n", idxFace,
-						arrFaces[idxFace].c_str(), dot);
-				arrDisplacements[i] = n[idxFace] * dot;
+				printf("Face[%d] = %s, dot = %.4f, VERTEX USED: [%.4f, %.4f, %.4f] \n",
+						idxFace, arrFaces[idxFace].c_str(), dot, v.x, v.y, v.z);
+				arrDisplacements.push_back(n[idxFace] * dot);
+				arrIndices.push_back(it->first);
 			}
 
 			//Apply displacements to the model
@@ -513,49 +538,12 @@ void MouseMove(int x, int y)
 		}
 		else
 			g_appSettings.idxCollisionFace = -1;
+		glutPostRedisplay();
 	}
-	/*
-	if(g_lpDeformable->isHapticInProgress())
-	{
-		vec3f ptDelta(x - g_appSettings.screenDragStart.x,
-					   g_appSettings.screenDragStart.y - y, 0);
-		//for(int i=0; i<3 && i != g_appSettings.axis; i++)
-			//vsetElement3f(ptDelta, i, 0.0f);
-		string strAxis = "X";
-		if(TheUITransform::Instance().axis == uiaX)
-		{
-			strAxis = "X";
-			ptDelta.y = 0.0f;
-			ptDelta.z = 0.0f;
-		}
-		else if(TheUITransform::Instance().axis == uiaY)
-		{
-			strAxis = "Y";
-			ptDelta.x = 0.0f;
-			ptDelta.z = 0.0f;
-		}
-		else if(TheUITransform::Instance().axis == uiaZ)
-		{
-			strAxis = "Z";
-			ptDelta.y = 0.0f;
-			ptDelta.x = 0.0f;
-			ptDelta.z = ptDelta.x;
-		}
-		else
-			strAxis = "FREE";
+}
 
-		//Scale
-		ptDelta = ptDelta * 0.0001;
-
-		char buffer[1024];
-		sprintf(buffer, "HAPTIC DELTA VECTOR=(%.4f, %.4f, %.4f), AXIS=%s", ptDelta.x, ptDelta.y, ptDelta.z, strAxis.c_str());
-		g_infoLines[INDEX_HAPTIC_INFO] = string(buffer);
-		g_appSettings.screenDragEnd = vec2i(x, y);
-
-		g_lpDeformable->hapticSetCurrentDisplacement(ptDelta.x, ptDelta.y, ptDelta.z);
-	}
-	*/
-
+void MouseMove(int x, int y)
+{
 	g_arcBallCam.mouseMove(x, y);
 	glutPostRedisplay();
 }
@@ -673,23 +661,56 @@ void Keyboard(int key, int x, int y)
 
 		case(GLUT_KEY_F5):
 		{
-			g_appSettings.toolThickness -= 0.1;
-			g_appSettings.toolThickness = MATHMIN(g_appSettings.toolThickness, 0.1);
-			LogInfoArg1("Decrease tool thickness to: %.4f", g_appSettings.toolThickness);
-			double w = g_appSettings.toolThickness * 0.5;
+			int axis = TheUITransform::Instance().axis;
+			vec3d lo = g_lpAvatarCube->lower();
+			vec3d hi = g_lpAvatarCube->upper();
+
+			vec3d inc(0,0,0);
+			if(axis < uiaFree)
+				inc.setElement(axis, -0.1);
+			else
+				inc = vec3d(-0.1, -0.1, -0.1);
+			inc = inc * 0.5;
 			SAFE_DELETE(g_lpAvatarCube);
-			g_lpAvatarCube = new AvatarCube(vec3d(-0.1,-0.2,-w), vec3d(0.1, 0.2, w));
+			g_lpAvatarCube = new AvatarCube(lo - inc, hi + inc);
 			break;
 		}
 
 		case(GLUT_KEY_F6):
 		{
-			g_appSettings.toolThickness += 0.1;
-			g_appSettings.toolThickness = MATHMAX(g_appSettings.toolThickness, 0.1);
-			LogInfoArg1("Increase tool thickness to: %.4f", g_appSettings.toolThickness);
-			double w = g_appSettings.toolThickness * 0.5;
+			int axis = TheUITransform::Instance().axis;
+			vec3d lo = g_lpAvatarCube->lower();
+			vec3d hi = g_lpAvatarCube->upper();
+			vec3d inc(0,0,0);
+			if(axis < uiaFree)
+				inc.setElement(axis, 0.1);
+			else
+				inc = vec3d(0.1, 0.1, 0.1);
+			inc = inc * 0.5;
 			SAFE_DELETE(g_lpAvatarCube);
-			g_lpAvatarCube = new AvatarCube(vec3d(-0.1,-0.2,-w), vec3d(0.1, 0.2, w));
+			g_lpAvatarCube = new AvatarCube(lo - inc, hi + inc);
+			break;
+		}
+
+		case(GLUT_KEY_F7):
+		{
+			int radius = MATHMAX(g_lpDeformable->getHapticForceRadius() - 1, 1);
+			g_lpDeformable->setHapticForceRadius(radius);
+			LogInfoArg1("Decrease haptic force radius: %d", radius);
+			break;
+		}
+
+		case(GLUT_KEY_F8):
+		{
+			int radius = MATHMIN(g_lpDeformable->getHapticForceRadius() + 1, 10);
+			g_lpDeformable->setHapticForceRadius(radius);
+			LogInfoArg1("Increase haptic force radius: %d", radius);
+			break;
+		}
+
+		case(GLUT_KEY_F9):
+		{
+			g_appSettings.bDrawAffineWidgets = !g_appSettings.bDrawAffineWidgets;
 			break;
 		}
 
@@ -742,7 +763,9 @@ void LoadSettings()
 	g_lpDeformable = new Deformable(strVegFile.cptr(),
 									strObjFile.cptr(),
 									vFixedVertices);
+	g_lpDeformable->setHapticForceRadius(cfg.readInt("AVATAR", "RADIUS"));
 
+	//Cube
 	g_lpAvatarCube = new AvatarCube(vec3d(-0.1,-0.2,-0.1), vec3d(0.1, 0.2, 0.1));
 	//g_lpAvatar->setShaderEffectProgram(g_uiShader);
 	//g_lpAvatar->setEffectType(setFixedFunction);
@@ -801,7 +824,9 @@ int main(int argc, char* argv[])
 	glutDisplayFunc(Draw);
 	glutReshapeFunc(Resize);
 	glutMouseFunc(MousePress);
+	glutPassiveMotionFunc(MousePassiveMove);
 	glutMotionFunc(MouseMove);
+
 	glutMouseWheelFunc(MouseWheel);
 
 	glutSpecialFunc(Keyboard);

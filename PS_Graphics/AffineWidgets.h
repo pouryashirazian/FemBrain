@@ -13,7 +13,7 @@ using namespace PS::FUNCTIONALMATH;
 
 #define AXIS_SELECTION_RADIUS 0.2f
 enum UITRANSFORMTYPE {uitTranslate, uitRotate, uitScale};
-enum UITRANSFORMAXIS {uiaX, uiaY, uiaZ, uiaFree, uiaCount};
+enum UITRANSFORMAXIS {uiaX, uiaY, uiaZ, uiaFree};
 
 struct UITRANSFORM{
     UITRANSFORMTYPE type;

@@ -57,7 +57,9 @@ public:
 	void hapticSetCurrentDisplacement(const vec3d& displacement);
 	void hapticSetCurrentDisplacements(const vector<int>& indices,
 											const vector<vec3d>& displacements);
-	bool isHapticInProgress() const {return m_bHapticForceInProgress;}
+	bool isHapticInProgress() const {return m_bHapticInProgress;}
+	int getHapticForceRadius() const {return m_hapticForceNeighorhoodSize;}
+	void setHapticForceRadius(int radius) { m_hapticForceNeighorhoodSize = radius;}
 
 
 	//Render
@@ -91,7 +93,7 @@ private:
 	void cleanup();
 
 private:
-	bool m_bHapticForceInProgress;
+	bool m_bHapticInProgress;
 	double m_hapticCompliance;
 	double m_hapticExtForce[3];
 	double m_hapticExtDisplacements[3];

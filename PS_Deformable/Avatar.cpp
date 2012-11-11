@@ -156,9 +156,11 @@ void AvatarCube::setup(const vec3d& lo, const vec3d& hi)
 
 void AvatarCube::draw()
 {
+	/*
 	this->setWireFrameMode(false);
 	this->setShaderEffectProgram(m_uShaderFill);
 	GLMeshBuffer::draw();
+	*/
 
 	this->setWireFrameMode(true);
 	this->setShaderEffectProgram(m_uShaderLine);

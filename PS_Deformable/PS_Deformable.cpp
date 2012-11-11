@@ -66,7 +66,7 @@ void Deformable::setup(const char* lpVegFilePath,
 	//m_hapticCompliance = 1.0;
 	m_hapticCompliance = 1.0;
 	m_hapticForceNeighorhoodSize = DEFAULT_FORCE_NEIGHBORHOOD_SIZE;
-	m_bHapticForceInProgress = false;
+	m_bHapticInProgress = false;
 
 
 	VolumetricMesh * lpVolMesh = VolumetricMeshLoader::load(const_cast<char*>(lpVegFilePath));
@@ -331,7 +331,7 @@ bool Deformable::removeFixedVertex(int index){
 bool Deformable::hapticStart(int index)
 {
 	m_idxPulledVertex = index;
-	m_bHapticForceInProgress = true;
+	m_bHapticInProgress = true;
 	return true;
 }
 
@@ -346,13 +346,13 @@ bool Deformable::hapticStart(const vec3d& wpos)
 		}
 	}
 
-	m_bHapticForceInProgress = true;
+	m_bHapticInProgress = true;
 	return true;
 }
 
 void Deformable::hapticEnd()
 {
-	m_bHapticForceInProgress = false;
+	m_bHapticInProgress = false;
 	m_idxPulledVertex = -1;
 	m_vHapticIndices.resize(0);
 	m_vHapticDisplacements.resize(0);
@@ -363,7 +363,7 @@ bool Deformable::hapticUpdateForce()
 {
 	if (m_idxPulledVertex < 0)
 		return false;
-	if (!m_bHapticForceInProgress)
+	if (!m_bHapticInProgress)
 		return false;
 
 	double extForce[3];
@@ -435,7 +435,7 @@ bool Deformable::hapticUpdateDisplace()
 {
 	if(m_vHapticIndices.size() == 0)
 		return false;
-	if (!m_bHapticForceInProgress)
+	if (!m_bHapticInProgress)
 		return false;
 
 
