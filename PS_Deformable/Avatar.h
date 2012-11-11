@@ -17,6 +17,7 @@ public:
 	vec3d lower() const {return m_lo;}
 	vec3d upper() const {return m_hi;}
 private:
+	void cleanup();
 	void setup(const vec3d& lo, const vec3d& hi);
 
 private:

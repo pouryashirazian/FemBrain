@@ -248,8 +248,8 @@ int Deformable::pickVertices(const vec3d& boxLo, const vec3d& boxHi,
 
 int Deformable::pickVertices(const vec3d& boxLo, const vec3d& boxHi)
 {
-	m_vArrHapticIndices.resize(0);
-	m_vArrHapticVertices.resize(0);
+	m_vHapticIndices.resize(0);
+	m_vHapticDisplacements.resize(0);
 
 	ObjMesh* lpMesh = m_lpDeformableMesh->GetMesh();
 	U32 ctVertices = lpMesh->getNumVertices();
@@ -260,12 +260,12 @@ int Deformable::pickVertices(const vec3d& boxLo, const vec3d& boxHi)
 
 		if(Contains<double>(boxLo, boxHi, vv))
 		{
-			m_vArrHapticVertices.push_back(vv);
-			m_vArrHapticIndices.push_back(i);
+			m_vHapticDisplacements.push_back(vv);
+			m_vHapticIndices.push_back(i);
 		}
 	}
 
-	return (int)m_vArrHapticVertices.size();
+	return (int)m_vHapticDisplacements.size();
 }
 
 bool Deformable::addFixedVertex(int index)
@@ -354,6 +354,8 @@ void Deformable::hapticEnd()
 {
 	m_bHapticForceInProgress = false;
 	m_idxPulledVertex = -1;
+	m_vHapticIndices.resize(0);
+	m_vHapticDisplacements.resize(0);
 }
 
 //Apply External Forces to the integrator
@@ -431,7 +433,7 @@ bool Deformable::hapticUpdateForce()
  */
 bool Deformable::hapticUpdateDisplace()
 {
-	if (m_idxPulledVertex < 0)
+	if(m_vHapticIndices.size() == 0)
 		return false;
 	if (!m_bHapticForceInProgress)
 		return false;
@@ -440,59 +442,69 @@ bool Deformable::hapticUpdateDisplace()
 	//Reset Displacements Vector
 	memset(m_arrDisplacements, 0, sizeof(double) * m_dof);
 
-	for(int i=0; i<3; i++)
-		m_arrDisplacements[3 * m_idxPulledVertex + i] += m_hapticExtDisplacements[i];
-
-	//Distribute force over the neighboring vertices
-	set<int> affectedVertices;
-	set<int> lastLayerVertices;
-	affectedVertices.insert(m_idxPulledVertex);
-	lastLayerVertices.insert(m_idxPulledVertex);
-
-	for (int j = 1; j < m_hapticForceNeighorhoodSize; j++)
+	//Instead of pulled vertex we may now have an array of vertices
+	for(int i=0; i<m_vHapticIndices.size(); i++)
 	{
-		// linear kernel
-		double displaceMagnitude = 1.0 * (m_hapticForceNeighorhoodSize - j)
-				/ static_cast<double>(m_hapticForceNeighorhoodSize);
-
-		set<int> newAffectedVertices;
-		for (set<int>::iterator iter = lastLayerVertices.begin();
-				iter != lastLayerVertices.end(); iter++)
-		{
-			// traverse all neighbors and check if they were already previously inserted
-			int vtx = *iter;
-			int deg = m_lpMeshGraph->GetNumNeighbors(vtx);
-			for (int k = 0; k < deg; k++) {
-				int vtxNeighbor = m_lpMeshGraph->GetNeighbor(vtx, k);
-
-				//If the vertex was not in the set of affected vertices then
-				//Add it to the new set
-				if (affectedVertices.find(vtxNeighbor)
-						== affectedVertices.end()) {
-					// discovered new vertex
-					newAffectedVertices.insert(vtxNeighbor);
-				}
-			}
-		}
-
-		//LastLayerVertices only keeps the last circle of vertices, so clear it now
-		lastLayerVertices.clear();
-
-		//Apply forces to the newly affected vertices
-		for (set<int>::iterator iter = newAffectedVertices.begin();
-				iter != newAffectedVertices.end(); iter++)
-		{
-			// apply force
-			m_arrDisplacements[3 * *iter + 0] += displaceMagnitude * m_hapticExtDisplacements[0];
-			m_arrDisplacements[3 * *iter + 1] += displaceMagnitude * m_hapticExtDisplacements[1];
-			m_arrDisplacements[3 * *iter + 2] += displaceMagnitude * m_hapticExtDisplacements[2];
-
-			// generate new layers
-			lastLayerVertices.insert(*iter);
-			affectedVertices.insert(*iter);
-		}
+		int idxVertex = m_vHapticIndices[i];
+		m_arrDisplacements[3 * idxVertex + 0] = m_vHapticDisplacements[i].x;
+		m_arrDisplacements[3 * idxVertex + 1] = m_vHapticDisplacements[i].y;
+		m_arrDisplacements[3 * idxVertex + 2] = m_vHapticDisplacements[i].z;
 	}
 
+	//Distribute force over the neighboring vertices
+	for(int iVertex = 0; iVertex < m_vHapticIndices.size(); iVertex++)
+	{
+		set<int> affectedVertices;
+		set<int> lastLayerVertices;
+		affectedVertices.insert(m_vHapticIndices[iVertex]);
+		lastLayerVertices.insert(m_vHapticIndices[iVertex]);
+		vec3d displace = m_vHapticDisplacements[iVertex];
+
+		for (int j = 1; j < m_hapticForceNeighorhoodSize; j++)
+		{
+			// linear kernel
+			double displaceMagnitude = 1.0 * (m_hapticForceNeighorhoodSize - j)
+					/ static_cast<double>(m_hapticForceNeighorhoodSize);
+
+			set<int> newAffectedVertices;
+			for (set<int>::iterator iter = lastLayerVertices.begin();
+					iter != lastLayerVertices.end(); iter++)
+			{
+				// traverse all neighbors and check if they were already previously inserted
+				int vtx = *iter;
+				int deg = m_lpMeshGraph->GetNumNeighbors(vtx);
+				for (int k = 0; k < deg; k++) {
+					int vtxNeighbor = m_lpMeshGraph->GetNeighbor(vtx, k);
+
+					//If the vertex was not in the set of affected vertices then
+					//Add it to the new set
+					if (affectedVertices.find(vtxNeighbor)
+							== affectedVertices.end()) {
+						// discovered new vertex
+						newAffectedVertices.insert(vtxNeighbor);
+					}
+				}
+			}
+
+			//LastLayerVertices only keeps the last circle of vertices, so clear it now
+			lastLayerVertices.clear();
+
+			//Apply forces to the newly affected vertices
+			for (set<int>::iterator iter = newAffectedVertices.begin();
+					iter != newAffectedVertices.end(); iter++)
+			{
+
+				// apply force
+				m_arrDisplacements[3 * *iter + 0] += displaceMagnitude * displace.x;
+				m_arrDisplacements[3 * *iter + 1] += displaceMagnitude * displace.y;
+				m_arrDisplacements[3 * *iter + 2] += displaceMagnitude * displace.z;
+
+				// generate new layers
+				lastLayerVertices.insert(*iter);
+				affectedVertices.insert(*iter);
+			}
+		}
+	}
 
 	//Compute external forces to be applied. Input: displacements, Output: forces
 	memset(m_arrExtForces, 0, sizeof(double) * m_dof);
@@ -509,20 +521,28 @@ bool Deformable::hapticUpdateDisplace()
 /*!
  * Set force
  */
-void Deformable::hapticSetCurrentForce(double extForce[3])
+void Deformable::hapticSetCurrentForce(const vec3d& extForce)
 {
-	for(int i=0; i<3; i++)
-		m_hapticExtForce[i] = extForce[i];
+	m_hapticExtForce[0] = extForce.x;
+	m_hapticExtForce[1] = extForce.y;
+	m_hapticExtForce[2] = extForce.z;
 }
 
 /*!
  * Set displacements
  */
-void Deformable::hapticSetCurrentDisplacement(double dx, double dy, double dz)
+void Deformable::hapticSetCurrentDisplacement(const vec3d& displacement)
 {
-	m_hapticExtDisplacements[0] = dx;
-	m_hapticExtDisplacements[1] = dy;
-	m_hapticExtDisplacements[2] = dz;
+	m_hapticExtDisplacements[0] = displacement.x;
+	m_hapticExtDisplacements[1] = displacement.y;
+	m_hapticExtDisplacements[2] = displacement.z;
+}
+
+void Deformable::hapticSetCurrentDisplacements(const vector<int>& indices,
+													 const vector<vec3d>& displacements)
+{
+	m_vHapticIndices.assign(indices.begin(), indices.end());
+	m_vHapticDisplacements.assign(displacements.begin(), displacements.end());
 }
 
 /*!

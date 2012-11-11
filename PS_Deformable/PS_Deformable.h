@@ -53,8 +53,10 @@ public:
 	void hapticEnd();
 	bool hapticUpdateForce();
 	bool hapticUpdateDisplace();
-	void hapticSetCurrentForce(double extForce[3]);
-	void hapticSetCurrentDisplacement(double dx, double dy, double dz);
+	void hapticSetCurrentForce(const vec3d& extForce);
+	void hapticSetCurrentDisplacement(const vec3d& displacement);
+	void hapticSetCurrentDisplacements(const vector<int>& indices,
+											const vector<vec3d>& displacements);
 	bool isHapticInProgress() const {return m_bHapticForceInProgress;}
 
 
@@ -132,8 +134,8 @@ private:
 	vector<int> m_vFixedVertices;
 	vector<int> m_vFixedDofs;
 
-	vector<vec3d> m_vArrHapticVertices;
-	vector<int> m_vArrHapticIndices;
+	vector<vec3d> m_vHapticDisplacements;
+	vector<int> m_vHapticIndices;
 	int m_idxPulledVertex;
 
 	int m_positiveDefiniteSolver;

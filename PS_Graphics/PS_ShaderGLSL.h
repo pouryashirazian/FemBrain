@@ -2,7 +2,7 @@
 #ifndef CGLSHADER_H
 #define CGLSHADER_H
 
-#include "PS_String.h"
+#include "../PS_Base/PS_String.h"
 #include "GL/glew.h"
 #include <vector>
 

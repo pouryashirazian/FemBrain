@@ -49,18 +49,23 @@ public:
 		this->bDrawWireFrame = false;
 		this->bPanCamera = false;
 		this->bShowElements = false;
+		this->idxCollisionFace = -1;
 		this->millis = DEFAULT_TIMER_MILLIS;
 		this->hapticMode = 0;
+		this->toolThickness = 0.1;
 	}
 
 public:
 	bool bPanCamera;
 	bool bDrawWireFrame;
 	bool bShowElements;
+
+	int idxCollisionFace;
 	U32   millis;
 	int appWidth;
 	int appHeight;
 	int hapticMode;
+	double toolThickness;
 
 	vec3d worldAvatarPos;
 	vec3d worldDragStart;
@@ -384,6 +389,9 @@ void MousePress(int button, int state, int x, int y)
 	glutPostRedisplay();
 }
 
+/*!
+ *
+ */
 void MouseMove(int x, int y)
 {
 	if(g_lpDeformable->isHapticInProgress() && g_appSettings.hapticMode == hmDynamic)
@@ -435,7 +443,76 @@ void MouseMove(int x, int y)
 		for(U32 i=0; i<arrIndices.size() ;i++)
 			printf("Collision Index = %d \n", arrIndices[i]);
 
-		//g_lpDeformable->hapticSetCurrentDisplacement(ptDelta.x, ptDelta.y, ptDelta.z);
+		//Collided Now
+		if(arrIndices.size() > 0)
+		{
+			//Set Affected Vertices
+			//Check against six faces of avatar to find the intersection
+			//Front Face Normal
+			vec3d n[6];
+			vec3d s[6];
+
+			//X. Left and Right
+			n[0] = vec3d(-1, 0, 0);
+			n[1] = vec3d(1, 0, 0);
+
+			//Y. Bottom and Top
+			n[2] = vec3d(0, -1, 0);
+			n[3] = vec3d(0, 1, 0);
+
+			//Z. Back and Front
+			n[4] = vec3d(0, 0, -1);
+			n[5] = vec3d(0, 0, 1);
+
+			//Sample Point to use
+			s[0] = lower;
+			s[1] = upper;
+			s[2] = lower;
+			s[3] = upper;
+			s[4] = lower;
+			s[5] = upper;
+
+			//Previously Detected Face?
+			if(g_appSettings.idxCollisionFace < 0)
+			{
+				//Detect Collision Face
+				double minDot = GetMaxLimit<double>();
+				int idxMin = 0;
+				for(int i=0; i<(int)arrVertices.size(); i++)
+				{
+					vec3d p = arrVertices[i];
+					for(int j=0; j<6; j++)
+					{
+						double dot = vec3d::dot(s[j] - p, n[j]);
+						if(dot < minDot)
+						{
+							minDot = dot;
+							idxMin = j;
+						}
+					}
+					g_appSettings.idxCollisionFace = idxMin;
+					//vec3d q = p - n[idxMin] * minDot;
+				}
+			}
+
+			//Compute Displacement
+			vector<vec3d> arrDisplacements;
+			arrDisplacements.resize(arrVertices.size());
+			int idxFace = g_appSettings.idxCollisionFace;
+			for(int i=0; i< (int)arrVertices.size(); i++)
+			{
+				double dot = vec3d::dot(s[idxFace] - arrVertices[i], n[idxFace]);
+				string arrFaces [] = {"LEFT", "RIGHT", "BOTTOM", "TOP", "NEAR", "FAR"};
+				printf("Face[%d] = %s, dot = %.4f\n", idxFace,
+						arrFaces[idxFace].c_str(), dot);
+				arrDisplacements[i] = n[idxFace] * dot;
+			}
+
+			//Apply displacements to the model
+			g_lpDeformable->hapticSetCurrentDisplacements(arrIndices, arrDisplacements);
+		}
+		else
+			g_appSettings.idxCollisionFace = -1;
 	}
 	/*
 	if(g_lpDeformable->isHapticInProgress())
@@ -591,6 +668,28 @@ void Keyboard(int key, int x, int y)
 			LogInfoArg1("Change haptic axis to %d", TheUITransform::Instance().axis);
 			g_lpTranslateWidget->createWidget();
 
+			break;
+		}
+
+		case(GLUT_KEY_F5):
+		{
+			g_appSettings.toolThickness -= 0.1;
+			g_appSettings.toolThickness = MATHMIN(g_appSettings.toolThickness, 0.1);
+			LogInfoArg1("Decrease tool thickness to: %.4f", g_appSettings.toolThickness);
+			double w = g_appSettings.toolThickness * 0.5;
+			SAFE_DELETE(g_lpAvatarCube);
+			g_lpAvatarCube = new AvatarCube(vec3d(-0.1,-0.2,-w), vec3d(0.1, 0.2, w));
+			break;
+		}
+
+		case(GLUT_KEY_F6):
+		{
+			g_appSettings.toolThickness += 0.1;
+			g_appSettings.toolThickness = MATHMAX(g_appSettings.toolThickness, 0.1);
+			LogInfoArg1("Increase tool thickness to: %.4f", g_appSettings.toolThickness);
+			double w = g_appSettings.toolThickness * 0.5;
+			SAFE_DELETE(g_lpAvatarCube);
+			g_lpAvatarCube = new AvatarCube(vec3d(-0.1,-0.2,-w), vec3d(0.1, 0.2, w));
 			break;
 		}
 

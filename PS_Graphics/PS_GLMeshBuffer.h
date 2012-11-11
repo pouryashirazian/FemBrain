@@ -72,7 +72,7 @@ public:
 
 protected:
 	//Releases all buffer objects for rendering
-	void cleanup();
+	virtual void cleanup();
 
 
 protected:

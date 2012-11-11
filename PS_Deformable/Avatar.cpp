@@ -6,6 +6,7 @@
  */
 #include "Avatar.h"
 #include "../PS_Graphics/PS_Vector.h"
+#include "GL/glew.h"
 
 using namespace PS::MATH;
 
@@ -23,9 +24,17 @@ AvatarCube::AvatarCube(const vec3d& lo, const vec3d& hi)
 }
 
 AvatarCube::~AvatarCube(){
-
+	this->cleanup();
 }
 
+void AvatarCube::cleanup()
+{
+	GLMeshBuffer::cleanup();
+	if(glIsProgram(m_uShaderFill))
+		glDeleteProgram(m_uShaderFill);
+	if(glIsProgram(m_uShaderLine))
+		glDeleteProgram(m_uShaderLine);
+}
 void AvatarCube::setup(const vec3d& lo, const vec3d& hi)
 {
 	this->m_lo = lo;
