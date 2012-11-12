@@ -2,9 +2,9 @@
 #ifndef CRAY
 #define CRAY
 
-#include "PS_VectorMath.h"
+#include "PS_Vector.h"
 
-using namespace PS::FUNCTIONALMATH;
+using namespace PS::MATH;
 
 namespace PS{
 namespace MATH{
@@ -13,33 +13,33 @@ namespace MATH{
 class Ray
 {
 public:
-	svec3f start;
-	svec3f direction;
-	svec3f inv_direction;
+	vec3f start;
+	vec3f direction;
+	vec3f inv_direction;
 	int	  sign[3];
 
 public:
 	Ray() 	{
-		start = svec3f(0,0,0);
-		direction = svec3f(1,0,0);
+		start = vec3f(0,0,0);
+		direction = vec3f(1,0,0);
 	}
 
-	Ray(const svec3f& s, const svec3f& dir)
+	Ray(const vec3f& s, const vec3f& dir)
 	{
 		set(s, dir);
 	}
 
-	svec3f point(float t) const
+	vec3f point(float t) const
 	{
-		svec3f res = vadd3f(start, vscale3f(t, direction));
+		vec3f res = start + direction * t;
 		return res;
 	}
 
-	void set(const svec3f& s, const svec3f& dir)
+	void set(const vec3f& s, const vec3f& dir)
 	{
 		start = s;
 		direction = dir;
-		inv_direction = svec3f(1/dir.x, 1/dir.y, 1/dir.z);
+		inv_direction = vec3f(1/dir.x, 1/dir.y, 1/dir.z);
 		sign[0] = (inv_direction.x < 0.0f);
 		sign[1] = (inv_direction.y < 0.0f);
 		sign[2] = (inv_direction.z < 0.0f);

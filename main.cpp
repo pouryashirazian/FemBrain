@@ -102,7 +102,7 @@ void MousePress(int button, int state, int x, int y);
 void MouseMove(int x, int y);
 void MousePassiveMove(int x, int y);
 void MouseWheel(int button, int dir, int x, int y);
-bool ScreenToWorld(const svec3f& screenP, svec3f& worldP);
+bool ScreenToWorld(const vec3f& screenP, vec3f& worldP);
 
 void Keyboard(int key, int x, int y);
 void DrawText(const char* chrText, int x, int y);
@@ -351,9 +351,30 @@ void MousePress(int button, int state, int x, int y)
 			}
 		}
 	}
-	else if(button == GLUT_LEFT_BUTTON){
-		if(state == GLUT_DOWN)
-		{
+	else if (button == GLUT_LEFT_BUTTON) {
+		if (state == GLUT_DOWN) {
+			vec3f posNear(x, WINDOW_HEIGHT - y, 0.0f);
+			vec3f posFar(x, WINDOW_HEIGHT - y, 1.0f);
+			vec3f posTransNear;
+			vec3f posTransFar;
+			Ray ray;
+
+			if(ScreenToWorld(posNear, posTransNear) && ScreenToWorld(posFar, posTransFar))
+			{
+				vec3f dir = posTransFar - posTransNear;
+				dir.normalize();
+				ray.set(posTransNear, dir);
+			}
+
+			//UITRANSFORMAXIS axis;
+			vec3d w = g_appSettings.worldAvatarPos;
+			g_lpTranslateWidget->setPos(vec3f(w.x, w.y, w.z));
+			if(g_lpTranslateWidget->selectAxis(ray, ZNEAR, ZFAR) != uiaFree)
+			{
+				printf("Changed axis\n");
+			}
+
+
 			vec3d wpos;
 			int stencilValue = ConvertScreenToWorld(x, y, wpos);
 			if (stencilValue == 1)
@@ -467,7 +488,6 @@ void MousePassiveMove(int x, int y)
 		s[5] = upper;
 
 		//Compute Displacements based on the original vertex position
-		int ctCollision = 0;
 		{
 			vector<vec3d> arrVertices;
 			vector<int> arrIndices;
@@ -478,16 +498,16 @@ void MousePassiveMove(int x, int y)
 				//If it does not have the vertex then add it
 				if(g_hashVertices.find(arrIndices[i]) == g_hashVertices.end())
 					g_hashVertices.insert(std::pair<int, vec3d>(arrIndices[i], arrVertices[i]));
-				else
-					g_hashVertices[arrIndices[i]] = arrVertices[i];
+				//else
+					//g_hashVertices[arrIndices[i]] = arrVertices[i];
 			}
-
-			ctCollision = (int)arrIndices.size();
 		}
 
+		AABB aabbAvatar(vec3(lower.x, lower.y, lower.z), vec3(upper.x, upper.y, upper.z));
 		//Collided Now
-		if(ctCollision > 0)
+		if(g_lpDeformable->aabb().intersect(aabbAvatar))
 		{
+			printf("INTERSECTS\n");
 			//Set Affected Vertices
 			//Check against six faces of avatar to find the intersection
 
@@ -603,7 +623,7 @@ string GetGPUInfo()
 	return  string("GPU: ") + strVendorName + ", " + strRenderer + ", " + strVersion;
 }
 
-bool ScreenToWorld(const svec3f& screenP, svec3f& worldP)
+bool ScreenToWorld(const vec3f& screenP, vec3f& worldP)
 {
     GLdouble ox, oy, oz;
     GLdouble mv[16];
@@ -615,7 +635,7 @@ bool ScreenToWorld(const svec3f& screenP, svec3f& worldP)
     glGetIntegerv(GL_VIEWPORT, vp);
     if(gluUnProject(screenP.x, screenP.y, screenP.z, mv, pr, vp, &ox, &oy, &oz) == GL_TRUE)
     {
-        worldP = svec3f(ox, oy, oz);
+        worldP = vec3f(ox, oy, oz);
         return true;
     }
 

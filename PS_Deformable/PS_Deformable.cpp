@@ -136,6 +136,11 @@ void Deformable::setup(const char* lpVegFilePath,
 													 m_dampingStiffnessCoeff);
 
 	m_ctTimeStep = 0;
+
+	//Compute AABB
+	Vec3d lo, up;
+	m_lpDeformableMesh->GetMesh()->getBoundingBox(1.0, &lo, &up);
+	m_aabb.set(vec3(lo[0], lo[1], lo[2]), vec3(up[0], up[1], up[2]));
 }
 
 void Deformable::setDampingStiffnessCoeff(double s)
@@ -588,6 +593,8 @@ void Deformable::draw()
 			glEnable(GL_LIGHTING);
 		}
 	}
+
+
 
 	// render any extra scene geometry
 	glStencilFunc(GL_ALWAYS, 0, ~(0u));

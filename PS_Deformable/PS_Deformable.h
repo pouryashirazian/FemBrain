@@ -77,6 +77,8 @@ public:
 	bool addFixedVertex(int index);
 	bool removeFixedVertex(int index);
 
+	AABB aabb() const { return m_aabb;}
+
 	/*!
 	 * Return: Outputs number of dofs
 	 */
@@ -93,6 +95,9 @@ private:
 	void cleanup();
 
 private:
+	AABB m_aabb;
+
+
 	bool m_bHapticInProgress;
 	double m_hapticCompliance;
 	double m_hapticExtForce[3];

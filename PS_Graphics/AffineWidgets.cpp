@@ -538,7 +538,8 @@ UITRANSFORMAXIS TranslateWidget::selectAxis(const Ray& ray, float zNear,
 		float zFar) {
 	AABB box;
 
-	for (int i = 0; i < 3; i++) {
+	for (int i = 0; i < 3; i++)
+	{
 		box.set(m_axisBoxesLo[i], m_axisBoxesHi[i]);
 		box.translate(m_pos);
 		if (box.intersect(ray, zNear, zFar)) {
