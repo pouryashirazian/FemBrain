@@ -42,7 +42,6 @@ public:
     void zero();
     void identity();
 
-
     //Access to rows and cols and elements
     Vec4<T> getRow(int iRow) const;
     Vec4<T> getCol(int iCol) const;
@@ -55,6 +54,7 @@ public:
 
     T element(int iRow, int iCol) const;
     void setElement(int iRow, int iCol, T v);
+    const T* cptr() const {return &e[0][0];}
 
     //Transpose and Invert
     void transpose();
@@ -66,8 +66,11 @@ public:
     T determinant() const;
     T trace() const;
 
-    //Graphics Ops   
-    Vec4<T> map(const Vec4<T>& v);
+    //Transformations
+    Vec4<T> map(const Vec4<T>& v) const;
+    void scale(const Vec3<T>& s);
+    void translate(const Vec3<T>& t);
+
 
     //Conditionals
     bool isIdentity() const;
@@ -336,12 +339,35 @@ T Matrix<T>::trace() const
 
 //Map a vector using this matrix
 template <typename T>
-Vec4<T> Matrix<T>::map(const Vec4<T>& v)
+Vec4<T> Matrix<T>::map(const Vec4<T>& v) const
 {
     Vec4<T> output;
     for(int i=0; i< m_ctColElements; i++)
         output.setElement(i, Vec4<T>::dot(this->getRow(i), v));
     return output;
+}
+
+template <typename T>
+void Matrix<T>::scale(const Vec3<T>& s)
+{
+	Matrix<T> work;
+	work.e[0][0] = s.x;
+	work.e[1][1] = s.y;
+	work.e[2][2] = s.z;
+
+	*this = *this * work;
+}
+
+template <typename T>
+void Matrix<T>::translate(const Vec3<T>& t)
+{
+	Matrix<T> work;
+	work.e[3][0] = t.x;
+	work.e[3][1] = t.y;
+	work.e[3][2] = t.z;
+
+
+	*this = mul(*this, work);
 }
 
 //Conditionals
@@ -388,7 +414,7 @@ bool Matrix<T>::isOrthogonal() const
 
 //Friend Functions
 template <typename T>
-bool isEqual(const Matrix<T>& a, const Matrix<T>& b)
+bool Matrix<T>::isEqual(const Matrix<T>& a, const Matrix<T>& b)
 {
     for(int i=0; i<4; i++)
         for(int j=0; j<4; j++)
@@ -402,7 +428,7 @@ bool isEqual(const Matrix<T>& a, const Matrix<T>& b)
 
 
 template <typename T>
-Matrix<T> mul(const Matrix<T>& a, const Matrix<T>& b)
+Matrix<T> Matrix<T>::mul(const Matrix<T>& a, const Matrix<T>& b)
 {
     Matrix<T> output;
     output.zero();
@@ -414,7 +440,7 @@ Matrix<T> mul(const Matrix<T>& a, const Matrix<T>& b)
 }
 
 template <typename T>
-Matrix<T> mul(const Matrix<T>& a, T s)
+Matrix<T> Matrix<T>::mul(const Matrix<T>& a, T s)
 {
     Matrix<T> output;
     for(int i=0; i<4; i++)
@@ -426,7 +452,7 @@ Matrix<T> mul(const Matrix<T>& a, T s)
 }
 
 template <typename T>
-Matrix<T> mulEntrywise(const Matrix<T>& a, const Matrix<T>& b)
+Matrix<T> Matrix<T>::mulEntrywise(const Matrix<T>& a, const Matrix<T>& b)
 {
     Matrix<T> output;
     for(int i=0; i<4; i++)
@@ -438,14 +464,14 @@ Matrix<T> mulEntrywise(const Matrix<T>& a, const Matrix<T>& b)
 }
 
 template <typename T>
-T mulFrobeniousInner(const Matrix<T>& a, const Matrix<T>& b)
+T Matrix<T>::mulFrobeniousInner(const Matrix<T>& a, const Matrix<T>& b)
 {
     //tr(aTb) = tr(abT)
     return trace(mul(a.transposed(), b));
 }
 
 template <typename T>
-Matrix<T> add(const Matrix<T>& a, const Matrix<T>& b)
+Matrix<T> Matrix<T>::add(const Matrix<T>& a, const Matrix<T>& b)
 {
     Matrix<T> output;
     for(int i=0; i<4; i++)
@@ -458,7 +484,7 @@ Matrix<T> add(const Matrix<T>& a, const Matrix<T>& b)
 }
 
 template <typename T>
-Matrix<T> sub(const Matrix<T>& a, const Matrix<T>& b)
+Matrix<T> Matrix<T>::sub(const Matrix<T>& a, const Matrix<T>& b)
 {
     Matrix<T> output;
     for(int i=0; i<4; i++)

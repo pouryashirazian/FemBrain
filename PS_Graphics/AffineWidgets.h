@@ -3,6 +3,7 @@
 
 #include "PS_Vector.h"
 #include "PS_Quaternion.h"
+#include "PS_Matrix.h"
 #include "PS_Ray.h"
 #include "loki/Singleton.h"
 
@@ -29,12 +30,14 @@ typedef SingletonHolder<UITRANSFORM, CreateUsingNew, PhoenixSingleton> TheUITran
 
 class AbstractWidget{
 public:    
-    AbstractWidget() {}
+    AbstractWidget() {
+    	m_mtxTranform.identity();
+    }
     virtual ~AbstractWidget() {}
 
     virtual void draw() = 0;
     virtual void createWidget() = 0;
-    virtual UITRANSFORMAXIS selectAxis(const Ray& ray, float zNear, float zFar)
+    virtual UITRANSFORMAXIS selectAxis(const vec3f& worldpos, const Ray& ray, float zNear, float zFar)
     {
         return uiaFree;
     }
@@ -44,15 +47,12 @@ public:
     vec4f maskColor( UITRANSFORMAXIS axis );
     void maskColorSetGLFront( UITRANSFORMAXIS axis );
 
-
-    void setPos(const vec3f& pos) {m_pos = pos;}
-    vec3f getPos() const {return m_pos;}
-
-    void setLength(const vec3f& len) {m_length = len;}
-    vec3f getLength() const {return m_length;}
+    mat44f getTransform() const {return m_mtxTranform;}
+    void setTransform(const mat44f& mtx) {
+    	m_mtxTranform = mtx;
+    }
 protected:
-    vec3f m_pos;
-    vec3f m_length;
+    mat44f m_mtxTranform;
 };
 
 
@@ -64,8 +64,7 @@ class RotationWidget : public AbstractWidget
 public:
     RotationWidget()
     {
-        m_pos = vec3f(0,0,0);
-        m_length = vec3f(0.5f, 0.5f, 0.5f);
+    	m_mtxTranform.identity();
         this->createWidget();
     }
 
@@ -88,8 +87,7 @@ class ScaleWidget : public AbstractWidget
 public:
     ScaleWidget()
     {
-        m_pos = vec3f(0,0,0);
-        m_length = vec3f(1,1,1);
+    	this->m_mtxTranform.identity();
         this->createWidget();
     }
 
@@ -99,7 +97,8 @@ public:
 
     void draw();
     void createWidget();
-    UITRANSFORMAXIS selectAxis(const Ray& ray, float zNear, float zFar);
+    UITRANSFORMAXIS selectAxis(const vec3f& worldpos, const Ray& ray, float zNear, float zFar);
+
 private:
     U32 m_glList;
     vec3f m_axisBoxesLo[3];
@@ -116,8 +115,7 @@ class TranslateWidget : public AbstractWidget
 public:
     TranslateWidget()
     {
-        m_pos = vec3f(0,0,0);
-        m_length = vec3f(1,1,1);
+    	this->m_mtxTranform.identity();
         this->createWidget();
     }
 
@@ -126,7 +124,7 @@ public:
 
     void draw();
     void createWidget();
-    UITRANSFORMAXIS selectAxis(const Ray& ray, float zNear, float zFar);
+    UITRANSFORMAXIS selectAxis(const vec3f& worldpos, const Ray& ray, float zNear, float zFar);
 
 
 private:

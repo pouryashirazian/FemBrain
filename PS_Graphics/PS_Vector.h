@@ -389,6 +389,8 @@ public:
     //Constructors
     Vec4() {}
     Vec4(T x_, T y_, T z_, T w_ = 1.0f):x(x_), y(y_), z(z_), w(w_) {}
+    Vec4(const Vec2<T>& vl2, const Vec2<T>& vr2):x(vl2.x), y(vl2.y), z(vr2.x), w(vr2.y) {}
+    Vec4(const Vec3<T>& v3, T w_):x(v3.x), y(v3.y), z(v3.z), w(w_) {}
     Vec4(const Vec4& rhs):x(rhs.x), y(rhs.y), z(rhs.z), w(rhs.w) {}
     Vec4(const T* lpValues)
     {

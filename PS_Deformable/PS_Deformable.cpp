@@ -106,10 +106,6 @@ void Deformable::setup(const char* lpVegFilePath,
 	//Copy from the input fixed vertices
 	m_vFixedVertices.assign(vFixedVertices.begin(), vFixedVertices.end());
 
-
-	m_vFixedDofs.resize(0);
-	FixedVerticesToFixedDOF(m_vFixedVertices, m_vFixedDofs);
-
 	// (tangential) Rayleigh damping
 	// "underwater"-like damping
 	m_dampingMassCoeff = 0.0;
@@ -124,18 +120,12 @@ void Deformable::setup(const char* lpVegFilePath,
 
 	//Time Step the model
 	m_timeStep = 0.0333;
-
-	// initialize the Integrator
-	m_lpIntegrator = new ImplicitBackwardEulerSparse(m_dof, m_timeStep,
-													 m_lpMassMatrix,
-													 m_lpDeformableForceModel,
-													 m_positiveDefiniteSolver,
-													 m_vFixedDofs.size(),
-													 &m_vFixedDofs[0],
-													 m_dampingMassCoeff,
-													 m_dampingStiffnessCoeff);
-
 	m_ctTimeStep = 0;
+	m_lpIntegrator = NULL;
+
+	//Create the integrator
+	this->setupIntegrator();
+
 
 	//Compute AABB
 	Vec3d lo, up;
@@ -282,19 +272,8 @@ bool Deformable::addFixedVertex(int index)
 	}
 
 	m_vFixedVertices.push_back(index);
-	FixedVerticesToFixedDOF(m_vFixedVertices, m_vFixedDofs);
+	this->setupIntegrator();
 
-	SAFE_DELETE(m_lpIntegrator);
-
-	// initialize the Integrator
-	m_lpIntegrator = new ImplicitBackwardEulerSparse(m_dof, m_timeStep,
-													 m_lpMassMatrix,
-													 m_lpDeformableForceModel,
-													 m_positiveDefiniteSolver,
-													 m_vFixedDofs.size(),
-													 &m_vFixedDofs[0],
-													 m_dampingMassCoeff,
-													 m_dampingStiffnessCoeff);
 	return true;
 }
 
@@ -314,7 +293,12 @@ bool Deformable::removeFixedVertex(int index){
 	if(!bChanged)
 		return false;
 
+	this->setupIntegrator();
+	return true;
+}
 
+void Deformable::setupIntegrator()
+{
 	//Update DOFS
 	FixedVerticesToFixedDOF(m_vFixedVertices, m_vFixedDofs);
 
@@ -322,7 +306,7 @@ bool Deformable::removeFixedVertex(int index){
 	SAFE_DELETE(m_lpIntegrator);
 
 	// initialize the Integrator
-	m_lpIntegrator = new ImplicitBackwardEulerSparse(m_dof, m_timeStep,
+	m_lpIntegrator = new VolumeConservingIntegrator(m_dof, m_timeStep,
 													 m_lpMassMatrix,
 													 m_lpDeformableForceModel,
 													 m_positiveDefiniteSolver,
@@ -330,7 +314,6 @@ bool Deformable::removeFixedVertex(int index){
 													 &m_vFixedDofs[0],
 													 m_dampingMassCoeff,
 													 m_dampingStiffnessCoeff);
-	return true;
 }
 
 bool Deformable::hapticStart(int index)

@@ -6,20 +6,20 @@ namespace MATH{
 
 
 bool AABB::contains(const vec3& p) const {
-	if(((p.x >= lower.x) && (p.x <= upper.x))&&
-	  ((p.y >= lower.y) && (p.y <= upper.y))&&
- 	  ((p.z >= lower.z) && (p.z <= upper.z)))
+	if(((p.x >= m_lower.x) && (p.x <= m_upper.x))&&
+	  ((p.y >= m_lower.y) && (p.y <= m_upper.y))&&
+ 	  ((p.z >= m_lower.z) && (p.z <= m_upper.z)))
 		return true;
 	else
 		return false;
 }
 
 bool AABB::intersect(const AABB& rhs) const {
-    if ((lower.x >= rhs.upper.x) || (upper.x <= rhs.lower.x))
+    if ((m_lower.x >= rhs.m_upper.x) || (m_upper.x <= rhs.m_lower.x))
         return false;
-    if ((lower.y >= rhs.upper.y) || (upper.y <= rhs.lower.y))
+    if ((m_lower.y >= rhs.m_upper.y) || (m_upper.y <= rhs.m_lower.y))
         return false;
-    if ((lower.z >= rhs.upper.z) || (upper.z <= rhs.lower.z))
+    if ((m_lower.z >= rhs.m_upper.z) || (m_upper.z <= rhs.m_lower.z))
         return false;
 
     return true;

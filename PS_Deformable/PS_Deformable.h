@@ -17,7 +17,8 @@
 #include "corotationalLinearFEM.h"
 #include "corotationalLinearFEMForceModel.h"
 #include "generateMassMatrix.h"
-#include "implicitBackwardEulerSparse.h"
+//#include "implicitBackwardEulerSparse.h"
+#include "PS_VolumeConservingIntegrator.h"
 #include "sceneObjectDeformable.h"
 #include "graph.h"
 
@@ -92,6 +93,8 @@ private:
 			    const char* lpObjFilePath,
 			    std::vector<int>& vFixedVertices);
 
+	void setupIntegrator();
+
 	void cleanup();
 
 private:
@@ -122,7 +125,8 @@ private:
 	ForceModel* m_lpDeformableForceModel;
 
 	//Integrator
-	ImplicitBackwardEulerSparse* m_lpIntegrator;
+	//ImplicitBackwardEulerSparse* m_lpIntegrator;
+	VolumeConservingIntegrator* m_lpIntegrator;
 
 	//
 	SceneObjectDeformable * m_lpDeformableMesh;

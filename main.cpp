@@ -177,9 +177,8 @@ void Draw()
 			glTranslated(wpos.x, wpos.y, wpos.z);
 			g_lpAvatarCube->draw();
 
-			if(g_appSettings.bDrawAffineWidgets)
+			if (g_appSettings.bDrawAffineWidgets)
 			{
-				glScalef(0.4, 0.4, 0.4);
 				glDisable(GL_DEPTH_TEST);
 				g_lpTranslateWidget->draw();
 				glEnable(GL_DEPTH_TEST);
@@ -367,9 +366,8 @@ void MousePress(int button, int state, int x, int y)
 			}
 
 			//UITRANSFORMAXIS axis;
-			vec3d w = g_appSettings.worldAvatarPos;
-			g_lpTranslateWidget->setPos(vec3f(w.x, w.y, w.z));
-			if(g_lpTranslateWidget->selectAxis(ray, ZNEAR, ZFAR) != uiaFree)
+			vec3d ap = g_appSettings.worldAvatarPos;
+			if(g_lpTranslateWidget->selectAxis(vec3f(ap.x, ap.y, ap.z), ray, ZNEAR, ZFAR) != uiaFree)
 			{
 				printf("Changed axis\n");
 			}
@@ -385,33 +383,6 @@ void MousePress(int button, int state, int x, int y)
 				LogInfoArg1("Selected Vertex Index = %d ", idxVertex);
 			}
 		}
-
-/*
-			int stencilValue = ConvertScreenToWorld(x, y, g_appSettings.worldAvatarPos);
-			if (stencilValue == 1)
-			{
-				double closestVertex[3];
-				int idxVertex = g_lpDeformable->pickVertex(worldX, worldY, worldZ, &closestVertex[0]);
-
-				if(g_appSettings.hapticMode == hmForce)
-				{
-					if(g_lpDeformable->hapticStart(idxVertex))
-					{
-						g_appSettings.worldDragStart = vec3d(&closestVertex[0]);
-						g_appSettings.screenDragStart = vec2i(x, y);
-					}
-				}
-				else if(g_appSettings.hapticMode == hmAddFixed)
-				{
-
-				}
-				else if(g_appSettings.hapticMode == hmRemoveFixed)
-				{
-
-				}
-			}
-*/
-
 	}
 
 	//Camera
@@ -456,6 +427,7 @@ void MousePassiveMove(int x, int y)
 			break;
 		}
 
+		//World Avatar Pos
 		vec3d wpos = g_appSettings.worldAvatarPos;
 
 		char buffer[1024];
@@ -778,6 +750,10 @@ void LoadSettings()
 	//Translation Widget
 	TheUITransform::Instance().axis = uiaX;
 	g_lpTranslateWidget = new TranslateWidget();
+	mat44f mtx;
+	mtx.scale(vec3f(0.4f, 0.4f, 0.4f));
+	g_lpTranslateWidget->setTransform(mtx);
+
 
 	//Create Deformable Model
 	g_lpDeformable = new Deformable(strVegFile.cptr(),

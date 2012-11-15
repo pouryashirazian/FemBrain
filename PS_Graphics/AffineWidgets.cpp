@@ -68,6 +68,7 @@ void RotationWidget::createWidget() {
 
 	int n = 31;
 	vec3f origin(0, 0, 0);
+	vec3f vlen(1,1,1);
 
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 
@@ -80,8 +81,8 @@ void RotationWidget::createWidget() {
 	for (int i = 0; i <= n; i++) {
 		theta = static_cast<float>(i) * (TwoPi / (float) n);
 		v.x = 0.0f;
-		v.y = m_length.y * sin(theta);
-		v.z = m_length.z * cos(theta);
+		v.y = vlen.y * sin(theta);
+		v.z = vlen.z * cos(theta);
 
 		v = v + origin;
 		glVertex3f(v.x, v.y, v.z);
@@ -93,9 +94,9 @@ void RotationWidget::createWidget() {
 	maskColorSetGLFront(uiaY);
 	for (int i = 0; i <= n; i++) {
 		theta = static_cast<float>(i) * (TwoPi / (float) n);
-		v.x = m_length.x * cos(theta);
+		v.x = vlen.x * cos(theta);
 		v.y = 0.0f;
-		v.z = m_length.z * sin(theta);
+		v.z = vlen.z * sin(theta);
 
 		v = v + origin;
 		glVertex3f(v.x, v.y, v.z);
@@ -107,8 +108,8 @@ void RotationWidget::createWidget() {
 	maskColorSetGLFront(uiaZ);
 	for (int i = 0; i <= n; i++) {
 		theta = static_cast<float>(i) * (TwoPi / (float) n);
-		v.x = m_length.x * cos(theta);
-		v.y = m_length.y * sin(theta);
+		v.x = vlen.x * cos(theta);
+		v.y = vlen.y * sin(theta);
 		v.z = 0.0f;
 
 		v = v + origin;
@@ -128,7 +129,7 @@ RotationWidget::~RotationWidget() {
 
 void RotationWidget::draw() {
 	glPushMatrix();
-	glTranslatef(m_pos.x, m_pos.y, m_pos.z);
+	glMultMatrixf(m_mtxTranform.cptr());
 	glCallList(m_glList);
 	glPopMatrix();
 }
@@ -138,9 +139,9 @@ void ScaleWidget::createWidget() {
 	vec3f ptEnd[3];
 	vec3f origin = vec3f(0, 0, 0);
 
-	ptEnd[0] = vec3f(1.0f, 0.0f, 0.0f) * m_length.x;
-	ptEnd[1] = vec3f(0.0f, 1.0f, 0.0f) * m_length.y;
-	ptEnd[2] = vec3f(0.0f, 0.0f, 1.0f) * m_length.z;
+	ptEnd[0] = vec3f(1.0f, 0.0f, 0.0f);
+	ptEnd[1] = vec3f(0.0f, 1.0f, 0.0f);
+	ptEnd[2] = vec3f(0.0f, 0.0f, 1.0f);
 
 	//Octree
 	m_axisBoxesLo[0] = vec3f(0, -AXIS_SELECTION_RADIUS,
@@ -240,17 +241,20 @@ ScaleWidget::~ScaleWidget() {
 
 void ScaleWidget::draw() {
 	glPushMatrix();
-	glTranslatef(m_pos.x, m_pos.y, m_pos.z);
+	glMultMatrixf(m_mtxTranform.cptr());
 	glCallList(m_glList);
 	glPopMatrix();
 }
 
-UITRANSFORMAXIS ScaleWidget::selectAxis(const Ray& ray, float zNear, float zFar) {
+UITRANSFORMAXIS ScaleWidget::selectAxis(const vec3f& worldpos, const Ray& ray, float zNear, float zFar)
+{
 	AABB box;
 
 	for (int i = 0; i < 3; i++) {
 		box.set(m_axisBoxesLo[i], m_axisBoxesHi[i]);
-		box.translate(m_pos);
+		box.tranform(m_mtxTranform);
+		box.translate(worldpos);
+
 		if (box.intersect(ray, zNear, zFar)) {
 			TheUITransform::Instance().axis = (UITRANSFORMAXIS) i;
 			this->createWidget();
@@ -353,9 +357,9 @@ void TranslateWidget::createWidget() {
 
 	m_glList = glGenLists(1);
 	glNewList(m_glList, GL_COMPILE);
-	ptEnd[0] = vec3f(1.0f, 0.0f, 0.0f) * m_length.x;
-	ptEnd[1] = vec3f(0.0f, 1.0f, 0.0f) * m_length.y;
-	ptEnd[2] = vec3f(0.0f, 0.0f, 1.0f) * m_length.z;
+	ptEnd[0] = vec3f(1.0f, 0.0f, 0.0f);
+	ptEnd[1] = vec3f(0.0f, 1.0f, 0.0f);
+	ptEnd[2] = vec3f(0.0f, 0.0f, 1.0f);
 
 	//Octree
 	m_axisBoxesLo[0] = vec3f(0, -AXIS_SELECTION_RADIUS,
@@ -446,14 +450,19 @@ void TranslateWidget::createWidget() {
 	glEndList();
 }
 
-TranslateWidget::~TranslateWidget() {
+TranslateWidget::~TranslateWidget()
+{
 	if (glIsList(m_glList))
 		glDeleteLists(m_glList, 1);
-
 }
 
 void TranslateWidget::draw() {
-	//glCallList(m_glList);
+	glPushMatrix();
+	glMultMatrixf(m_mtxTranform.cptr());
+	glCallList(m_glList);
+	glPopMatrix();
+
+/*
 	vec3f ptEnd[3];
 	vec3f origin(0, 0, 0);
 	ptEnd[0] = vec3f(1.0f, 0.0f, 0.0f);
@@ -532,16 +541,19 @@ void TranslateWidget::draw() {
 	glEnd();
 
 	glPopAttrib();
+	*/
 }
 
-UITRANSFORMAXIS TranslateWidget::selectAxis(const Ray& ray, float zNear,
-		float zFar) {
+UITRANSFORMAXIS TranslateWidget::selectAxis(const vec3f& worldpos, const Ray& ray, float zNear, float zFar)
+{
 	AABB box;
 
 	for (int i = 0; i < 3; i++)
 	{
 		box.set(m_axisBoxesLo[i], m_axisBoxesHi[i]);
-		box.translate(m_pos);
+		box.tranform(m_mtxTranform);
+		box.translate(worldpos);
+
 		if (box.intersect(ray, zNear, zFar)) {
 			TheUITransform::Instance().axis = (UITRANSFORMAXIS) i;
 			this->createWidget();
