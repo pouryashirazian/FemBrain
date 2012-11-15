@@ -79,7 +79,7 @@ std::map<int, vec3d> g_hashVertices;
 
 //Global Variables
 AvatarCube* g_lpAvatarCube = NULL;
-TranslateWidget*	g_lpTranslateWidget = NULL;
+AbstractWidget*	g_lpAffineWidget = NULL;
 PS::ArcBallCamera g_arcBallCam;
 PS::HPC::GPUPoly* g_lpBlobRender = NULL;
 Deformable* g_lpDeformable = NULL;
@@ -104,7 +104,8 @@ void MousePassiveMove(int x, int y);
 void MouseWheel(int button, int dir, int x, int y);
 bool ScreenToWorld(const vec3f& screenP, vec3f& worldP);
 
-void Keyboard(int key, int x, int y);
+void NormalKey(unsigned char key, int x, int y);
+void SpecialKey(int key, int x, int y);
 void DrawText(const char* chrText, int x, int y);
 string GetGPUInfo();
 
@@ -180,7 +181,7 @@ void Draw()
 			if (g_appSettings.bDrawAffineWidgets)
 			{
 				glDisable(GL_DEPTH_TEST);
-				g_lpTranslateWidget->draw();
+				g_lpAffineWidget->draw();
 				glEnable(GL_DEPTH_TEST);
 			}
 		glPopMatrix();
@@ -367,7 +368,7 @@ void MousePress(int button, int state, int x, int y)
 
 			//UITRANSFORMAXIS axis;
 			vec3d ap = g_appSettings.worldAvatarPos;
-			if(g_lpTranslateWidget->selectAxis(vec3f(ap.x, ap.y, ap.z), ray, ZNEAR, ZFAR) != uiaFree)
+			if(g_lpAffineWidget->selectAxis(vec3f(ap.x, ap.y, ap.z), ray, ZNEAR, ZFAR) != uiaFree)
 			{
 				printf("Changed axis\n");
 			}
@@ -614,7 +615,60 @@ bool ScreenToWorld(const vec3f& screenP, vec3f& worldP)
     return false;
 }
 
-void Keyboard(int key, int x, int y)
+void NormalKey(unsigned char key, int x, int y)
+{
+	mat44f mtx;
+	mtx.scale(vec3f(0.4, 0.4, 0.4));
+	switch(key)
+	{
+	case('g'):{
+		SAFE_DELETE(g_lpAffineWidget);
+		g_lpAffineWidget = CreateAffineWidget(uitTranslate);
+		g_lpAffineWidget->setTransform(mtx);
+		break;
+	}
+
+	case('s'):{
+		SAFE_DELETE(g_lpAffineWidget);
+		g_lpAffineWidget = CreateAffineWidget(uitScale);
+		g_lpAffineWidget->setTransform(mtx);
+		break;
+	}
+
+	case('r'):{
+		SAFE_DELETE(g_lpAffineWidget);
+		g_lpAffineWidget = CreateAffineWidget(uitRotate);
+		g_lpAffineWidget->setTransform(mtx);
+		break;
+	}
+
+	case('x'):{
+		SAFE_DELETE(g_lpAffineWidget);
+		TheUITransform::Instance().axis = uiaX;
+		g_lpAffineWidget = CreateAffineWidget(TheUITransform::Instance().type);
+		g_lpAffineWidget->setTransform(mtx);
+		break;
+	}
+	case('y'):{
+		SAFE_DELETE(g_lpAffineWidget);
+		TheUITransform::Instance().axis = uiaY;
+		g_lpAffineWidget = CreateAffineWidget(TheUITransform::Instance().type);
+		g_lpAffineWidget->setTransform(mtx);
+		break;
+	}
+	case('z'):{
+		SAFE_DELETE(g_lpAffineWidget);
+		TheUITransform::Instance().axis = uiaZ;
+		g_lpAffineWidget = CreateAffineWidget(TheUITransform::Instance().type);
+		g_lpAffineWidget->setTransform(mtx);
+
+		break;
+	}
+
+	}
+}
+
+void SpecialKey(int key, int x, int y)
 {
 	switch(key)
 	{
@@ -646,7 +700,7 @@ void Keyboard(int key, int x, int y)
 			//Set UIAxis
 			TheUITransform::Instance().axis = (TheUITransform::Instance().axis + 1) % 4;
 			LogInfoArg1("Change haptic axis to %d", TheUITransform::Instance().axis);
-			g_lpTranslateWidget->createWidget();
+			g_lpAffineWidget->createWidget();
 
 			break;
 		}
@@ -749,10 +803,10 @@ void LoadSettings()
 
 	//Translation Widget
 	TheUITransform::Instance().axis = uiaX;
-	g_lpTranslateWidget = new TranslateWidget();
+	g_lpAffineWidget = new TranslateWidget();
 	mat44f mtx;
 	mtx.scale(vec3f(0.4f, 0.4f, 0.4f));
-	g_lpTranslateWidget->setTransform(mtx);
+	g_lpAffineWidget->setTransform(mtx);
 
 
 	//Create Deformable Model
@@ -825,7 +879,8 @@ int main(int argc, char* argv[])
 
 	glutMouseWheelFunc(MouseWheel);
 
-	glutSpecialFunc(Keyboard);
+	glutKeyboardFunc(NormalKey);
+	glutSpecialFunc(SpecialKey);
 	glutCloseFunc(Close);
 	glutTimerFunc(g_appSettings.millis, TimeStep, 0);
 

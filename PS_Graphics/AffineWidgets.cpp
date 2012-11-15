@@ -178,7 +178,7 @@ void ScaleWidget::createWidget() {
 
 	maskColorSetGLFront(uiaZ);
 	glVertex3f(origin.x, origin.y, origin.z);
-	glVertex3f(ptEnd[1].x, ptEnd[1].y, ptEnd[1].z);
+	glVertex3f(ptEnd[2].x, ptEnd[2].y, ptEnd[2].z);
 	glEnd();
 	glPopAttrib();
 
@@ -564,3 +564,28 @@ UITRANSFORMAXIS TranslateWidget::selectAxis(const vec3f& worldpos, const Ray& ra
 	return uiaFree;
 }
 
+AbstractWidget* CreateAffineWidget(UITRANSFORMTYPE type)
+{
+	AbstractWidget* lpWidget = NULL;
+	switch(type)
+	{
+	case(uitTranslate):
+	{
+		lpWidget = new TranslateWidget();
+		break;
+	}
+	case(uitScale):
+	{
+		lpWidget = new ScaleWidget();
+		break;
+	}
+
+	case(uitRotate):
+	{
+		lpWidget = new RotationWidget();
+		break;
+	}
+	}
+	TheUITransform::Instance().type = type;
+	return lpWidget;
+}

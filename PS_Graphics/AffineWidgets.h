@@ -136,4 +136,6 @@ private:
     vec3f m_axisBoxesHi[3];
 };
 
+AbstractWidget* CreateAffineWidget(UITRANSFORMTYPE type);
+
 #endif
