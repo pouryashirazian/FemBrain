@@ -29,10 +29,20 @@ public:
 		set(s, dir);
 	}
 
+	Ray(const vec3d& s, const vec3d& dir)
+	{
+		set(s, dir);
+	}
+
 	vec3f point(float t) const
 	{
 		vec3f res = start + direction * t;
 		return res;
+	}
+
+	void set(const vec3d& s, const vec3d& dir)
+	{
+		this->set(vec3f(s.x, s.y, s.z), vec3f(dir.x, dir.y, dir.z));
 	}
 
 	void set(const vec3f& s, const vec3f& dir)

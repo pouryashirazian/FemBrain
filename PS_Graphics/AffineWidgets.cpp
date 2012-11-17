@@ -6,6 +6,26 @@ GLfloat g_vertices[][3] = { { -1.0, -1.0, 1.0 }, { -1.0, 1.0, 1.0 }, { 1.0, 1.0,
 		1.0 }, { 1.0, -1.0, 1.0 }, { -1.0, -1.0, -1.0 }, { -1.0, 1.0, -1.0 }, {
 		1.0, 1.0, -1.0 }, { 1.0, -1.0, -1.0 } };
 
+UITRANSFORMAXIS AbstractWidget::selectAxis(int x, int y)
+{
+    GLint vp[4];
+    glGetIntegerv(GL_VIEWPORT, vp);
+
+	vec3d posNear(x, vp[3] - y, 0.0f);
+	vec3d posFar(x, vp[3] - y, 1.0f);
+	vec3d posTransNear;
+	vec3d posTransFar;
+
+
+	ScreenToWorld(posNear, posTransNear);
+	ScreenToWorld(posFar, posTransFar);
+	vec3d dir = posTransFar - posTransNear;
+	dir.normalize();
+	Ray ray(posTransNear, dir);
+
+	return this->selectAxis(TheUITransform::Instance().translate, ray, 0.01, 1000.0);
+}
+
 vec3f AbstractWidget::maskDisplacement(vec3f v, UITRANSFORMAXIS axis) {
 	if (axis == uiaFree)
 		return v;

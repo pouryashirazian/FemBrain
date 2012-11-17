@@ -535,3 +535,51 @@ bool CompileShaderCode(const char* vShaderCode, const char* vFragmentCode, GLuin
 	return true;
 }
 
+int ScreenToWorld(const vec3d& screenP, vec3d& worldP)
+{
+    GLdouble ox, oy, oz;
+    GLdouble mv[16];
+    GLdouble pr[16];
+    GLint vp[4];
+
+    glGetDoublev(GL_MODELVIEW_MATRIX, mv);
+    glGetDoublev(GL_PROJECTION_MATRIX, pr);
+    glGetIntegerv(GL_VIEWPORT, vp);
+    if(gluUnProject(screenP.x, screenP.y, screenP.z, mv, pr, vp, &ox, &oy, &oz) == GL_TRUE)
+    {
+        worldP = vec3d(ox, oy, oz);
+        return 1;
+    }
+
+    return 0;
+}
+
+int ScreenToWorldReadStencil(int x, int y, vec3d& world)
+{
+	GLdouble model[16];
+	glGetDoublev(GL_MODELVIEW_MATRIX, model);
+
+	GLdouble proj[16];
+	glGetDoublev(GL_PROJECTION_MATRIX, proj);
+
+	GLint view[4];
+	glGetIntegerv(GL_VIEWPORT, view);
+
+	int winX = x;
+	int winY = view[3] - 1 - y;
+
+	float zValue;
+	glReadPixels(winX, winY, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &zValue);
+
+	GLubyte stencilValue;
+	glReadPixels(winX, winY, 1, 1, GL_STENCIL_INDEX, GL_UNSIGNED_BYTE,
+			&stencilValue);
+
+	GLdouble worldX, worldY, worldZ;
+	gluUnProject(winX, winY, zValue, model, proj, view,
+					&worldX, &worldY, &worldZ);
+
+	world = vec3d(worldX, worldY, worldZ);
+
+	return stencilValue;
+}

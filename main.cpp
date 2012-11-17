@@ -39,7 +39,7 @@ using namespace PS::HPC;
 #define INDEX_GPU_INFO 	   2
 
 
-enum HAPTICMODES {hmDynamic, hmAddFixed, hmRemoveFixed, hmCount};
+enum HAPTICMODES {hmDynamic, hmSceneEdit};
 
 //Application Settings
 class AppSettings{
@@ -68,9 +68,9 @@ public:
 	int appHeight;
 	int hapticMode;
 
-	vec3d worldAvatarPos;
-	vec3d worldDragStart;
-	vec3d worldDragEnd;
+	//vec3d worldAvatarPos;
+	//vec3d worldDragStart;
+	//vec3d worldDragEnd;
 	vec2i screenDragStart;
 	vec2i screenDragEnd;
 };
@@ -102,10 +102,11 @@ void MousePress(int button, int state, int x, int y);
 void MouseMove(int x, int y);
 void MousePassiveMove(int x, int y);
 void MouseWheel(int button, int dir, int x, int y);
-bool ScreenToWorld(const vec3f& screenP, vec3f& worldP);
+
 
 void NormalKey(unsigned char key, int x, int y);
 void SpecialKey(int key, int x, int y);
+
 void DrawText(const char* chrText, int x, int y);
 string GetGPUInfo();
 
@@ -171,11 +172,11 @@ void Draw()
 	g_lpDeformable->draw();
 
 	//Draw Interaction Avatar
-	if(g_appSettings.hapticMode == hmDynamic && g_lpAvatarCube)
+	if(g_lpAvatarCube)
 	{
-		vec3d wpos = g_appSettings.worldAvatarPos;
+		vec3f wpos = TheUITransform::Instance().translate;
 		glPushMatrix();
-			glTranslated(wpos.x, wpos.y, wpos.z);
+			glTranslatef(wpos.x, wpos.y, wpos.z);
 			g_lpAvatarCube->draw();
 
 			if (g_appSettings.bDrawAffineWidgets)
@@ -303,87 +304,45 @@ void Resize(int w, int h)
 	glLoadIdentity();
 }
 
-int ConvertScreenToWorld(int x, int y, vec3d& world)
-{
-	GLdouble model[16];
-	glGetDoublev(GL_MODELVIEW_MATRIX, model);
 
-	GLdouble proj[16];
-	glGetDoublev(GL_PROJECTION_MATRIX, proj);
-
-	GLint view[4];
-	glGetIntegerv(GL_VIEWPORT, view);
-
-	int winX = x;
-	int winY = view[3] - 1 - y;
-
-	float zValue;
-	glReadPixels(winX, winY, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &zValue);
-
-	GLubyte stencilValue;
-	glReadPixels(winX, winY, 1, 1, GL_STENCIL_INDEX, GL_UNSIGNED_BYTE,
-			&stencilValue);
-
-	GLdouble worldX, worldY, worldZ;
-	gluUnProject(winX, winY, zValue, model, proj, view,
-					&worldX, &worldY, &worldZ);
-
-	world = vec3d(worldX, worldY, worldZ);
-
-	return stencilValue;
-}
 
 void MousePress(int button, int state, int x, int y)
 {
-	if(button == GLUT_RIGHT_BUTTON)
-	{
-		if(state == GLUT_DOWN)
-		{
-			if(g_lpDeformable->isHapticInProgress())
-				g_lpDeformable->hapticEnd();
-			else if(g_appSettings.hapticMode == hmDynamic)
-			{
-				g_appSettings.screenDragStart = vec2i(x, y);
-				g_appSettings.screenDragEnd = vec2i(x, y);
-				g_lpDeformable->hapticStart(0);
+	g_appSettings.screenDragStart = vec2i(x, y);
+	g_appSettings.screenDragEnd = vec2i(x, y);
 
-				g_hashVertices.clear();
+	if (button == GLUT_LEFT_BUTTON)
+	{
+		if (state == GLUT_DOWN)
+		{
+			if(g_lpAffineWidget->selectAxis(x, y))
+			{
+				LogInfoArg1("Affine Widget changed axis to: %d", TheUITransform::Instance().axis);
+			}
+			else //Check if the user intended to pick a model vertex
+			{
+				vec3d wpos;
+				int stencilValue = ScreenToWorldReadStencil(x, y, wpos);
+				if (stencilValue == 1) {
+					vec3d closestVertex;
+					int idxVertex = g_lpDeformable->pickVertex(wpos, closestVertex);
+					g_lpDeformable->setPulledVertex(idxVertex);
+					LogInfoArg1("Selected Vertex Index = %d ", idxVertex);
+				}
 			}
 		}
 	}
-	else if (button == GLUT_LEFT_BUTTON) {
+	else if (button == GLUT_RIGHT_BUTTON) {
 		if (state == GLUT_DOWN) {
-			vec3f posNear(x, WINDOW_HEIGHT - y, 0.0f);
-			vec3f posFar(x, WINDOW_HEIGHT - y, 1.0f);
-			vec3f posTransNear;
-			vec3f posTransFar;
-			Ray ray;
-
-			if(ScreenToWorld(posNear, posTransNear) && ScreenToWorld(posFar, posTransFar))
-			{
-				vec3f dir = posTransFar - posTransNear;
-				dir.normalize();
-				ray.set(posTransNear, dir);
-			}
-
-			//UITRANSFORMAXIS axis;
-			vec3d ap = g_appSettings.worldAvatarPos;
-			if(g_lpAffineWidget->selectAxis(vec3f(ap.x, ap.y, ap.z), ray, ZNEAR, ZFAR) != uiaFree)
-			{
-				printf("Changed axis\n");
-			}
-
-
-			vec3d wpos;
-			int stencilValue = ConvertScreenToWorld(x, y, wpos);
-			if (stencilValue == 1)
-			{
-				vec3d closestVertex;
-				int idxVertex = g_lpDeformable->pickVertex(wpos, closestVertex);
-				g_lpDeformable->setPulledVertex(idxVertex);
-				LogInfoArg1("Selected Vertex Index = %d ", idxVertex);
+			if (g_lpDeformable->isHapticInProgress())
+				g_lpDeformable->hapticEnd();
+			else if (g_appSettings.hapticMode == hmDynamic) {
+				g_lpDeformable->hapticStart(0);
+				g_hashVertices.clear();
 			}
 		}
+	} else if (button == GLUT_MIDDLE_BUTTON) {
+
 	}
 
 	//Camera
@@ -394,42 +353,44 @@ void MousePress(int button, int state, int x, int y)
 }
 
 /*!
- *
+ * Passive Move for mouse
  */
 void MousePassiveMove(int x, int y)
 {
 	if(g_lpDeformable->isHapticInProgress() && g_appSettings.hapticMode == hmDynamic)
 	{
-		double dx = x - g_appSettings.screenDragStart.x;
-		double dy = g_appSettings.screenDragStart.y - y;
-		dx *= 0.001;
-		dy *= 0.001;
-
+		float dx = x - g_appSettings.screenDragStart.x;
+		float dy = g_appSettings.screenDragStart.y - y;
+		dx *= 0.001f;
+		dy *= 0.001f;
 		g_appSettings.screenDragStart = vec2i(x, y);
 		string strAxis;
+		vec3f worldAvatarPos = TheUITransform::Instance().translate;
+
 		switch(TheUITransform::Instance().axis)
 		{
 		case uiaX:
-			g_appSettings.worldAvatarPos.x += dx;
+			worldAvatarPos.x += dx;
 			strAxis = "X";
 			break;
 		case uiaY:
-			g_appSettings.worldAvatarPos.y += dy;
+			worldAvatarPos.y += dy;
 			strAxis = "Y";
 			break;
 		case uiaZ:
-			g_appSettings.worldAvatarPos.z += dx;
+			worldAvatarPos.z += dx;
 			strAxis = "Z";
 			break;
 
 		case uiaFree:
-			g_appSettings.worldAvatarPos = g_appSettings.worldAvatarPos + vec3d(dx, dy, 0.0);
+			worldAvatarPos = worldAvatarPos + vec3f(dx, dy, 0.0);
 			strAxis = "FREE";
 			break;
 		}
 
 		//World Avatar Pos
-		vec3d wpos = g_appSettings.worldAvatarPos;
+		TheUITransform::Instance().translate = worldAvatarPos;
+		vec3d wpos = vec3d(worldAvatarPos.x, worldAvatarPos.y, worldAvatarPos.z);
 
 		char buffer[1024];
 		sprintf(buffer, "HAPTIC DELTA=(%.4f, %.4f), AVATAR=(%.4f, %0.4f, %.4f), AXIS=%s PRESS F4 To Change.",
@@ -509,8 +470,6 @@ void MousePassiveMove(int x, int y)
 				}
 			}
 
-
-
 			//Compute Displacement
 			vector<vec3d> arrDisplacements;
 			vector<int> arrIndices;
@@ -537,7 +496,36 @@ void MousePassiveMove(int x, int y)
 
 void MouseMove(int x, int y)
 {
-	g_arcBallCam.mouseMove(x, y);
+	if(g_appSettings.hapticMode == hmDynamic)
+		g_arcBallCam.mouseMove(x, y);
+	else{
+		double d[3];
+		d[0] = x - g_appSettings.screenDragStart.x;
+		d[1] = g_appSettings.screenDragEnd.y - y;
+		d[2] = d[0];
+		for(int i=0;i<3;i++)
+			d[i] *= 0.001;
+
+		printf("WP = [%.4f, %.4f, %.4f] \n", d[0], d[1], d[2]);
+
+		//Scale
+		if(TheUITransform::Instance().type == uitScale)
+		{
+			int axis = TheUITransform::Instance().axis;
+			vec3d lo = g_lpAvatarCube->lower();
+			vec3d hi = g_lpAvatarCube->upper();
+
+			vec3d inc(0,0,0);
+			if(axis < uiaFree)
+				inc.setElement(axis, d[axis]);
+			else
+				inc = vec3d(d);
+			inc = inc * 0.5;
+			SAFE_DELETE(g_lpAvatarCube);
+			g_lpAvatarCube = new AvatarCube(lo - inc, hi + inc);
+
+		}
+	}
 	glutPostRedisplay();
 }
 
@@ -596,24 +584,7 @@ string GetGPUInfo()
 	return  string("GPU: ") + strVendorName + ", " + strRenderer + ", " + strVersion;
 }
 
-bool ScreenToWorld(const vec3f& screenP, vec3f& worldP)
-{
-    GLdouble ox, oy, oz;
-    GLdouble mv[16];
-    GLdouble pr[16];
-    GLint vp[4];
 
-    glGetDoublev(GL_MODELVIEW_MATRIX, mv);
-    glGetDoublev(GL_PROJECTION_MATRIX, pr);
-    glGetIntegerv(GL_VIEWPORT, vp);
-    if(gluUnProject(screenP.x, screenP.y, screenP.z, mv, pr, vp, &ox, &oy, &oz) == GL_TRUE)
-    {
-        worldP = vec3f(ox, oy, oz);
-        return true;
-    }
-
-    return false;
-}
 
 void NormalKey(unsigned char key, int x, int y)
 {
@@ -625,6 +596,7 @@ void NormalKey(unsigned char key, int x, int y)
 		SAFE_DELETE(g_lpAffineWidget);
 		g_lpAffineWidget = CreateAffineWidget(uitTranslate);
 		g_lpAffineWidget->setTransform(mtx);
+		g_appSettings.hapticMode = hmDynamic;
 		break;
 	}
 
@@ -632,6 +604,7 @@ void NormalKey(unsigned char key, int x, int y)
 		SAFE_DELETE(g_lpAffineWidget);
 		g_lpAffineWidget = CreateAffineWidget(uitScale);
 		g_lpAffineWidget->setTransform(mtx);
+		g_appSettings.hapticMode = hmSceneEdit;
 		break;
 	}
 
@@ -639,6 +612,7 @@ void NormalKey(unsigned char key, int x, int y)
 		SAFE_DELETE(g_lpAffineWidget);
 		g_lpAffineWidget = CreateAffineWidget(uitRotate);
 		g_lpAffineWidget->setTransform(mtx);
+		g_appSettings.hapticMode = hmSceneEdit;
 		break;
 	}
 
@@ -679,21 +653,6 @@ void SpecialKey(int key, int x, int y)
 			break;
 		}
 
-		case(GLUT_KEY_F3):
-		{
-			g_appSettings.hapticMode ++;
-			g_appSettings.hapticMode = g_appSettings.hapticMode % (int)hmCount;
-			DAnsiStr strMode = "Force";
-
-			if(g_appSettings.hapticMode == hmDynamic)
-				strMode = "FORCE";
-			else if(g_appSettings.hapticMode == hmAddFixed)
-				strMode = "ADDFIXED";
-			else if(g_appSettings.hapticMode == hmRemoveFixed)
-				strMode = "REMFIXED";
-			LogInfoArg2("Haptic mode: %d, %s", g_appSettings.hapticMode, strMode.cptr());
-			break;
-		}
 
 		case(GLUT_KEY_F4):
 		{
@@ -787,8 +746,7 @@ void LoadSettings()
 	LogInfo("Loading Settings from the ini file.");
 
 	CSketchConfig cfg(ChangeFileExt(GetExePath(), ".ini"), CSketchConfig::fmRead);
-	vec3f pos = cfg.readVec3f("AVATAR", "POS");
-	g_appSettings.worldAvatarPos = vec3d(pos.x, pos.y, pos.z);
+	TheUITransform::Instance().translate = cfg.readVec3f("AVATAR", "POS");
 
 	DAnsiStr strVegFile = cfg.readString("MODEL", "VEGFILE", "");
 	DAnsiStr strObjFile = cfg.readString("MODEL", "OBJFILE", "");

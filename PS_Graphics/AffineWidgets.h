@@ -6,6 +6,7 @@
 #include "PS_Matrix.h"
 #include "PS_Ray.h"
 #include "loki/Singleton.h"
+#include "PS_GLFuncs.h"
 
 using namespace Loki;
 using namespace PS;
@@ -37,6 +38,9 @@ public:
 
     virtual void draw() = 0;
     virtual void createWidget() = 0;
+
+    virtual UITRANSFORMAXIS selectAxis(int x, int y);
+
     virtual UITRANSFORMAXIS selectAxis(const vec3f& worldpos, const Ray& ray, float zNear, float zFar)
     {
         return uiaFree;

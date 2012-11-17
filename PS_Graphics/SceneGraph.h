@@ -10,6 +10,10 @@
 
 #include "PS_GLMeshBuffer.h"
 
+#include "loki/Functor.h"
+
+
+
 /*!
  * The entire animation scene is modeled in a giant scene graph structure.
  * SceneGraph is serializable and supports mesh-based and non-mesh based models.

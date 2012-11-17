@@ -10,9 +10,11 @@
 
 #include <string>
 #include "../PS_Base/PS_MathBase.h"
+#include "PS_Vector.h"
 
 
 using namespace std;
+using namespace PS::MATH;
 
 //Global Funcs for OpenGL
 
@@ -61,6 +63,22 @@ bool ReadShaderCode(const char* lpChrFilePath,
 bool CompileShaderCode(const char* vShaderCode,
 					   const char* vFragmentCode,
 					   U32& uiOutProgramObj);
+
+/*!
+ * Converts a point from screen clip space to world space using the OpenGL unproject method.
+ * User should flipy axis and provide correct screen coords.
+ * @screenP point in screen space.
+ * @worldP point in world space.
+ * @return 1 upon successful unproject
+ */
+int  ScreenToWorld(const vec3d& screenP, vec3d& worldP);
+
+/*!
+ * Converts a point from screen clip space to world space using opengl unproject.
+ * Y axis will be flipped and z-axis will be read from depth buffer.
+ * Returns the value associated with this pixel in the stencil buffer.
+ */
+int  ScreenToWorldReadStencil(int x, int y, vec3d& world);
 
 
 #endif /* PS_GLFUNCS_H_ */
