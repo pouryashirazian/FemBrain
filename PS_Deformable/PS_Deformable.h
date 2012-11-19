@@ -54,8 +54,9 @@ public:
 	void hapticEnd();
 	bool hapticUpdateForce();
 	bool hapticUpdateDisplace();
-	void hapticSetCurrentForce(const vec3d& extForce);
-	void hapticSetCurrentDisplacement(const vec3d& displacement);
+	void hapticSetCurrentForces(const vector<int>& indices,
+									const vector<vec3d>& forces);
+
 	void hapticSetCurrentDisplacements(const vector<int>& indices,
 											const vector<vec3d>& displacements);
 	bool isHapticInProgress() const {return m_bHapticInProgress;}
@@ -100,13 +101,6 @@ private:
 private:
 	AABB m_aabb;
 
-
-	bool m_bHapticInProgress;
-	double m_hapticCompliance;
-	double m_hapticExtForce[3];
-	double m_hapticExtDisplacements[3];
-	int m_hapticForceNeighorhoodSize;
-
 	double m_dampingStiffnessCoeff;
 	double m_dampingMassCoeff;
 	double m_timeStep;
@@ -125,10 +119,9 @@ private:
 	ForceModel* m_lpDeformableForceModel;
 
 	//Integrator
-	//ImplicitBackwardEulerSparse* m_lpIntegrator;
 	VolumeConservingIntegrator* m_lpIntegrator;
 
-	//
+	//Deformable Mesh
 	SceneObjectDeformable * m_lpDeformableMesh;
 
 	//Mass Matrix
@@ -145,10 +138,16 @@ private:
 	vector<int> m_vFixedVertices;
 	vector<int> m_vFixedDofs;
 
+	//Haptic forces
+	bool m_bHapticInProgress;
+	int m_hapticForceNeighorhoodSize;
+	double m_hapticCompliance;
+
+	//vector<vec3d> m_vHaptic
+	vector<vec3d> m_vHapticForces;
 	vector<vec3d> m_vHapticDisplacements;
 	vector<int> m_vHapticIndices;
 	int m_idxPulledVertex;
-
 	int m_positiveDefiniteSolver;
 
 	bool m_bRenderFixedVertices;

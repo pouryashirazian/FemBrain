@@ -477,7 +477,9 @@ void MousePassiveMove(int x, int y)
 			for(std::map<int, vec3d>::iterator it = g_hashVertices.begin(); it != g_hashVertices.end(); ++it)
 			{
 				vec3d v = it->second;
-				double dot = vec3d::dot(s[idxFace] - v, n[idxFace]);
+
+				//1000000
+				double dot = vec3d::dot(s[idxFace] - v, n[idxFace]) * 500000;
 				string arrFaces [] = {"LEFT", "RIGHT", "BOTTOM", "TOP", "NEAR", "FAR"};
 				printf("Face[%d] = %s, dot = %.4f, VERTEX USED: [%.4f, %.4f, %.4f] \n",
 						idxFace, arrFaces[idxFace].c_str(), dot, v.x, v.y, v.z);
@@ -486,7 +488,8 @@ void MousePassiveMove(int x, int y)
 			}
 
 			//Apply displacements to the model
-			g_lpDeformable->hapticSetCurrentDisplacements(arrIndices, arrDisplacements);
+			//g_lpDeformable->hapticSetCurrentDisplacements(arrIndices, arrDisplacements);
+			g_lpDeformable->hapticSetCurrentForces(arrIndices, arrDisplacements);
 		}
 		else
 			g_appSettings.idxCollisionFace = -1;
