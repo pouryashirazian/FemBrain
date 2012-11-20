@@ -11,6 +11,8 @@
 #elif defined(PS_OS_LINUX)
 	#include <CL/opencl.h>
 	#include <GL/glxew.h>
+#elif defined(PS_OS_MAC)
+//#include <open>
 #endif
 
 

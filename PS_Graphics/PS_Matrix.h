@@ -79,6 +79,13 @@ public:
     bool isAntiSymmetric() const;
     bool isOrthogonal() const;
 
+    //3D Projection Matrices
+    void ortho(T left, T right, T bottom, T top, T nearPlane, T farPlane);
+    void frustum(T left, T right, T bottom, T top, T nearPlane, T farPlane);
+    void perspective(T angle, T aspect, T nearPlane, T farPlane);
+    void lookAt(const Vec3<T>& eye, const Vec3<T>& center, const Vec3<T>& up);
+
+
     //Static Ops
     static inline bool isEqual(const Matrix& a, const Matrix& b);
     static inline Matrix mul(const Matrix& a, const Matrix& b);
@@ -495,6 +502,172 @@ Matrix<T> Matrix<T>::sub(const Matrix<T>& a, const Matrix<T>& b)
     return output;
 }
 
+/*!
+    Multiplies this matrix by another that applies an orthographic
+    projection for a window with lower-left corner (\a left, \a bottom),
+    upper-right corner (\a right, \a top), and the specified \a nearPlane
+    and \a farPlane clipping planes.
+
+    \sa frustum(), perspective()
+*/
+template <typename T>
+void Matrix<T>::ortho(T left, T right, T bottom, T top, T nearPlane, T farPlane)
+{
+    // Bail out if the projection volume is zero-sized.
+    if (left == right || bottom == top || nearPlane == farPlane)
+        return;
+
+    // Construct the projection.
+    T width = right - left;
+    T invheight = top - bottom;
+    T clip = farPlane - nearPlane;
+    Matrix<T> m;
+    m.e[0][0] = 2.0f / width;
+    m.e[1][0] = 0.0f;
+    m.e[2][0] = 0.0f;
+    m.e[3][0] = -(left + right) / width;
+    m.e[0][1] = 0.0f;
+    m.e[1][1] = 2.0f / invheight;
+    m.e[2][1] = 0.0f;
+    m.e[3][1] = -(top + bottom) / invheight;
+    m.e[0][2] = 0.0f;
+    m.e[1][2] = 0.0f;
+    m.e[2][2] = -2.0f / clip;
+    m.e[3][2] = -(nearPlane + farPlane) / clip;
+    m.e[0][3] = 0.0f;
+    m.e[1][3] = 0.0f;
+    m.e[2][3] = 0.0f;
+    m.e[3][3] = 1.0f;
+    //m.flagBits = Translation | Scale;
+
+    // Apply the projection.
+    *this = m;
+}
+
+/*!
+    Multiplies this matrix by another that applies a perspective
+    frustum projection for a window with lower-left corner (\a left, \a bottom),
+    upper-right corner (\a right, \a top), and the specified \a nearPlane
+    and \a farPlane clipping planes.
+
+    \sa ortho(), perspective()
+*/
+template <typename T>
+void Matrix<T>::frustum(T left, T right, T bottom, T top, T nearPlane, T farPlane)
+
+{
+    // Bail out if the projection volume is zero-sized.
+    if (left == right || bottom == top || nearPlane == farPlane)
+        return;
+
+    // Construct the projection.
+    Matrix<T> m;
+    T width = right - left;
+    T invheight = top - bottom;
+    T clip = farPlane - nearPlane;
+    m.e[0][0] = 2.0f * nearPlane / width;
+    m.e[1][0] = 0.0f;
+    m.e[2][0] = (left + right) / width;
+    m.e[3][0] = 0.0f;
+    m.e[0][1] = 0.0f;
+    m.e[1][1] = 2.0f * nearPlane / invheight;
+    m.e[2][1] = (top + bottom) / invheight;
+    m.e[3][1] = 0.0f;
+    m.e[0][2] = 0.0f;
+    m.e[1][2] = 0.0f;
+    m.e[2][2] = -(nearPlane + farPlane) / clip;
+    m.e[3][2] = -2.0f * nearPlane * farPlane / clip;
+    m.e[0][3] = 0.0f;
+    m.e[1][3] = 0.0f;
+    m.e[2][3] = -1.0f;
+    m.e[3][3] = 0.0f;
+    //m.flagBits = General;
+
+    // Apply the projection.
+    *this = m;
+}
+
+/*!
+    Multiplies this matrix by another that applies a perspective
+    projection.  The field of view will be \a angle degrees within
+    a window with a given \a aspect ratio.  The projection will
+    have the specified \a nearPlane and \a farPlane clipping planes.
+
+    \sa ortho(), frustum()
+*/
+template <typename T>
+void Matrix<T>::perspective(T angle, T aspect, T nearPlane, T farPlane)
+{
+    // Bail out if the projection volume is zero-sized.
+    if (nearPlane == farPlane || aspect == 0.0f)
+        return;
+
+    // Construct the projection.
+    Matrix<T> m;
+    T radians = (angle / 2.0f) * Pi / 180.0f;
+    T sine = sin(radians);
+    if (sine == 0.0f)
+        return;
+
+    T cotan = cos(radians) / sine;
+    T clip = farPlane - nearPlane;
+    m.e[0][0] = cotan / aspect;
+    m.e[1][0] = 0.0f;
+    m.e[2][0] = 0.0f;
+    m.e[3][0] = 0.0f;
+    m.e[0][1] = 0.0f;
+    m.e[1][1] = cotan;
+    m.e[2][1] = 0.0f;
+    m.e[3][1] = 0.0f;
+    m.e[0][2] = 0.0f;
+    m.e[1][2] = 0.0f;
+    m.e[2][2] = -(nearPlane + farPlane) / clip;
+    m.e[3][2] = -(2.0f * nearPlane * farPlane) / clip;
+    m.e[0][3] = 0.0f;
+    m.e[1][3] = 0.0f;
+    m.e[2][3] = -1.0f;
+    m.e[3][3] = 0.0f;
+    //m.flagBits = General;
+
+    // Apply the projection.
+    *this = m;
+}
+
+/*!
+    Multiplies this matrix by another that applies an \a eye position
+    transformation.  The \a center value indicates the center of the
+    view that the \a eye is looking at.  The \a up value indicates
+    which direction should be considered up with respect to the \a eye.
+*/
+template <typename T>
+void Matrix<T>::lookAt(const Vec3<T>& eye, const Vec3<T>& center, const Vec3<T>& up)
+{
+    Vec3<T> forward = (center - eye).normalized();
+    Vec3<T> side = Vec3<T>::cross(forward, up).normalized();
+    Vec3<T> upVector = Vec3<T>::cross(side, forward);
+
+    Matrix<T> m;
+    m.e[0][0] = side.x();
+    m.e[1][0] = side.y();
+    m.e[2][0] = side.z();
+    m.e[3][0] = 0.0f;
+    m.e[0][1] = upVector.x();
+    m.e[1][1] = upVector.y();
+    m.e[2][1] = upVector.z();
+    m.e[3][1] = 0.0f;
+    m.e[0][2] = -forward.x();
+    m.e[1][2] = -forward.y();
+    m.e[2][2] = -forward.z();
+    m.e[3][2] = 0.0f;
+    m.e[0][3] = 0.0f;
+    m.e[1][3] = 0.0f;
+    m.e[2][3] = 0.0f;
+    m.e[3][3] = 1.0f;
+    //m.flagBits = Rotation;
+
+    *this = m;
+    translate(-eye);
+}
 
 
 
