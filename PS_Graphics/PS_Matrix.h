@@ -474,7 +474,7 @@ template <typename T>
 T Matrix<T>::mulFrobeniousInner(const Matrix<T>& a, const Matrix<T>& b)
 {
     //tr(aTb) = tr(abT)
-    return trace(mul(a.transposed(), b));
+    return mul(a.transposed(), b).trace();
 }
 
 template <typename T>
