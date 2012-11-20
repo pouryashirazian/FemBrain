@@ -21,6 +21,7 @@
 #include "PS_VolumeConservingIntegrator.h"
 #include "sceneObjectDeformable.h"
 #include "graph.h"
+#include "DBLogger.h"
 
 using namespace std;
 using namespace PS::MATH;
@@ -46,6 +47,9 @@ public:
 	int pickVertices(const vec3d& boxLo, const vec3d& boxHi,
 					   vector<vec3d>& arrFoundCoords, vector<int>& arrFoundIndices) const;
 	int pickVertices(const vec3d& boxLo, const vec3d& boxHi);
+
+	//Fill Record for
+	void statFillRecord(DBLogger::Record& rec) const;
 
 	//Haptic Interaction
 	void setPulledVertex(int index) { m_idxPulledVertex = index;}
@@ -81,6 +85,9 @@ public:
 
 	AABB aabb() const { return m_aabb;}
 
+	double computeVolume() const;
+	bool isVolumeChanged() const { return this->computeVolume() != m_restVolume;}
+
 	/*!
 	 * Return: Outputs number of dofs
 	 */
@@ -104,6 +111,7 @@ private:
 	double m_dampingStiffnessCoeff;
 	double m_dampingMassCoeff;
 	double m_timeStep;
+	double m_restVolume;
 
 	Graph* m_lpMeshGraph;
 	//double* m_lpHapticForces;

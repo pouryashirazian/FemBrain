@@ -7,6 +7,7 @@
 #include <fstream>
 #include <map>
 
+
 #include "PS_Base/PS_MathBase.h"
 #include "PS_Base/PS_Logger.h"
 #include "PS_Base/PS_FileDirectory.h"
@@ -52,7 +53,8 @@ public:
 		this->bShowElements = false;
 		this->bDrawAffineWidgets = true;
 		this->idxCollisionFace = -1;
-		this->millis = DEFAULT_TIMER_MILLIS;
+		this->timerInterval = DEFAULT_TIMER_MILLIS;
+		this->timeAnim = 0;
 		this->hapticMode = 0;
 	}
 
@@ -63,7 +65,9 @@ public:
 	bool bDrawAffineWidgets;
 
 	int idxCollisionFace;
-	U32   millis;
+	U32  timerInterval;
+	U64  timeAnim;
+	U64  timeLogger;
 	int appWidth;
 	int appHeight;
 	int hapticMode;
@@ -490,6 +494,7 @@ void MousePassiveMove(int x, int y)
 			//Apply displacements to the model
 			//g_lpDeformable->hapticSetCurrentDisplacements(arrIndices, arrDisplacements);
 			g_lpDeformable->hapticSetCurrentForces(arrIndices, arrDisplacements);
+
 		}
 		else
 			g_appSettings.idxCollisionFace = -1;
@@ -547,7 +552,9 @@ void Close()
 	SAFE_DELETE(g_lpDeformable);
 	SAFE_DELETE(g_lpAvatarCube);
 
+
 	PS::TheEventLogger::Instance().flush();
+	TheDataBaseLogger::Instance().flush();
 }
 
 string QueryOGL(GLenum name)
@@ -741,7 +748,22 @@ void SpecialKey(int key, int x, int y)
 void TimeStep(int t)
 {
 	g_lpDeformable->timestep();
-	glutTimerFunc(g_appSettings.millis, TimeStep, 0);
+	g_appSettings.timeAnim += g_appSettings.timerInterval;
+
+
+	//Log Database
+	if(g_appSettings.timeAnim - g_appSettings.timeLogger > 100)
+	{
+		if(g_lpDeformable->isVolumeChanged())
+		{
+			DBLogger::Record rec;
+			g_lpDeformable->statFillRecord(rec);
+			TheDataBaseLogger::Instance().append(rec);
+			g_appSettings.timeLogger = g_appSettings.timeAnim;
+		}
+	}
+
+	glutTimerFunc(g_appSettings.timerInterval, TimeStep, 0);
 }
 
 void LoadSettings()
@@ -843,7 +865,7 @@ int main(int argc, char* argv[])
 	glutKeyboardFunc(NormalKey);
 	glutSpecialFunc(SpecialKey);
 	glutCloseFunc(Close);
-	glutTimerFunc(g_appSettings.millis, TimeStep, 0);
+	glutTimerFunc(g_appSettings.timerInterval, TimeStep, 0);
 
 	//Print GPU INFO
 	GetGPUInfo();

@@ -131,6 +131,37 @@ void Deformable::setup(const char* lpVegFilePath,
 	Vec3d lo, up;
 	m_lpDeformableMesh->GetMesh()->getBoundingBox(1.0, &lo, &up);
 	m_aabb.set(vec3(lo[0], lo[1], lo[2]), vec3(up[0], up[1], up[2]));
+
+	//Compute model rest volume
+	m_restVolume = this->computeVolume();
+}
+
+void Deformable::statFillRecord(DBLogger::Record& rec) const
+{
+	rec.ctElements = m_lpTetMesh->getNumElements();
+	rec.ctVertices = m_lpTetMesh->getNumVertices();
+
+	rec.msComputeDeformation = 0;
+	rec.msComputeTetrahedra = 0;
+	rec.msRenderTime = 0;
+	rec.restVolume = m_restVolume;
+	rec.totalVolume = this->computeVolume();
+	rec.xpElementType = "TET";
+	rec.xpForceModel = "COROTATIONAL LINEAR FEM";
+	rec.xpIntegrator = "Backward Euler";
+	rec.xpModelName = "DISC";
+	rec.xpTime = DBLogger::timestamp();
+}
+
+double Deformable::computeVolume() const
+{
+	U32 ctElements = m_lpTetMesh->getNumElements();
+	double vol = 0.0;
+	for(U32 i=0; i<ctElements; i++)
+	{
+		vol += m_lpTetMesh->getElementVolume(i);
+	}
+	return vol;
 }
 
 void Deformable::setDampingStiffnessCoeff(double s)
