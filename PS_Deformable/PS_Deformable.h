@@ -86,7 +86,7 @@ public:
 	AABB aabb() const { return m_aabb;}
 
 	double computeVolume() const;
-	bool isVolumeChanged() const { return this->computeVolume() != m_restVolume;}
+	bool isVolumeChanged() const { return  !EssentiallyEquald(this->computeVolume(), m_restVolume, 0.0001);}
 
 	/*!
 	 * Return: Outputs number of dofs
@@ -141,6 +141,7 @@ private:
 	U32 m_dof;
 	double* m_arrDisplacements;
 	double* m_arrExtForces;
+	double* m_arrElementVolumes;
 
 	//Fixed Vertices
 	vector<int> m_vFixedVertices;

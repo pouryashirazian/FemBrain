@@ -273,6 +273,11 @@ inline bool EssentiallyEqual(float a, float b, float epsilon)
     return fabs(a - b) <= ( (fabs(a) > fabs(b) ? fabs(b) : fabs(a)) * epsilon);
 }
 
+inline bool EssentiallyEquald(double a, double b, double epsilon)
+{
+    return fabs(a - b) <= ( (fabs(a) > fabs(b) ? fabs(b) : fabs(a)) * epsilon);
+}
+
 inline bool DefinitelyGreaterThan(float a, float b, float epsilon)
 {
     return (a - b) > ( (fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * epsilon);

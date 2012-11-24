@@ -46,6 +46,8 @@ void Deformable::cleanup()
 	//Double Arrays
 	SAFE_DELETE_ARRAY(m_arrDisplacements);
 	SAFE_DELETE_ARRAY(m_arrExtForces);
+
+	SAFE_DELETE_ARRAY(m_arrElementVolumes);
 }
 
 //Setup
@@ -133,7 +135,29 @@ void Deformable::setup(const char* lpVegFilePath,
 	m_aabb.set(vec3(lo[0], lo[1], lo[2]), vec3(up[0], up[1], up[2]));
 
 	//Compute model rest volume
+	int ctVertices = m_lpTetMesh->getNumVertices();
+	if(ctVertices == m_lpDeformableMesh->GetNumVertices())
+	{
+		for(int i=0; i < ctVertices; i++)
+		{
+			Vec3d tetVertex = * m_lpTetMesh->getVertex(i);
+			Vec3d objVertex = m_lpDeformableMesh->GetMesh()->getPosition(i);
+
+			printf("TetVertex [%.2f, %.2f, %.2f], ObjVertex [%.2f, %.2f, %.2f] \n",
+					tetVertex[0], tetVertex[1], tetVertex[2],
+					objVertex[0], objVertex[1], objVertex[2]);
+		}
+	}
+
+
+
+
+	U32 ctElems = m_lpTetMesh->getNumElements();
+	m_arrElementVolumes = new double[ctElems];
+	for(U32 i=0; i<ctElems; i++)
+		m_arrElementVolumes[i] = m_lpTetMesh->getElementVolume(i);
 	m_restVolume = this->computeVolume();
+	m_restVolume = m_restVolume;
 }
 
 void Deformable::statFillRecord(DBLogger::Record& rec) const
@@ -146,6 +170,7 @@ void Deformable::statFillRecord(DBLogger::Record& rec) const
 	rec.msRenderTime = 0;
 	rec.restVolume = m_restVolume;
 	rec.totalVolume = this->computeVolume();
+
 	rec.xpElementType = "TET";
 	rec.xpForceModel = "COROTATIONAL LINEAR FEM";
 	rec.xpIntegrator = "Backward Euler";
@@ -157,9 +182,27 @@ double Deformable::computeVolume() const
 {
 	U32 ctElements = m_lpTetMesh->getNumElements();
 	double vol = 0.0;
+	int idxIndices[4];
+	Vec3d elemVertices[4];
 	for(U32 i=0; i<ctElements; i++)
 	{
-		vol += m_lpTetMesh->getElementVolume(i);
+		//int ctVertices = m_lpTetMesh->getNumVertices();
+		//int ctV2 = m_lpDeformableMesh->GetNumVertices();
+		idxIndices[0] = m_lpTetMesh->getVertexIndex(i, 0);
+		idxIndices[1] = m_lpTetMesh->getVertexIndex(i, 1);
+		idxIndices[2] = m_lpTetMesh->getVertexIndex(i, 2);
+		idxIndices[3] = m_lpTetMesh->getVertexIndex(i, 3);
+
+		elemVertices[0] = m_lpDeformableMesh->GetMesh()->getPosition(idxIndices[0]);
+		elemVertices[1] = m_lpDeformableMesh->GetMesh()->getPosition(idxIndices[1]);
+		elemVertices[2] = m_lpDeformableMesh->GetMesh()->getPosition(idxIndices[2]);
+		elemVertices[3] = m_lpDeformableMesh->GetMesh()->getPosition(idxIndices[3]);
+
+		double cur = m_lpTetMesh->getTetVolume(&elemVertices[0], &elemVertices[1], &elemVertices[2], &elemVertices[3]);
+		vol += cur;
+		//if(cur != m_arrElementVolumes[i])
+			//printf("Element vol changed! ELEM = %d \n", i);
+
 	}
 	return vol;
 }

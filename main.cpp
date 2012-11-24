@@ -34,6 +34,8 @@ using namespace PS::HPC;
 #define ZNEAR 0.01
 #define ZFAR 100.0
 #define DEFAULT_TIMER_MILLIS 33
+#define DEFAULT_FORCE_COEFF 1000000
+
 
 #define INDEX_CAMERA_INFO 0
 #define INDEX_HAPTIC_INFO 1
@@ -56,6 +58,7 @@ public:
 		this->timerInterval = DEFAULT_TIMER_MILLIS;
 		this->timeAnim = 0;
 		this->hapticMode = 0;
+		this->hapticForceCoeff = DEFAULT_FORCE_COEFF;
 	}
 
 public:
@@ -65,6 +68,10 @@ public:
 	bool bDrawAffineWidgets;
 
 	int idxCollisionFace;
+	double initialCollisionFaceModelDist;
+	double currentCollisionFaceModelDist;
+	double hapticForceCoeff;
+
 	U32  timerInterval;
 	U64  timeAnim;
 	U64  timeLogger;
@@ -425,7 +432,7 @@ void MousePassiveMove(int x, int y)
 		s[4] = lower;
 		s[5] = upper;
 
-		//Compute Displacements based on the original vertex position
+		//List all the vertices in the model impacted
 		{
 			vector<vec3d> arrVertices;
 			vector<int> arrIndices;
@@ -433,7 +440,7 @@ void MousePassiveMove(int x, int y)
 			for(U32 i=0; i<arrIndices.size(); i++)
 			{
 				printf("Collision Index = %d \n", arrIndices[i]);
-				//If it does not have the vertex then add it
+				//If it does not have the vertex then add it. If we have it then the original vertex is used.
 				if(g_hashVertices.find(arrIndices[i]) == g_hashVertices.end())
 					g_hashVertices.insert(std::pair<int, vec3d>(arrIndices[i], arrVertices[i]));
 				//else
@@ -446,13 +453,13 @@ void MousePassiveMove(int x, int y)
 		if(g_lpDeformable->aabb().intersect(aabbAvatar))
 		{
 			printf("INTERSECTS\n");
-			//Set Affected Vertices
-			//Check against six faces of avatar to find the intersection
 
+			//Detect Collision Face
+			//Check against six faces of Avatar to find the intersection
 			//Previously Detected Face? If no then detect now
 			if(g_appSettings.idxCollisionFace < 0)
 			{
-				//Detect Collision Face
+				g_appSettings.hapticForceCoeff = DEFAULT_FORCE_COEFF;
 				double minDot = GetMaxLimit<double>();
 				int idxMin = 0;
 
@@ -468,32 +475,55 @@ void MousePassiveMove(int x, int y)
 							minDot = dot;
 							idxMin = j;
 						}
+
+						g_appSettings.idxCollisionFace = idxMin;
+						g_appSettings.initialCollisionFaceModelDist = minDot;
 					}
-					g_appSettings.idxCollisionFace = idxMin;
-					//vec3d q = p - n[idxMin] * minDot;
+				}
+			}
+			else
+			{
+				double minDot = GetMaxLimit<double>();
+				int idxFace = g_appSettings.idxCollisionFace;
+				//Iterate over vertices in collision
+				for(map<int, vec3d>::iterator it = g_hashVertices.begin(); it != g_hashVertices.end(); ++it)
+				{
+					double dot = vec3d::dot(s[idxFace] - it->second, n[idxFace]);
+					if(dot < minDot)
+					{
+						minDot = dot;
+						g_appSettings.currentCollisionFaceModelDist = minDot;
+					}
 				}
 			}
 
+
 			//Compute Displacement
-			vector<vec3d> arrDisplacements;
+			vector<vec3d> arrForces;
 			vector<int> arrIndices;
 			int idxFace = g_appSettings.idxCollisionFace;
 			for(std::map<int, vec3d>::iterator it = g_hashVertices.begin(); it != g_hashVertices.end(); ++it)
 			{
 				vec3d v = it->second;
 
+				if(g_appSettings.currentCollisionFaceModelDist > g_appSettings.initialCollisionFaceModelDist)
+					g_appSettings.hapticForceCoeff -= 1000;
+				else
+					g_appSettings.hapticForceCoeff += 1000;
+
+
 				//1000000
-				double dot = vec3d::dot(s[idxFace] - v, n[idxFace]) * 500000;
+				double dot = vec3d::dot(s[idxFace] - v, n[idxFace]) * g_appSettings.hapticForceCoeff;
 				string arrFaces [] = {"LEFT", "RIGHT", "BOTTOM", "TOP", "NEAR", "FAR"};
-				printf("Face[%d] = %s, dot = %.4f, VERTEX USED: [%.4f, %.4f, %.4f] \n",
-						idxFace, arrFaces[idxFace].c_str(), dot, v.x, v.y, v.z);
-				arrDisplacements.push_back(n[idxFace] * dot);
+				printf("Face[%d] = %s, dot = %.4f, VERTEX USED: [%.4f, %.4f, %.4f], COEFF: %.2f \n",
+						idxFace, arrFaces[idxFace].c_str(), dot, v.x, v.y, v.z, g_appSettings.hapticForceCoeff);
+				arrForces.push_back(n[idxFace] * dot);
 				arrIndices.push_back(it->first);
 			}
 
-			//Apply displacements to the model
+			//Apply displacements/forces to the model
 			//g_lpDeformable->hapticSetCurrentDisplacements(arrIndices, arrDisplacements);
-			g_lpDeformable->hapticSetCurrentForces(arrIndices, arrDisplacements);
+			g_lpDeformable->hapticSetCurrentForces(arrIndices, arrForces);
 
 		}
 		else
@@ -776,7 +806,6 @@ void LoadSettings()
 	DAnsiStr strVegFile = cfg.readString("MODEL", "VEGFILE", "");
 	DAnsiStr strObjFile = cfg.readString("MODEL", "OBJFILE", "");
 	DAnsiStr strBlobFile = cfg.readString("MODEL", "BLOBTREEFILE", "");
-
 
 	int ctFixed = 	cfg.readInt("MODEL", "FIXEDVERTICESCOUNT", 0);
 	vector<int> vFixedVertices;
