@@ -1,0 +1,28 @@
+List of features to be added:
+
+1. Unified scenegraph data structure for all geometries.
+
+	Graphics:
+		a. Implicit Surfaces
+		b. Mesh-based surfaces (Subdivision and others.)
+		c. NURBS
+		d. Bicubic and bilinear bezier patches
+		e. Affine Transformations and other animations
+		f. Custom shading programs embedded
+		
+	Physics:
+		a. Tetrahedralization
+		b. Voxelization
+		c. Veg exporter/importer
+		d. Material editor
+		
+2. OpenCL raytracing for scenegraph
+3. Sketch Machine singleton that responds to commands for affine transformations and 
+scenegraph incremental building modifications.
+	Features:
+		a. Scriptable language for building hierarchical structures based on scenegraph
+		b. Custom shaders 
+		c. Support for Rendering methods: 
+			* Rasterization with fast VBO, FBO
+			* Polygonization using OpenCL polygonizer
+			* Raytracer using OpenCL raytracer

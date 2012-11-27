@@ -2,6 +2,7 @@
 #include "../PS_Base/PS_Logger.h"
 #include "../PS_Graphics/PS_Box.h"
 #include "volumetricMeshLoader.h"
+#include "volumetricMeshENuMaterial.h"
 #include "generateMeshGraph.h"
 #include <algorithm>
 
@@ -157,7 +158,6 @@ void Deformable::setup(const char* lpVegFilePath,
 	for(U32 i=0; i<ctElems; i++)
 		m_arrElementVolumes[i] = m_lpTetMesh->getElementVolume(i);
 	m_restVolume = this->computeVolume();
-	m_restVolume = m_restVolume;
 }
 
 void Deformable::statFillRecord(DBLogger::Record& rec) const
@@ -165,11 +165,24 @@ void Deformable::statFillRecord(DBLogger::Record& rec) const
 	rec.ctElements = m_lpTetMesh->getNumElements();
 	rec.ctVertices = m_lpTetMesh->getNumVertices();
 
-	rec.msComputeDeformation = 0;
+	rec.msComputeDeformation = m_lpIntegrator->GetSystemSolveTime();
 	rec.msComputeTetrahedra = 0;
 	rec.msRenderTime = 0;
 	rec.restVolume = m_restVolume;
 	rec.totalVolume = this->computeVolume();
+
+	rec.youngModulo = 0.0;
+	rec.poissonRatio = 0.0;
+	if(m_lpTetMesh->getNumMaterials() > 0)
+	{
+		VolumetricMesh::Material* lpMaterial = m_lpTetMesh->getMaterial(0);
+		if(lpMaterial->getType() == VolumetricMesh::Material::ENU)
+		{
+			VolumetricMesh::ENuMaterial* lpENuMaterial = reinterpret_cast<VolumetricMesh::ENuMaterial*>(lpMaterial);
+			rec.youngModulo = lpENuMaterial->getE();
+			rec.poissonRatio = lpENuMaterial->getNu();
+		}
+	}
 
 	rec.xpElementType = "TET";
 	rec.xpForceModel = "COROTATIONAL LINEAR FEM";
@@ -498,6 +511,7 @@ bool Deformable::hapticUpdateForce()
 
 	// set forces to the integrator
 	m_lpIntegrator->SetExternalForces(m_arrExtForces);
+	///m_lpIntegrator->SetqState(m_arrExtForces);
 
 	return true;
 }

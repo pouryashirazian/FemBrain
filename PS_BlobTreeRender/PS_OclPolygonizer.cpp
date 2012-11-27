@@ -423,7 +423,10 @@ namespace HPC{
 		desc.image_width = 256;
 		desc.image_height = 1;
 		desc.image_row_pitch = 0;
+		desc.num_mip_levels = 0;
+		desc.num_samples = 0;
 		desc.buffer = NULL;
+
 
 		cl_mem inMemVertexCountTable = clCreateImage(m_lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
 					  	  	  	  	  	     &imageFormat, &desc, (void*) g_numVerticesTableCompact, &errNum );

@@ -1,13 +1,18 @@
-/*!
-* When programming for GPGPU there are times when you need to pass the result one rendering step to
-* the next step. GLSurface is an interface for rendering to a texture
-*/
+#ifndef PS_GLSURFACE_H
+#define PS_GLSURFACE_H
+
 #include "../PS_Base/PS_MathBase.h"
 #include "PS_PixelMap.h"
 //#include <GL/glew.h>
 
 #define DEFAULT_SURFACE_WIDTH 512
 #define DEFAULT_SURFACE_HEIGHT 512
+
+/*!
+* When programming for GPGPU there are times when you need to pass the result one rendering step to
+* the next step. GLSurface is an interface for rendering to a texture
+*/
+
 class GLSurface
 {
 public:
@@ -38,6 +43,7 @@ public:
 
 
 	U32 texture() const { return m_glTex[0];}
+	U32 renderbuffer() const {return m_glRBO;}
 	U32 width() const {return m_width;}
 	U32 height() const {return m_height;}
 private:
@@ -52,4 +58,6 @@ private:
 	U32 m_width;
 	U32 m_height;
 };
+
+#endif
 

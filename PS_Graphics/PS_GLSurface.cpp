@@ -19,33 +19,6 @@ GLSurface::~GLSurface()
 	cleanup();
 }
 
-void GLSurface::cleanup()
-{
-	//Detach Buffers
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glBindRenderbuffer(GL_RENDERBUFFER, 0);
-
-	//Cleanup by deleting all buffers
-	glDeleteFramebuffers(2, (GLuint*)&m_glFBO);
-	glDeleteTextures(1, (GLuint*)&m_glTex);
-}
-
-void GLSurface::initTextures(U32 w, U32 h)
-{
-	glGenTextures(2, m_glTex);
-
-	for (GLint i = 0; i < 2; i++){
-		glBindTexture(GL_TEXTURE_2D, m_glTex[i]);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		// this may change with window size changes
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
-	}
-	glBindTexture(GL_TEXTURE_2D, 0);
-}
-
 /*!
 *  Initialize the Surface
 */
@@ -104,6 +77,33 @@ void GLSurface::init(U32 w, U32 h)
 	//Attach Render Buffer to Frame Buffer
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_glRBO);
 	*/
+}
+
+void GLSurface::initTextures(U32 w, U32 h)
+{
+	glGenTextures(2, m_glTex);
+
+	for (GLint i = 0; i < 2; i++){
+		glBindTexture(GL_TEXTURE_2D, m_glTex[i]);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		// this may change with window size changes
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+	}
+	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void GLSurface::cleanup()
+{
+	//Detach Buffers
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+	//Cleanup by deleting all buffers
+	glDeleteFramebuffers(2, (GLuint*)&m_glFBO);
+	glDeleteTextures(1, (GLuint*)&m_glTex);
 }
 
 

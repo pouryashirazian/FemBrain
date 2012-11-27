@@ -18,10 +18,12 @@
 #include "PS_Graphics/PS_SketchConfig.h"
 #include "PS_Graphics/AffineWidgets.h"
 #include "PS_Graphics/PS_Vector.h"
+#include "PS_Graphics/OclRayTracer.h"
 
 #include "PS_Deformable/PS_Deformable.h"
 #include "PS_Deformable/PS_VegWriter.h"
 #include "PS_Deformable/Avatar.h"
+
 
 using namespace std;
 using namespace PS;
@@ -34,12 +36,13 @@ using namespace PS::HPC;
 #define ZNEAR 0.01
 #define ZFAR 100.0
 #define DEFAULT_TIMER_MILLIS 33
-#define DEFAULT_FORCE_COEFF 1000000
+#define DEFAULT_FORCE_COEFF 600000
 
+#define INDEX_GPU_INFO 	   0
+#define INDEX_CAMERA_INFO 1
+#define INDEX_HAPTIC_INFO 2
+#define INDEX_ANIMATION_INFO 3
 
-#define INDEX_CAMERA_INFO 0
-#define INDEX_HAPTIC_INFO 1
-#define INDEX_GPU_INFO 	   2
 
 
 enum HAPTICMODES {hmDynamic, hmSceneEdit};
@@ -56,7 +59,9 @@ public:
 		this->bDrawAffineWidgets = true;
 		this->idxCollisionFace = -1;
 		this->timerInterval = DEFAULT_TIMER_MILLIS;
-		this->timeAnim = 0;
+		this->ctAnimFrame = 0;
+		this->ctAnimLogger = 0;
+		this->ctLogsCollected = 0;
 		this->hapticMode = 0;
 		this->hapticForceCoeff = DEFAULT_FORCE_COEFF;
 	}
@@ -73,8 +78,10 @@ public:
 	double hapticForceCoeff;
 
 	U32  timerInterval;
-	U64  timeAnim;
-	U64  timeLogger;
+	U64  ctAnimFrame;
+	U64  ctAnimLogger;
+	U64  ctLogsCollected;
+
 	int appWidth;
 	int appHeight;
 	int hapticMode;
@@ -244,6 +251,9 @@ void Draw()
 				g_arcBallCam.getPan().x,
 				g_arcBallCam.getPan().y);
 		g_infoLines[INDEX_CAMERA_INFO] = string(chrMsg);
+
+		sprintf(chrMsg, "ANIMATION FRAME# %08llu, LOGS# %08llu, ", g_appSettings.ctAnimFrame, g_appSettings.ctLogsCollected);
+		g_infoLines[INDEX_ANIMATION_INFO] = string(chrMsg);
 	}
 
 	//Write Model Info
@@ -459,7 +469,7 @@ void MousePassiveMove(int x, int y)
 			//Previously Detected Face? If no then detect now
 			if(g_appSettings.idxCollisionFace < 0)
 			{
-				g_appSettings.hapticForceCoeff = DEFAULT_FORCE_COEFF;
+				//g_appSettings.hapticForceCoeff = DEFAULT_FORCE_COEFF;
 				double minDot = GetMaxLimit<double>();
 				int idxMin = 0;
 
@@ -505,15 +515,16 @@ void MousePassiveMove(int x, int y)
 			for(std::map<int, vec3d>::iterator it = g_hashVertices.begin(); it != g_hashVertices.end(); ++it)
 			{
 				vec3d v = it->second;
-
+/*
 				if(g_appSettings.currentCollisionFaceModelDist > g_appSettings.initialCollisionFaceModelDist)
 					g_appSettings.hapticForceCoeff -= 1000;
 				else
 					g_appSettings.hapticForceCoeff += 1000;
-
+*/
 
 				//1000000
 				double dot = vec3d::dot(s[idxFace] - v, n[idxFace]) * g_appSettings.hapticForceCoeff;
+				//double dot = vec3d::dot(s[idxFace] - v, n[idxFace]);
 				string arrFaces [] = {"LEFT", "RIGHT", "BOTTOM", "TOP", "NEAR", "FAR"};
 				printf("Face[%d] = %s, dot = %.4f, VERTEX USED: [%.4f, %.4f, %.4f], COEFF: %.2f \n",
 						idxFace, arrFaces[idxFace].c_str(), dot, v.x, v.y, v.z, g_appSettings.hapticForceCoeff);
@@ -522,7 +533,6 @@ void MousePassiveMove(int x, int y)
 			}
 
 			//Apply displacements/forces to the model
-			//g_lpDeformable->hapticSetCurrentDisplacements(arrIndices, arrDisplacements);
 			g_lpDeformable->hapticSetCurrentForces(arrIndices, arrForces);
 
 		}
@@ -778,18 +788,19 @@ void SpecialKey(int key, int x, int y)
 void TimeStep(int t)
 {
 	g_lpDeformable->timestep();
-	g_appSettings.timeAnim += g_appSettings.timerInterval;
+	g_appSettings.ctAnimFrame ++;
 
 
 	//Log Database
-	if(g_appSettings.timeAnim - g_appSettings.timeLogger > 100)
+	if(g_appSettings.ctAnimFrame - g_appSettings.ctAnimLogger > 5)
 	{
 		if(g_lpDeformable->isVolumeChanged())
 		{
 			DBLogger::Record rec;
 			g_lpDeformable->statFillRecord(rec);
 			TheDataBaseLogger::Instance().append(rec);
-			g_appSettings.timeLogger = g_appSettings.timeAnim;
+			g_appSettings.ctAnimLogger = g_appSettings.ctAnimFrame;
+			g_appSettings.ctLogsCollected = g_appSettings.ctLogsCollected + 1;
 		}
 	}
 
@@ -820,6 +831,8 @@ void LoadSettings()
 	mtx.scale(vec3f(0.4f, 0.4f, 0.4f));
 	g_lpAffineWidget->setTransform(mtx);
 
+	//System settings
+	g_appSettings.hapticForceCoeff = cfg.readInt("SYSTEM", "FORCECOEFF", DEFAULT_FORCE_COEFF);
 
 	//Create Deformable Model
 	g_lpDeformable = new Deformable(strVegFile.cptr(),
@@ -827,16 +840,12 @@ void LoadSettings()
 									vFixedVertices);
 	g_lpDeformable->setHapticForceRadius(cfg.readInt("AVATAR", "RADIUS"));
 
-	//Cube
-	g_lpAvatarCube = new AvatarCube(vec3d(-0.1,-0.2,-0.1), vec3d(0.1, 0.2, 0.1));
+	//Avatar
+	vec3f thickness = cfg.readVec3f("AVATAR", "THICKNESS");
+	vec3d thicknessd = vec3d(thickness.x, thickness.y, thickness.z);
+	g_lpAvatarCube = new AvatarCube(thicknessd * (-0.5), thicknessd * 0.5);
 	//g_lpAvatar->setShaderEffectProgram(g_uiShader);
 	//g_lpAvatar->setEffectType(setFixedFunction);
-
-	/*
-	g_lpBlobRender = new GPUPoly();
-	g_lpBlobRender->readModel(strFPModel.cptr());
-	g_lpBlobRender->runTandem(0.1);
-	*/
 
 	//Loading Camera
 	if(cfg.hasSection("CAMERA") >= 0)
@@ -850,9 +859,12 @@ void LoadSettings()
 	}
 
 	//DISPLAY INFO
+	g_infoLines.push_back(GetGPUInfo());
 	g_infoLines.push_back(string("CAMERA"));
 	g_infoLines.push_back(string("HAPTIC"));
-	g_infoLines.push_back(GetGPUInfo());
+	g_infoLines.push_back(string("ANIMATION"));
+
+
 
 }
 
@@ -939,6 +951,18 @@ int main(int argc, char* argv[])
 
 	//Load Settings
 	LoadSettings();
+/*
+	DAnsiStr strFPModel = ExtractFilePath(GetExePath());
+	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/sphere.txt";
+	g_lpBlobRender = new GPUPoly();
+	g_lpBlobRender->readModel(strFPModel.cptr());
+	g_lpBlobRender->runTandem(0.1);
+*/
+
+	PS::HPC::RayTracer* lpTracer = new RayTracer(128, 128);
+	lpTracer->run();
+	SAFE_DELETE(lpTracer);
+
 
 	//Surface
 	/*
