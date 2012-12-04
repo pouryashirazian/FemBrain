@@ -1,5 +1,6 @@
 #include "PS_Deformable.h"
 #include "../PS_Base/PS_Logger.h"
+#include "../PS_Base/PS_FileDirectory.h"
 #include "../PS_Graphics/PS_Box.h"
 #include "volumetricMeshLoader.h"
 #include "volumetricMeshENuMaterial.h"
@@ -65,6 +66,7 @@ void Deformable::setup(const char* lpVegFilePath,
 	m_idxPulledVertex = -1;
 	m_bRenderFixedVertices = true;
 	m_bRenderVertices = false;
+	m_strModelName = PS::FILESTRINGUTILS::ExtractFileTitleOnly(DAnsiStr(lpVegFilePath));
 
 	//m_hapticCompliance = 1.0;
 	m_hapticCompliance = 1.0;
@@ -187,7 +189,7 @@ void Deformable::statFillRecord(DBLogger::Record& rec) const
 	rec.xpElementType = "TET";
 	rec.xpForceModel = "COROTATIONAL LINEAR FEM";
 	rec.xpIntegrator = "Backward Euler";
-	rec.xpModelName = "DISC";
+	rec.xpModelName = m_strModelName.cptr();
 	rec.xpTime = DBLogger::timestamp();
 }
 

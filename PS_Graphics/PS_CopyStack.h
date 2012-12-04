@@ -25,7 +25,7 @@ public:
 
     void pop() {m_stk.pop();}
 
-    T& top() { return m_stk.back();}
+    T top() const { return m_stk.back();}
 
 private:
     std::vector<T> m_stk;

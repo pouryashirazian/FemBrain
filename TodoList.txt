@@ -1,3 +1,21 @@
+Problems:
+1. Modeling and animating has a large distance between them. The model should be easily converted to
+animation.
+2. The collision between avatar and the deformable model is only detected when avatar hits a vertex of model.
+3. 
+
+
+
+
+
+
+
+
+
+
+
+
+
 List of features to be added:
 
 1. Unified scenegraph data structure for all geometries.

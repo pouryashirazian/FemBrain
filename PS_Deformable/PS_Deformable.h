@@ -10,6 +10,7 @@
 
 #include <vector>
 #include "../PS_Base/PS_MathBase.h"
+#include "../PS_Base/PS_String.h"
 #include "../PS_Graphics/PS_GLMeshBuffer.h"
 #include "../PS_Graphics/PS_Vector.h"
 #include "../PS_Graphics/PS_Box.h"
@@ -88,6 +89,10 @@ public:
 	double computeVolume() const;
 	bool isVolumeChanged() const { return  !EssentiallyEquald(this->computeVolume(), m_restVolume, 0.0001);}
 
+	//ModelName
+	DAnsiStr getModelName() const {return m_strModelName;}
+	void setModelName(const DAnsiStr& strModelName) {m_strModelName = strModelName;}
+
 	/*!
 	 * Return: Outputs number of dofs
 	 */
@@ -161,6 +166,8 @@ private:
 
 	bool m_bRenderFixedVertices;
 	bool m_bRenderVertices;
+
+	DAnsiStr m_strModelName;
 };
 
 #endif /* PS_DEFORMABLE_H_ */

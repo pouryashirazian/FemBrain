@@ -57,6 +57,7 @@ public:
 		this->bPanCamera = false;
 		this->bShowElements = false;
 		this->bDrawAffineWidgets = true;
+		this->bLogSql = true;
 		this->idxCollisionFace = -1;
 		this->timerInterval = DEFAULT_TIMER_MILLIS;
 		this->ctAnimFrame = 0;
@@ -71,6 +72,7 @@ public:
 	bool bDrawWireFrame;
 	bool bShowElements;
 	bool bDrawAffineWidgets;
+	bool bLogSql;
 
 	int idxCollisionFace;
 	double initialCollisionFaceModelDist;
@@ -336,7 +338,7 @@ void MousePress(int button, int state, int x, int y)
 	{
 		if (state == GLUT_DOWN)
 		{
-			if(g_lpAffineWidget->selectAxis(x, y))
+			if(g_lpAffineWidget->selectAxis(x, y) != uiaFree)
 			{
 				LogInfoArg1("Affine Widget changed axis to: %d", TheUITransform::Instance().axis);
 			}
@@ -792,7 +794,7 @@ void TimeStep(int t)
 
 
 	//Log Database
-	if(g_appSettings.ctAnimFrame - g_appSettings.ctAnimLogger > 5)
+	if(g_appSettings.bLogSql && (g_appSettings.ctAnimFrame - g_appSettings.ctAnimLogger > 5))
 	{
 		if(g_lpDeformable->isVolumeChanged())
 		{
@@ -833,6 +835,7 @@ void LoadSettings()
 
 	//System settings
 	g_appSettings.hapticForceCoeff = cfg.readInt("SYSTEM", "FORCECOEFF", DEFAULT_FORCE_COEFF);
+	g_appSettings.bLogSql = cfg.readBool("SYSTEM", "LOGSQL", g_appSettings.bLogSql);
 
 	//Create Deformable Model
 	g_lpDeformable = new Deformable(strVegFile.cptr(),
@@ -884,7 +887,7 @@ void SaveSettings()
 //Main Loop of Application
 int main(int argc, char* argv[])
 {
-	//VegWriter::WriteVegFile("/home/pourya/Desktop/disc/disc.1.node");
+	//VegWriter::WriteVegFile("/home/pourya/Desktop/Models/pyramid/pyramid.1.node");
 
 	//Setup the event logger
 	PS::TheEventLogger::Instance().setWriteFlags(PS_LOG_WRITE_EVENTTYPE | PS_LOG_WRITE_TIMESTAMP | PS_LOG_WRITE_SOURCE | PS_LOG_WRITE_TO_SCREEN);
@@ -959,10 +962,11 @@ int main(int argc, char* argv[])
 	g_lpBlobRender->runTandem(0.1);
 */
 
+	/*
 	PS::HPC::RayTracer* lpTracer = new RayTracer(128, 128);
 	lpTracer->run();
 	SAFE_DELETE(lpTracer);
-
+	 */
 
 	//Surface
 	/*
