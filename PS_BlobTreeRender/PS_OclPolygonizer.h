@@ -10,6 +10,7 @@
 #include "PS_PolyMemManager.h"
 #include "../PS_Graphics/PS_ComputeDevice.h"
 #include "../PS_Graphics/PS_VectorMath.h"
+#include "../PS_Graphics/PS_GLMeshBuffer.h"
 
 using namespace PS::SIMDPOLY;
 using namespace PS::HPC;
@@ -42,41 +43,40 @@ namespace HPC{
 /*!
  * GPU polygonizer for iso-surface extraction of the animated BlobTree on the GPU
  */
-class GPUPoly{
+class GPUPoly : public GLMeshBuffer
+{
 public:
 	GPUPoly();
 	explicit GPUPoly(const char* lpFilePath);
 	virtual ~GPUPoly();
-	void cleanup();
 
 	//Produce vertices count from the table
 	static void ProduceNumVerticesTable(const char* chrOutput);
-
-	/*!
-	 * Read a model from disk and converts it into a proper format for GPU
-	 */
-	bool readModel(const char* lpFilePath);
-
-
-	//Draws the mesh using accelerated memory buffer objects
-	void drawMesh(bool bWireFrameMode = false);
-	void drawBBox();
-
 	static void DrawBox(const svec3f& lo, const svec3f& hi, const svec3f& color, float lineWidth);
 
 	/*!
-	*@param cellsize the cubic cellsize for the polygonizer
-	*@return true when done
-	*/
-	int run(float cellsize = DEFAULT_CELL_SIZE);
+	 * Read a model from disk and converts it into a proper format for GPU
+	 * @param lpFilePath the model file path
+	 */
+	bool readModel(const char* lpFilePath);
+
 
 	/*!
 	 * Run the algorithm in tandem
 	 */
 	int runTandem(float cellsize = DEFAULT_CELL_SIZE);
 
+	//Draws the mesh using accelerated memory buffer objects
+	void drawBBox();
+
 private:
 	void init();
+
+	/*!
+	*@param cellsize the cubic cellsize for the polygonizer
+	*@return true when done
+	*/
+	int run(float cellsize = DEFAULT_CELL_SIZE);
 
 private:
     struct CellParam{
@@ -88,10 +88,6 @@ private:
 	};
 
 	CellParam m_param;
-
-	//Output:
-	//Mesh Buffer Object for Drawing
-	MESH_BUFFER_OBJECTS m_outMesh;
 
 	//Compute Kernels
 	PS::HPC::ComputeDevice* m_lpGPU;

@@ -169,27 +169,15 @@ void Draw()
 	//Render
 	g_arcBallCam.look();
 
-	//glTranslatef(0,0,10);
-	/*
-	glTranslatef(g_appSettings.pan.x, g_appSettings.pan.y, 0.0f);
-	svec3f p = g_arcBallCam.getCoordinates();
-	svec3f c = g_arcBallCam.getCenter();
-	gluLookAt(p.x, p.y, p.z, c.x, c.y, c.z, 0.0f, 1.0f, 0.0f);
-	*/
-	//Use Shader Effect
-	/*
-	glUseProgram(g_uiShader);
+	//Draw Polygonizer output
 	if(g_lpBlobRender)
 	{
+		g_lpBlobRender->setWireFrameMode(g_appSettings.bDrawWireFrame);
 		g_lpBlobRender->drawBBox();
-		g_lpBlobRender->drawMesh(g_appSettings.bDrawWireFrame);
+		glEnable(GL_LIGHTING);
+			g_lpBlobRender->draw();
+		glDisable(GL_LIGHTING);
 	}
-	glUseProgram(0);
-	*/
-
-
-	//Draw Deformable Model
-	g_lpDeformable->draw();
 
 	//Draw Interaction Avatar
 	if(g_lpAvatarCube)
@@ -214,8 +202,6 @@ void Draw()
 	{
 		GLint vp[4];
 		glGetIntegerv(GL_VIEWPORT, vp);
-		//svec3f s1 = g_appSettings.worldDragStart;
-		//svec3f s2 = g_appSettings.worldDragEnd;
 		vec2i s1 = g_appSettings.screenDragStart;
 		vec2i s2 = g_appSettings.screenDragEnd;
 
@@ -792,7 +778,6 @@ void TimeStep(int t)
 	g_lpDeformable->timestep();
 	g_appSettings.ctAnimFrame ++;
 
-
 	//Log Database
 	if(g_appSettings.bLogSql && (g_appSettings.ctAnimFrame - g_appSettings.ctAnimLogger > 5))
 	{
@@ -847,8 +832,6 @@ void LoadSettings()
 	vec3f thickness = cfg.readVec3f("AVATAR", "THICKNESS");
 	vec3d thicknessd = vec3d(thickness.x, thickness.y, thickness.z);
 	g_lpAvatarCube = new AvatarCube(thicknessd * (-0.5), thicknessd * 0.5);
-	//g_lpAvatar->setShaderEffectProgram(g_uiShader);
-	//g_lpAvatar->setEffectType(setFixedFunction);
 
 	//Loading Camera
 	if(cfg.hasSection("CAMERA") >= 0)
@@ -866,8 +849,6 @@ void LoadSettings()
 	g_infoLines.push_back(string("CAMERA"));
 	g_infoLines.push_back(string("HAPTIC"));
 	g_infoLines.push_back(string("ANIMATION"));
-
-
 
 }
 
@@ -903,7 +884,6 @@ int main(int argc, char* argv[])
 	glutMouseFunc(MousePress);
 	glutPassiveMotionFunc(MousePassiveMove);
 	glutMotionFunc(MouseMove);
-
 	glutMouseWheelFunc(MouseWheel);
 
 	glutKeyboardFunc(NormalKey);
@@ -950,17 +930,19 @@ int main(int argc, char* argv[])
 		fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
 		exit(1);
 	}
+
+	//Build Shaders for drawing the mesh
 	CompileShaderCode(g_lpVertexShaderCode, g_lpFragShaderCode, g_uiShader);
 
 	//Load Settings
 	LoadSettings();
-/*
+
 	DAnsiStr strFPModel = ExtractFilePath(GetExePath());
 	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/sphere.txt";
 	g_lpBlobRender = new GPUPoly();
 	g_lpBlobRender->readModel(strFPModel.cptr());
 	g_lpBlobRender->runTandem(0.1);
-*/
+
 
 	/*
 	PS::HPC::RayTracer* lpTracer = new RayTracer(128, 128);

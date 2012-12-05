@@ -10,7 +10,7 @@
 
 GLMeshBuffer::GLMeshBuffer()
 {
-	vboColor = vboNormal = vboTexCoord = vboVertex = iboFaces = INVALID_GLBUFFER;
+	m_vboColor = m_vboNormal = m_vboTexCoord = m_vboVertex = m_iboFaces = INVALID_GLBUFFER;
 	m_isValidColor = m_isValidIndex = m_isValidNormal = m_isValidTexCoord = m_isValidVertex = false;
 	m_ctFaceElements = m_ctVertices = 0;
 	m_faceMode = GL_TRIANGLES;
@@ -32,15 +32,15 @@ GLMeshBuffer::~GLMeshBuffer()
 void GLMeshBuffer::cleanup()
 {
 	if(m_isValidColor)
-		glDeleteBuffers(1, &vboColor);
+		glDeleteBuffers(1, &m_vboColor);
 	if(m_isValidTexCoord)
-		glDeleteBuffers(1, &vboTexCoord);
+		glDeleteBuffers(1, &m_vboTexCoord);
 	if(m_isValidVertex)
-		glDeleteBuffers(1, &vboVertex);
+		glDeleteBuffers(1, &m_vboVertex);
 	if(m_isValidNormal)
-		glDeleteBuffers(1, &vboNormal);
+		glDeleteBuffers(1, &m_vboNormal);
 	if(m_isValidIndex)
-		glDeleteBuffers(1, &iboFaces);
+		glDeleteBuffers(1, &m_iboFaces);
 	m_isValidColor = m_isValidIndex = m_isValidNormal = false;
 	m_isValidTexCoord = m_isValidVertex = false;
 }
@@ -71,8 +71,8 @@ void GLMeshBuffer::setupVertexAttribs(const vector<float>& arrAttribs, int step,
 		m_isValidVertex = true;
 		m_stepVertex = step;
 		m_ctVertices = arrAttribs.size() / m_stepVertex;
-		glGenBuffers(1, &vboVertex);
-		glBindBuffer(GL_ARRAY_BUFFER, vboVertex);
+		glGenBuffers(1, &m_vboVertex);
+		glBindBuffer(GL_ARRAY_BUFFER, m_vboVertex);
 		glBufferData(GL_ARRAY_BUFFER, arrAttribs.size() * sizeof(float), &arrAttribs[0], GL_STATIC_DRAW);
 	}
 	else if(attribKind == vatNormal)
@@ -90,8 +90,8 @@ void GLMeshBuffer::setupVertexAttribs(const vector<float>& arrAttribs, int step,
 			arrNormalizedNormals[i * 3 + 2] = n.z;
 		}
 
-		glGenBuffers(1, &vboNormal);
-		glBindBuffer(GL_ARRAY_BUFFER, vboNormal);
+		glGenBuffers(1, &m_vboNormal);
+		glBindBuffer(GL_ARRAY_BUFFER, m_vboNormal);
 		glBufferData(GL_ARRAY_BUFFER, arrAttribs.size() * sizeof(float), &arrAttribs[0], GL_STATIC_DRAW);
 	}
 	else if(attribKind == vatColor)
@@ -99,8 +99,8 @@ void GLMeshBuffer::setupVertexAttribs(const vector<float>& arrAttribs, int step,
 		m_isValidColor = true;
 		m_stepColor = step;
 
-		glGenBuffers(1, &vboColor);
-		glBindBuffer(GL_ARRAY_BUFFER, vboColor);
+		glGenBuffers(1, &m_vboColor);
+		glBindBuffer(GL_ARRAY_BUFFER, m_vboColor);
 		glBufferData(GL_ARRAY_BUFFER, arrAttribs.size() * sizeof(float), &arrAttribs[0], GL_STATIC_DRAW);
 	}
 	else if(attribKind == vatTexCoord)
@@ -108,8 +108,8 @@ void GLMeshBuffer::setupVertexAttribs(const vector<float>& arrAttribs, int step,
 		m_isValidTexCoord = true;
 		m_stepTexCoord = step;
 
-		glGenBuffers(1, &vboTexCoord);
-		glBindBuffer(GL_ARRAY_BUFFER, vboTexCoord);
+		glGenBuffers(1, &m_vboTexCoord);
+		glBindBuffer(GL_ARRAY_BUFFER, m_vboTexCoord);
 		glBufferData(GL_ARRAY_BUFFER, arrAttribs.size() * sizeof(float), &arrAttribs[0], GL_STATIC_DRAW);
 	}
 }
@@ -117,7 +117,7 @@ void GLMeshBuffer::setupVertexAttribs(const vector<float>& arrAttribs, int step,
 void GLMeshBuffer::setupPerVertexColor(const vec4f& color, U32 ctVertices, int step)
 {
 	if(m_isValidColor)
-		glDeleteBuffers(1, &vboColor);
+		glDeleteBuffers(1, &m_vboColor);
 
 	m_stepColor = step;
 	vector<float> arrColors;
@@ -128,8 +128,8 @@ void GLMeshBuffer::setupPerVertexColor(const vec4f& color, U32 ctVertices, int s
 			arrColors[i*step + j] = color.e[j];
 	}
 
-	glGenBuffers(1, &vboColor);
-	glBindBuffer(GL_ARRAY_BUFFER, vboColor);
+	glGenBuffers(1, &m_vboColor);
+	glBindBuffer(GL_ARRAY_BUFFER, m_vboColor);
 	glBufferData(GL_ARRAY_BUFFER, arrColors.size() * sizeof(float), &arrColors[0], GL_STATIC_DRAW);
 	m_isValidColor = true;
 }
@@ -139,8 +139,8 @@ void GLMeshBuffer::setupIndexBufferObject(const vector<U32>& arrIndex, int faceM
 	m_faceMode = faceMode;
 	m_isValidIndex = true;
 	m_ctFaceElements = arrIndex.size();
-	glGenBuffers(1, &iboFaces);
-	glBindBuffer(GL_ARRAY_BUFFER, iboFaces);
+	glGenBuffers(1, &m_iboFaces);
+	glBindBuffer(GL_ARRAY_BUFFER, m_iboFaces);
 	glBufferData(GL_ARRAY_BUFFER, arrIndex.size() * sizeof(U32), &arrIndex[0], GL_STATIC_DRAW);
 }
 
@@ -168,7 +168,7 @@ void GLMeshBuffer::draw()
 	//Color
 	if(m_isValidColor)
 	{
-		glBindBuffer(GL_ARRAY_BUFFER, vboColor);
+		glBindBuffer(GL_ARRAY_BUFFER, m_vboColor);
 		glColorPointer(m_stepColor, GL_FLOAT, 0, 0);
 		glEnableClientState(GL_COLOR_ARRAY);
 	}
@@ -176,7 +176,7 @@ void GLMeshBuffer::draw()
 	//TexCoord
 	if(m_isValidTexCoord)
 	{
-		glBindBuffer(GL_ARRAY_BUFFER, vboTexCoord);
+		glBindBuffer(GL_ARRAY_BUFFER, m_vboTexCoord);
 		glTexCoordPointer(m_stepTexCoord, GL_FLOAT, 0, 0);
 		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 	}
@@ -184,7 +184,7 @@ void GLMeshBuffer::draw()
 	//Normal
 	if(m_isValidNormal)
 	{
-		glBindBuffer(GL_ARRAY_BUFFER, vboNormal);
+		glBindBuffer(GL_ARRAY_BUFFER, m_vboNormal);
 		glNormalPointer(GL_FLOAT, 0, 0);
 		glEnableClientState(GL_NORMAL_ARRAY);
 	}
@@ -192,7 +192,7 @@ void GLMeshBuffer::draw()
 	//Vertex
 	if(m_isValidVertex)
 	{
-		glBindBuffer(GL_ARRAY_BUFFER, vboVertex);
+		glBindBuffer(GL_ARRAY_BUFFER, m_vboVertex);
 		glVertexPointer(m_stepVertex, GL_FLOAT, 0, 0);
 		glEnableClientState(GL_VERTEX_ARRAY);
 	}
@@ -201,7 +201,7 @@ void GLMeshBuffer::draw()
 	//Draw Faces
 	if(m_isValidIndex)
 	{
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboFaces);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_iboFaces);
 		glEnableClientState(GL_ELEMENT_ARRAY_BUFFER);
 		glDrawElements(m_faceMode, (GLsizei)m_ctFaceElements, GL_UNSIGNED_INT, (GLvoid*)0);
 

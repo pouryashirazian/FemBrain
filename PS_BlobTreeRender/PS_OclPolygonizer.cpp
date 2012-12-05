@@ -50,14 +50,16 @@ const char *KernelSource = "\n"		      \
         "}                                        \n" \
         "\n";
 
+
 namespace PS{
 namespace HPC{
-	GPUPoly::GPUPoly()
+
+	GPUPoly::GPUPoly() : GLMeshBuffer()
 	{
 		init();		
 	}
 
-	GPUPoly::GPUPoly(const char* lpFilePath)
+	GPUPoly::GPUPoly(const char* lpFilePath) : GLMeshBuffer()
 	{
 		init();
 		this->readModel(lpFilePath);
@@ -65,38 +67,11 @@ namespace HPC{
 
 	GPUPoly::~GPUPoly()
 	{
-		this->cleanup();
-	}
-
-	
-
-
-	//Code to produce number of vertices table
-	void GPUPoly::ProduceNumVerticesTable(const char* chrOutput)
-	{		
-		ofstream ofs;
-		ofs.open(chrOutput, ios::out);
-		for(size_t i=0; i < 256; i++)
-		{
-			int ctVertices = 0;
-			for(int j=0; j<16; j++)
-			{		
-				if(g_triTableCompact[i][j] != 255)
-					ctVertices++;
-				else
-					break;
-			}
-			ofs << "\t" << ctVertices << "," << '\0' << endl;
-		}
-		ofs.close();
-	}
-
-	void GPUPoly::cleanup()
-	{
-		m_outMesh.cleanup();
+		GLMeshBuffer::cleanup();
 		SAFE_DELETE(m_lpGPU);
 	}
 
+	
 	bool GPUPoly::readModel(const char* lpFilePath)
 	{
 		SOABlobPrims tempPrims;
@@ -260,43 +235,6 @@ namespace HPC{
 	}
 
 
-	void GPUPoly::drawMesh(bool bWireFrameMode)
-	{
-		if(!m_outMesh.bIsValid)	return;
-
-		glPushAttrib(GL_ALL_ATTRIB_BITS);
-		if(bWireFrameMode)
-			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		else
-			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		//Color
-		glBindBuffer(GL_ARRAY_BUFFER, m_outMesh.vboColor);
-		glColorPointer(4, GL_FLOAT, 0, 0);
-		glEnableClientState(GL_COLOR_ARRAY);
-		
-		//Normal
-		glBindBuffer(GL_ARRAY_BUFFER, m_outMesh.vboNormal);
-		glNormalPointer(GL_FLOAT, 0, 0);
-		glEnableClientState(GL_NORMAL_ARRAY);
-		
-		//Vertex
-		glBindBuffer(GL_ARRAY_BUFFER, m_outMesh.vboVertex);
-		glVertexPointer(4, GL_FLOAT, 0, 0);
-		glEnableClientState(GL_VERTEX_ARRAY);
-
-		//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, meshBuffers.iboFaces);
-		//glEnableClientState(GL_ELEMENT_ARRAY_BUFFER);
-		//glDrawElements(GL_TRIANGLES, (GLsizei)meshBuffers.ctTriangles * 3, GL_UNSIGNED_INT, (GLvoid*)0);
-		glDrawArrays(GL_TRIANGLES, 0, m_outMesh.ctVertices);
-
-		glDisableClientState(GL_COLOR_ARRAY);
-		glDisableClientState(GL_NORMAL_ARRAY);
-		glDisableClientState(GL_VERTEX_ARRAY);
-		//glDisableClientState(GL_ELEMENT_ARRAY_BUFFER);
-
-		glPopAttrib();
-	}
-
 	void GPUPoly::drawBBox()
 	{
 		DrawBox(m_bboxLo, m_bboxHi, svec3f(0,0,1), 1.0f);
@@ -327,11 +265,57 @@ namespace HPC{
 		glPopAttrib();
 	}
 
+	//Code to produce number of vertices table
+	void GPUPoly::ProduceNumVerticesTable(const char* chrOutput)
+	{
+		ofstream ofs;
+		ofs.open(chrOutput, ios::out);
+		for(size_t i=0; i < 256; i++)
+		{
+			int ctVertices = 0;
+			for(int j=0; j<16; j++)
+			{
+				if(g_triTableCompact[i][j] != 255)
+					ctVertices++;
+				else
+					break;
+			}
+			ofs << "\t" << ctVertices << "," << '\0' << endl;
+		}
+		ofs.close();
+	}
+
 
 	void GPUPoly::init()
 	{
-		m_outMesh.bIsValid = false;
+		//Vertex Shader Code
+		const char * lpVertexShaderCode =
+			"varying vec3 N;"
+			"varying vec3 V; "
+			"void main(void) {"
+			"gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;"
+			"gl_FrontColor = gl_Color;"
+			"N = normalize(gl_NormalMatrix * gl_Normal);"
+			"V = vec3(gl_ModelViewMatrix * gl_Vertex); }";
+
+		//Fragment Shader Code
+		const char* lpFragShaderCode =
+			"varying vec3 N;"
+			"varying vec3 V;"
+			"void main(void) {"
+			"vec3 L = normalize(gl_LightSource[0].position.xyz - V);"
+			"vec3 E = normalize(-V);"
+			"vec3 R = normalize(-reflect(L, N));"
+			"vec4 Iamb = 0.5 * gl_LightSource[0].ambient * gl_Color;"
+			"vec4 Idif = (gl_LightSource[0].diffuse * gl_Color) * max(dot(N,L), 0.0);"
+			"vec4 Ispec = (gl_LightSource[0].specular * (vec4(0.8, 0.8, 0.8, 0.8) + 0.2 * gl_Color)) * pow(max(dot(R, E), 0.0), 32.0);"
+			"gl_FragColor = gl_FrontLightModelProduct.sceneColor + Iamb + Idif + Ispec;	}";
+
+		//Set Rendering Shader
+		CompileShaderCode(lpVertexShaderCode, lpFragShaderCode, m_uShaderEffectProgram);
+		this->setShaderEffectProgram(m_uShaderEffectProgram);
 		
+		//Reading kernels for opencl
 		DAnsiStr strFP = ExtractFilePath(GetExePath());
 		strFP = ExtractOneLevelUp(strFP);
 		strFP += DAnsiStr("PS_Shaders/Polygonizer.cl");
@@ -365,7 +349,7 @@ namespace HPC{
 		//3.Empty cells are discarded
 		//4.Triangles are computed to the output mesh
 		m_arrHeader[OFFSET_CELLSIZE] = cellsize;
-		m_outMesh.cleanup();
+		GLMeshBuffer::cleanup();
 
 
 		//BBOX
@@ -388,26 +372,27 @@ namespace HPC{
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_MPU_TRIANGLE_COUNT * 3 * sizeof(U32), 0, GL_DYNAMIC_DRAW);
 		cl_mem inMemMeshFaces = clCreateFromGLBuffer(m_lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_meshBuffer.iboFaces, NULL);
 		*/
-
+		m_stepVertex = 4;
+		m_stepColor = 4;
 		U32 szVertexBuffer = m_ctCells * MAX_VERTICES_COUNT_PER_CELL * 4 * sizeof(float);
 
 		//Vertex
-		glGenBuffers(1, &m_outMesh.vboVertex);
-		glBindBuffer(GL_ARRAY_BUFFER, m_outMesh.vboVertex);
+		glGenBuffers(1, &m_vboVertex);
+		glBindBuffer(GL_ARRAY_BUFFER, m_vboVertex);
 		glBufferData(GL_ARRAY_BUFFER, szVertexBuffer, 0, GL_DYNAMIC_DRAW);
-		cl_mem outMemMeshVertex = clCreateFromGLBuffer(m_lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_outMesh.vboVertex, NULL);
+		cl_mem outMemMeshVertex = clCreateFromGLBuffer(m_lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_vboVertex, NULL);
 
 		//Color
-		glGenBuffers(1, &m_outMesh.vboColor);
-		glBindBuffer(GL_ARRAY_BUFFER, m_outMesh.vboColor);
+		glGenBuffers(1, &m_vboColor);
+		glBindBuffer(GL_ARRAY_BUFFER, m_vboColor);
 		glBufferData(GL_ARRAY_BUFFER, szVertexBuffer, 0, GL_DYNAMIC_DRAW);
-		cl_mem outMemMeshColor = clCreateFromGLBuffer(m_lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_outMesh.vboColor, NULL);
+		cl_mem outMemMeshColor = clCreateFromGLBuffer(m_lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_vboColor, NULL);
 
 		//Normal
-		glGenBuffers(1, &m_outMesh.vboNormal);
-		glBindBuffer(GL_ARRAY_BUFFER, m_outMesh.vboNormal);
+		glGenBuffers(1, &m_vboNormal);
+		glBindBuffer(GL_ARRAY_BUFFER, m_vboNormal);
 		glBufferData(GL_ARRAY_BUFFER, szVertexBuffer, 0, GL_DYNAMIC_DRAW);
-		cl_mem outMemMeshNormal = clCreateFromGLBuffer(m_lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_outMesh.vboNormal, NULL);
+		cl_mem outMemMeshNormal = clCreateFromGLBuffer(m_lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_vboNormal, NULL);
 
 		
 		//Load Marching Cubes tables
@@ -551,7 +536,7 @@ namespace HPC{
 		clEnqueueReleaseGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshVertex, 0, 0, 0);
 		clEnqueueReleaseGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshNormal, 0, 0, 0);
 		clEnqueueReleaseGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshColor, 0, 0, 0);
-		m_outMesh.bIsValid = true;
+		m_isValidVertex = m_isValidNormal = m_isValidColor = true;
 
 		// Read back the results from the device to verify the output
 		U8* arrVertexCount = new U8[m_ctCells];
@@ -598,7 +583,8 @@ namespace HPC{
 
 	int GPUPoly::runTandem(float cellsize)
 	{
-		m_outMesh.cleanup();
+		//Clear previous mesh
+		GLMeshBuffer::cleanup();
 
 		//Set CellSize
 		m_arrHeader[OFFSET_CELLSIZE] = cellsize;
@@ -774,26 +760,28 @@ namespace HPC{
 
 		//////////////////////////////////////////////////////////////////////////
 		//Kernel2:
-		U32 szVertexBuffer = ctSumVertices * 4 * sizeof(float);
+		m_stepVertex = 4;
+		m_stepColor = 4;
+		U32 szVertexBuffer = ctSumVertices * m_stepVertex * sizeof(float);
 		U32 szNormalBuffer = ctSumVertices * 3 * sizeof(float);
 
 		//Vertex
-		glGenBuffers(1, &m_outMesh.vboVertex);
-		glBindBuffer(GL_ARRAY_BUFFER, m_outMesh.vboVertex);
+		glGenBuffers(1, &m_vboVertex);
+		glBindBuffer(GL_ARRAY_BUFFER, m_vboVertex);
 		glBufferData(GL_ARRAY_BUFFER, szVertexBuffer, 0, GL_DYNAMIC_DRAW);
-		cl_mem outMemMeshVertex = clCreateFromGLBuffer(m_lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_outMesh.vboVertex, NULL);
+		cl_mem outMemMeshVertex = clCreateFromGLBuffer(m_lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_vboVertex, NULL);
 
 		//Color
-		glGenBuffers(1, &m_outMesh.vboColor);
-		glBindBuffer(GL_ARRAY_BUFFER, m_outMesh.vboColor);
+		glGenBuffers(1, &m_vboColor);
+		glBindBuffer(GL_ARRAY_BUFFER, m_vboColor);
 		glBufferData(GL_ARRAY_BUFFER, szVertexBuffer, 0, GL_DYNAMIC_DRAW);
-		cl_mem outMemMeshColor = clCreateFromGLBuffer(m_lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_outMesh.vboColor, NULL);
+		cl_mem outMemMeshColor = clCreateFromGLBuffer(m_lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_vboColor, NULL);
 
 		//Normal
-		glGenBuffers(1, &m_outMesh.vboNormal);
-		glBindBuffer(GL_ARRAY_BUFFER, m_outMesh.vboNormal);
+		glGenBuffers(1, &m_vboNormal);
+		glBindBuffer(GL_ARRAY_BUFFER, m_vboNormal);
 		glBufferData(GL_ARRAY_BUFFER, szNormalBuffer, 0, GL_DYNAMIC_DRAW);
-		cl_mem outMemMeshNormal = clCreateFromGLBuffer(m_lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_outMesh.vboNormal, NULL);
+		cl_mem outMemMeshNormal = clCreateFromGLBuffer(m_lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_vboNormal, NULL);
 
 		//Acquire Mesh for Writing
 		clEnqueueAcquireGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshVertex, 0, 0, 0);
@@ -835,12 +823,13 @@ namespace HPC{
 		m_lpGPU->finishAllCommands();
 
 		//Release Mesh for Writing
-		m_outMesh.bIsValid = true;
-		m_outMesh.ctVertices = ctSumVertices;
-		m_outMesh.ctTriangles = ctSumVertices / 3;
 		clEnqueueReleaseGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshVertex, 0, 0, 0);
 		clEnqueueReleaseGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshColor, 0, 0, 0);
 		clEnqueueReleaseGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshNormal, 0, 0, 0);
+		m_isValidVertex = m_isValidColor = m_isValidNormal = true;
+		m_ctVertices = ctSumVertices;
+		m_ctFaceElements = ctSumVertices;
+		//m_ctFaceElements = ctSumVertices / 3;
 		
 		//Export offsets
 		/*

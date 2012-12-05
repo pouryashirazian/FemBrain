@@ -33,9 +33,20 @@ using namespace PS::MATH;
 class Deformable{
 public:
 	Deformable();
+
+	/*!
+	 * Constructs a deformable model from the veg file and the rendereable mesh
+	 * from the obj file. Fixed vertices are setup in the ini file.
+	 */
 	Deformable(const char* lpVegFilePath,
 				const char* lpObjFilePath,
 				std::vector<int>& vFixedVertices);
+
+	/*!
+	 * Constructs a deformable model from the BlobTree by performing a round of
+	 * polygonization.
+	 */
+	//Deformable()
 
 	virtual ~Deformable();
 

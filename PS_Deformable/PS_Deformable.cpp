@@ -74,6 +74,7 @@ void Deformable::setup(const char* lpVegFilePath,
 	m_bHapticInProgress = false;
 
 
+	//Load the volumetric mesh
 	VolumetricMesh * lpVolMesh = VolumetricMeshLoader::load(const_cast<char*>(lpVegFilePath));
 	if (lpVolMesh == NULL)
 		LogError("Failed to load veg format mesh.");

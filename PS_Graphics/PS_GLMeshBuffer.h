@@ -76,16 +76,20 @@ protected:
 
 
 protected:
-
 	//Index to the buffer objects
-	U32 vboVertex;
-	U32 vboColor;
-	U32 vboNormal;
-	U32 vboTexCoord;
-	U32 iboFaces;
+	U32 m_vboVertex;
+	U32 m_vboColor;
+	U32 m_vboNormal;
+	U32 m_vboTexCoord;
+	U32 m_iboFaces;
 
+	//Flags
+	bool m_isValidVertex;
+	bool m_isValidNormal;
+	bool m_isValidColor;
+	bool m_isValidTexCoord;
+	bool m_isValidIndex;
 
-private:
 	bool m_bWireFrame;
 	U32 m_uShaderEffectProgram;
 	ShaderEffectType m_effectType;
@@ -101,12 +105,6 @@ private:
 
 	int m_faceMode;
 
-	//Flags
-	bool m_isValidVertex;
-	bool m_isValidNormal;
-	bool m_isValidColor;
-	bool m_isValidTexCoord;
-	bool m_isValidIndex;
 };
 
 
