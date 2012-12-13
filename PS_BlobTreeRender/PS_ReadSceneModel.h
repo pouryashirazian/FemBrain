@@ -78,7 +78,7 @@ private:
 		U32 idxArray;
 	};
 
-	U32 m_ctInstancedNodes;
+	int m_ctInstancedNodes;
 	std::vector<READNODES> m_lstReadNodes;
 
 	SOABlobPrims* m_lpBlobPrims;

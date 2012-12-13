@@ -119,9 +119,14 @@ public:
     void printInfo();
 
     /*!
-     * Create memory buffer for readonly or writeonly access
+     * Create memory buffer for readonly or writeonly access.
      */
     cl_mem createMemBuffer(const U32 size, MEMACCESSMODE mode);
+
+    /*!
+     * Create memory buffer for readonly or writeonly access from a GL Buffer.
+     */
+    cl_mem createMemBufferFromGL(U32 glBuffer, MEMACCESSMODE mode);
 
     /*!
      * Enqueues a write operation in the command queue

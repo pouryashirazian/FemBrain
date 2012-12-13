@@ -21,6 +21,13 @@ Deformable::Deformable(const char* lpVegFilePath,
 	this->setup(lpVegFilePath, lpObjFilePath, vFixedVertices);
 }
 
+Deformable::Deformable(U32 ctVertices, double* lpVertices,
+						  U32 ctElements, int* lpElements,
+						  std::vector<int>& vFixedVertices)
+{
+	this->setup(ctVertices, lpVertices, ctElements, lpElements, vFixedVertices);
+}
+
 Deformable::~Deformable()
 {
 	this->cleanup();
@@ -48,7 +55,6 @@ void Deformable::cleanup()
 	//Double Arrays
 	SAFE_DELETE_ARRAY(m_arrDisplacements);
 	SAFE_DELETE_ARRAY(m_arrExtForces);
-
 	SAFE_DELETE_ARRAY(m_arrElementVolumes);
 }
 
@@ -154,6 +160,87 @@ void Deformable::setup(const char* lpVegFilePath,
 	}
 
 
+
+
+	U32 ctElems = m_lpTetMesh->getNumElements();
+	m_arrElementVolumes = new double[ctElems];
+	for(U32 i=0; i<ctElems; i++)
+		m_arrElementVolumes[i] = m_lpTetMesh->getElementVolume(i);
+	m_restVolume = this->computeVolume();
+}
+
+/*!
+ * Deformable model built from vertices and indices
+ */
+void Deformable::setup(U32 ctVertices, double* lpVertices,
+						  U32 ctElements, int* lpElements,
+						  std::vector<int>& vFixedVertices)
+{
+	//m_lpDeformableMesh = new SceneObjectDeformable(const_cast<char*>(lpObjFilePath));
+	//m_lpDeformableMesh->EnableVertexSelection();
+	m_lpDeformableMesh->ResetDeformationToRest();
+	m_lpDeformableMesh->BuildNeighboringStructure();
+	m_lpDeformableMesh->BuildNormals();
+	m_lpDeformableMesh->SetMaterialAlpha(0.5);
+	m_idxPulledVertex = -1;
+	m_bRenderFixedVertices = true;
+	m_bRenderVertices = false;
+	m_strModelName = "MEMORY";
+
+	//m_hapticCompliance = 1.0;
+	m_hapticCompliance = 1.0;
+	m_hapticForceNeighorhoodSize = DEFAULT_FORCE_NEIGHBORHOOD_SIZE;
+	m_bHapticInProgress = false;
+
+
+	//Load the volumetric mesh
+	m_lpTetMesh = new TetMesh(ctVertices, lpVertices, ctElements, lpElements);
+
+	//MeshGraph
+	m_lpMeshGraph = GenerateMeshGraph::Generate(m_lpTetMesh);
+
+	//Setup Deformable Model
+	m_lpDeformable = new CorotationalLinearFEM(m_lpTetMesh);
+
+	//Setup Force Model
+	m_lpDeformableForceModel = new CorotationalLinearFEMForceModel(m_lpDeformable);
+
+	//Compute Mass Matrix
+	GenerateMassMatrix::computeMassMatrix(m_lpTetMesh, &m_lpMassMatrix, true);
+
+
+	// This option only affects PARDISO and SPOOLES solvers, where it is best
+	// to keep it at 0, which implies a symmetric, non-PD solve.
+	// With CG, this option is ignored.
+	m_positiveDefiniteSolver = 0;
+
+	//Copy from the input fixed vertices
+	m_vFixedVertices.assign(vFixedVertices.begin(), vFixedVertices.end());
+
+	// (tangential) Rayleigh damping
+	// "underwater"-like damping
+	m_dampingMassCoeff = 0.0;
+
+	// (primarily) high-frequency damping
+	m_dampingStiffnessCoeff = 0.01;
+
+	// total number of DOFs
+	m_dof = 3 * m_lpTetMesh->getNumVertices();
+	m_arrDisplacements = new double[m_dof];
+	m_arrExtForces = new double[m_dof];
+
+	//Time Step the model
+	m_timeStep = 0.0333;
+	m_ctTimeStep = 0;
+	m_lpIntegrator = NULL;
+
+	//Create the integrator
+	this->setupIntegrator();
+
+	//Compute AABB
+	Vec3d lo, up;
+	m_lpDeformableMesh->GetMesh()->getBoundingBox(1.0, &lo, &up);
+	m_aabb.set(vec3(lo[0], lo[1], lo[2]), vec3(up[0], up[1], up[2]));
 
 
 	U32 ctElems = m_lpTetMesh->getNumElements();

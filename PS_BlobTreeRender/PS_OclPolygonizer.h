@@ -70,7 +70,10 @@ public:
 	void drawBBox();
 
 private:
-	void init();
+	/*!
+	 * Init shaders and opencl kernels
+	 */
+	int init();
 
 	/*!
 	*@param cellsize the cubic cellsize for the polygonizer
@@ -95,6 +98,10 @@ private:
 	PS::HPC::ComputeKernel* m_lpKernelComputeConfig;
 	PS::HPC::ComputeKernel* m_lpKernelComputeMesh;
 
+	//Reusable vars
+	cl_mem m_inMemVertexCountTable;
+	cl_mem m_inMemTriangleTable;
+
 	//Inputs:
 	//BlobNode Matrix
 	SOABlobNodeMatrices m_mtxNode;
@@ -118,12 +125,6 @@ private:
 	U32 m_ctCells;
 };
 
-/*!
-* Compute Mesh Centroids
-*/
-int Run_MeshCentroidKernel(float* arrVertices, U32* arrFaces, 
-						   U32 ctVertices, U32 ctFaces,
-						   float*& lpCentriods);
 
 
 int Run_SphereDistKernel();

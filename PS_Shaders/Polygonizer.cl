@@ -457,8 +457,12 @@ __kernel void ComputeConfig(__global float4* arrInHeader4,
 		return;
 	
 	//float cellsize = arrInHeader4[OFFSET_HEADER_CELLSIZE];	
+	//Count : Prims, Ops, Mtx ; CellSize
+	U32 ctPrims = (U32)arrInHeader4[OFFSET4_HEADER_PARAMS].x;
+	U32 ctOps   = (U32)arrInHeader4[OFFSET4_HEADER_PARAMS].y;
 	float cellsize = arrInHeader4[OFFSET4_HEADER_PARAMS].w;
 	float4 lower = arrInHeader4[OFFSET4_HEADER_LOWER] + cellsize * (float4)(idX, idY, idZ, 0.0f);
+
 	float arrFields[8];
 	float4 arrVertices[8];
 	arrVertices[0] = lower;
@@ -497,9 +501,13 @@ __kernel void ComputeMesh(__global float4* arrInHeader4,
 						  __global float4* arrInMtxNode4,
 					      __constant struct CellParam* inCellParams,
 						  __read_only image2d_t texInTriangleTable,
-						  __global U8* arrInCellConfig,
-						  __global U8* arrInVertexCount,
-						  __global U32* arrInVertexBufferOffset,	
+						  __global U8* arrInCellConfig,						
+						  __global U32* arrInVertexBufferOffset,
+						  
+						  __global U32* arrInTetMeshBufferOffset,
+						  __global float* arrOutTetMeshVertices,
+						  __global U32* arrOutTetMeshIndices,
+						  
 						  __global float4* arrOutMeshVertex,
 						  __global float4* arrOutMeshColor,
 						  __global float* arrOutMeshNormal)						  
@@ -513,8 +521,12 @@ __kernel void ComputeMesh(__global float4* arrInHeader4,
 	uint idxCell = idZ * (inCellParams->ctNeededCells[0] * inCellParams->ctNeededCells[1]) + idY * inCellParams->ctNeededCells[0] + idX;
 	if(idxCell > inCellParams->ctTotalCells)
 		return;
-	if(arrInVertexCount[idxCell] == 0)
+	
+	//We need complete insiders too
+	if(arrInCellConfig[idxCell] == 0)
 		return;
+	//if(arrInVertexCount[idxCell] == 0)
+		//return;
 	
 	//float cellsize = arrInHeader4[OFFSET_HEADER_CELLSIZE];	
 	float cellsize = arrInHeader4[OFFSET4_HEADER_PARAMS].w;
@@ -529,13 +541,63 @@ __kernel void ComputeMesh(__global float4* arrInHeader4,
 	arrVertices[5] = lower + cellsize * (float4)(1, 0, 1, 0);
   	arrVertices[6] = lower + cellsize * (float4)(1, 1, 0, 0);
 	arrVertices[7] = lower + cellsize * (float4)(1, 1, 1, 0);
+	
 
     //Compute Configuration index
 	for(int i=0; i<8; i++)
 	{
 		arrFields[i] = ComputePrimitiveField(0, arrVertices[i], arrInOps4, arrInPrims4, arrInMtxNode4);
 	}
-		
+
+	//Tetrahedralize
+	//(x,y,z) * number of cubes * 8 cube corners
+	//cl_mem inoutMemTetMeshVertices = m_lpGPU->createMemBuffer(sizeof(float) * 3 * ctCrossedOrInside * 8, ComputeDevice::memReadWrite);
+
+	//(a,b,c,d) * number of cubes * 6 Tetrahedra per cube
+	//cl_mem inoutMemTetMeshIndices = m_lpGPU->createMemBuffer(sizeof(U32) * 4 * ctCrossedOrInside * 6, ComputeDevice::memReadWrite);
+	U32 idxTet = arrInTetMeshBufferOffset[idxCell];	
+	U32 offsetVertex = idxTet * 8 * 3;
+	for(int i=0; i<8; i++)
+	{
+		arrOutTetMeshVertices[offsetVertex + i*3 + 0] = arrVertices[i].x; 
+		arrOutTetMeshVertices[offsetVertex + i*3 + 1] = arrVertices[i].y;
+		arrOutTetMeshVertices[offsetVertex + i*3 + 2] = arrVertices[i].z;
+	}
+	
+	//6 Tets per each cube
+	U32 offsetTetVertex = idxTet*8;
+	U32 offsetTet = idxTet * 6 * 4;
+	arrOutTetMeshIndices[offsetTet + 0] = offsetTetVertex + LBN;
+	arrOutTetMeshIndices[offsetTet + 1] = offsetTetVertex + LTN;
+	arrOutTetMeshIndices[offsetTet + 2] = offsetTetVertex + RBN;
+	arrOutTetMeshIndices[offsetTet + 3] = offsetTetVertex + LBF;
+	
+	arrOutTetMeshIndices[offsetTet + 4] = offsetTetVertex + RTN;
+	arrOutTetMeshIndices[offsetTet + 5] = offsetTetVertex + LTN;
+	arrOutTetMeshIndices[offsetTet + 6] = offsetTetVertex + LBF;
+	arrOutTetMeshIndices[offsetTet + 7] = offsetTetVertex + RBN;
+
+	arrOutTetMeshIndices[offsetTet + 8] = offsetTetVertex + RTN;
+	arrOutTetMeshIndices[offsetTet + 9] = offsetTetVertex + LTN;
+	arrOutTetMeshIndices[offsetTet + 10] = offsetTetVertex + LTF;
+	arrOutTetMeshIndices[offsetTet + 11] = offsetTetVertex + LBF;
+
+	arrOutTetMeshIndices[offsetTet + 12] = offsetTetVertex + RTN;
+	arrOutTetMeshIndices[offsetTet + 13] = offsetTetVertex + RBN;
+	arrOutTetMeshIndices[offsetTet + 14] = offsetTetVertex + LBF;
+	arrOutTetMeshIndices[offsetTet + 15] = offsetTetVertex + RBF;
+
+	arrOutTetMeshIndices[offsetTet + 16] = offsetTetVertex + RTN;
+	arrOutTetMeshIndices[offsetTet + 17] = offsetTetVertex + LBF;
+	arrOutTetMeshIndices[offsetTet + 18] = offsetTetVertex + LTF;
+	arrOutTetMeshIndices[offsetTet + 19] = offsetTetVertex + RBF;
+
+	arrOutTetMeshIndices[offsetTet + 20] = offsetTetVertex + RTN;
+	arrOutTetMeshIndices[offsetTet + 21] = offsetTetVertex + LTF;
+	arrOutTetMeshIndices[offsetTet + 22] = offsetTetVertex + RTF;
+	arrOutTetMeshIndices[offsetTet + 23] = offsetTetVertex + RBF;
+
+	
 
 	//Variables
 	U32 idxEdge;
@@ -546,22 +608,15 @@ __kernel void ComputeMesh(__global float4* arrInHeader4,
 	float scale;
 	U32 idxMeshAttrib;
 	int idxEdgeStart, idxEdgeEnd, idxEdgeAxis;
-	int ctVertex = arrInVertexCount[idxCell];
 	int idxConfig = arrInCellConfig[idxCell];
 	int voffset = arrInVertexBufferOffset[idxCell];
-	//printf("Vertex Offset %d \n", voffset);
 
-	/*
-	printf("Tritable, config 1: ");
-	for(int i=0; i < 16; i++)
-		printf("%d, ", read_imageui(texInTriangleTable, tableSampler, (int2)(i, 1)).x);
-	printf(" \n");
-	*/
-
-	//Read configurations from texture memory
-	for(int i=0; i<ctVertex; i++)
+	//Break loop if the idxEdge is 255
+	for(int i=0; i<16; i++)
 	{
 		idxEdge = read_imageui(texInTriangleTable, tableSampler, (int2)(i, idxConfig)).x;
+		if(idxEdge == 255)
+			break;
 		idxEdgeStart = inCellParams->corner1[idxEdge];
 		idxEdgeEnd   = inCellParams->corner2[idxEdge];
 		idxEdgeAxis  = inCellParams->edgeaxis[idxEdge];	
@@ -578,11 +633,8 @@ __kernel void ComputeMesh(__global float4* arrInHeader4,
 		
 		//Use Linear Interpolation for now. Upgrade to Newton-Raphson (Gradient Marching)
 		v = e1 + scale * (e2 - e1);
-	
 
-		//printf("v = [%.2f, %.2f, %.2f]\n", v.x, v.y, v.z);
-		//printf("idxCfg = %d, idxEdge = %d, idxEdgeStart = %d, idxEdgeEnd = %d, idxEdgeAxis = %d \n", idxConfig, idxEdge, idxEdgeStart, idxEdgeEnd, idxEdgeAxis);
-
+		//Compute Normal
 		n = ComputeNormal(0, v, arrInOps4, arrInPrims4, arrInMtxNode4);
 
 		//MeshAttrib index

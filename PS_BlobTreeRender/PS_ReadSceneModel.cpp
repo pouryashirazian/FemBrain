@@ -377,7 +377,7 @@ int ModelReader::readNode(CSketchConfig* lpScript, int id, int* lpOutIsOp)
 		m_lpBlobPrims->type[idxNode] = GetScriptPrimType(strPrimType.ptr());
 
 		//Set Color
-		svec4f color = lpScript->readVec4f(strNodeName, "MtrlDiffused");
+		vec4f color = lpScript->readVec4f(strNodeName, "MtrlDiffused");
 		m_lpBlobPrims->colorX[idxNode] 	= color.x;
 		m_lpBlobPrims->colorY[idxNode] 	= color.y;
 		m_lpBlobPrims->colorZ[idxNode] 	= color.z;
@@ -387,7 +387,7 @@ int ModelReader::readNode(CSketchConfig* lpScript, int id, int* lpOutIsOp)
 		{
 		case(primQuadricPoint):
 		{
-			svec3f pos   = lpScript->readVec3f(strNodeName, "position");
+			vec3f pos   = lpScript->readVec3f(strNodeName, "position");
 			float scale  = lpScript->readFloat(strNodeName, "scale");
 			float radius = lpScript->readFloat(strNodeName, "radius");
 			m_lpBlobPrims->posX[idxNode] = pos.x;
@@ -406,7 +406,7 @@ int ModelReader::readNode(CSketchConfig* lpScript, int id, int* lpOutIsOp)
 		break;
 		case(primPoint):
 		{
-			svec3f pos = lpScript->readVec3f(strNodeName, "position");
+			vec3f pos = lpScript->readVec3f(strNodeName, "position");
 			m_lpBlobPrims->posX[idxNode] = pos.x;
 			m_lpBlobPrims->posY[idxNode] = pos.y;
 			m_lpBlobPrims->posZ[idxNode] = pos.z;
@@ -414,8 +414,8 @@ int ModelReader::readNode(CSketchConfig* lpScript, int id, int* lpOutIsOp)
 		break;
 		case(primLine):
 		{
-			svec3f s = lpScript->readVec3f(strNodeName, "start");
-			svec3f e = lpScript->readVec3f(strNodeName, "end");
+			vec3f s = lpScript->readVec3f(strNodeName, "start");
+			vec3f e = lpScript->readVec3f(strNodeName, "end");
 			m_lpBlobPrims->posX[idxNode] = s.x;
 			m_lpBlobPrims->posY[idxNode] = s.y;
 			m_lpBlobPrims->posZ[idxNode] = s.z;
@@ -427,8 +427,8 @@ int ModelReader::readNode(CSketchConfig* lpScript, int id, int* lpOutIsOp)
 		break;
 		case(primRing):
 		{
-			svec3f c = lpScript->readVec3f(strNodeName, "position");
-			svec3f d = lpScript->readVec3f(strNodeName, "direction");
+			vec3f c = lpScript->readVec3f(strNodeName, "position");
+			vec3f d = lpScript->readVec3f(strNodeName, "direction");
 			float r = lpScript->readFloat(strNodeName, "radius");
 			m_lpBlobPrims->posX[idxNode] = c.x;
 			m_lpBlobPrims->posY[idxNode] = c.y;
@@ -442,9 +442,9 @@ int ModelReader::readNode(CSketchConfig* lpScript, int id, int* lpOutIsOp)
 		}
 		break;
 		case(primDisc):
-					{
-			svec3f c = lpScript->readVec3f(strNodeName, "position");
-			svec3f d = lpScript->readVec3f(strNodeName, "direction");
+		{
+			vec3f c = lpScript->readVec3f(strNodeName, "position");
+			vec3f d = lpScript->readVec3f(strNodeName, "direction");
 			float r = lpScript->readFloat(strNodeName, "radius");
 
 			m_lpBlobPrims->posX[idxNode] = c.x;
@@ -460,9 +460,9 @@ int ModelReader::readNode(CSketchConfig* lpScript, int id, int* lpOutIsOp)
 					}
 		break;
 		case(primCylinder):
-					{
-			svec3f p = lpScript->readVec3f(strNodeName, "position");
-			svec3f d = lpScript->readVec3f(strNodeName, "direction");
+		{
+			vec3f p = lpScript->readVec3f(strNodeName, "position");
+			vec3f d = lpScript->readVec3f(strNodeName, "direction");
 			float r = lpScript->readFloat(strNodeName, "radius");
 			float h = lpScript->readFloat(strNodeName, "height");
 
@@ -479,8 +479,8 @@ int ModelReader::readNode(CSketchConfig* lpScript, int id, int* lpOutIsOp)
 					}
 		break;
 		case(primCube):
-					{
-			svec3f p = lpScript->readVec3f(strNodeName, "position");
+		{
+			vec3f p = lpScript->readVec3f(strNodeName, "position");
 			float s = lpScript->readFloat(strNodeName, "side");
 
 			m_lpBlobPrims->posX[idxNode] = p.x;
@@ -491,10 +491,10 @@ int ModelReader::readNode(CSketchConfig* lpScript, int id, int* lpOutIsOp)
 					}
 		break;
 		case(primTriangle):
-					{
-			svec3f a = lpScript->readVec3f(strNodeName, "corner0");
-			svec3f b = lpScript->readVec3f(strNodeName, "corner1");
-			svec3f c = lpScript->readVec3f(strNodeName, "corner2");
+		{
+			vec3f a = lpScript->readVec3f(strNodeName, "corner0");
+			vec3f b = lpScript->readVec3f(strNodeName, "corner1");
+			vec3f c = lpScript->readVec3f(strNodeName, "corner2");
 			m_lpBlobPrims->posX[idxNode] = a.x;
 			m_lpBlobPrims->posY[idxNode] = a.y;
 			m_lpBlobPrims->posZ[idxNode] = a.z;
@@ -564,9 +564,13 @@ int ModelReader::readTransformation(PS::CSketchConfig* lpScript, int id)
 	DAnsiStr strNodeName = printToAStr("BLOBNODE %d", id);
 
 	//Matrix Computation
-	svec3f s = lpScript->readVec3f(strNodeName, "AffineScale");
-	svec4f r = lpScript->readVec4f(strNodeName, "AffineRotate");
-	svec3f t = lpScript->readVec3f(strNodeName, "AffineTranslate");
+	vec3f ss = lpScript->readVec3f(strNodeName, "AffineScale");
+	vec4f rr = lpScript->readVec4f(strNodeName, "AffineRotate");
+	vec3f tt = lpScript->readVec3f(strNodeName, "AffineTranslate");
+
+	svec3f s(ss.x, ss.y, ss.z);
+	svec4f r(rr.x, rr.y, rr.z, rr.w);
+	svec3f t(tt.x, tt.y, tt.z);
 
 
 	MAT44 matForward, matBackward;

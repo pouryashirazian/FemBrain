@@ -941,7 +941,7 @@ int main(int argc, char* argv[])
 	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/sphere.txt";
 	g_lpBlobRender = new GPUPoly();
 	g_lpBlobRender->readModel(strFPModel.cptr());
-	g_lpBlobRender->runTandem(0.1);
+	g_lpBlobRender->runTandem(0.10);
 
 
 	/*

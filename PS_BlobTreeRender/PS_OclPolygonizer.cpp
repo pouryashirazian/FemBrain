@@ -68,6 +68,10 @@ namespace HPC{
 	GPUPoly::~GPUPoly()
 	{
 		GLMeshBuffer::cleanup();
+
+		//Clear Mem Objects
+		clReleaseMemObject(m_inMemTriangleTable);
+		clReleaseMemObject(m_inMemVertexCountTable);
 		SAFE_DELETE(m_lpGPU);
 	}
 
@@ -286,7 +290,7 @@ namespace HPC{
 	}
 
 
-	void GPUPoly::init()
+	int GPUPoly::init()
 	{
 		//Vertex Shader Code
 		const char * lpVertexShaderCode =
@@ -338,6 +342,49 @@ namespace HPC{
 		//m_lpKernelComputeConfig = lpProgram->addKernel("ComputeConfigIndexVertexCount");
 		m_lpKernelComputeConfig = lpProgram->addKernel("ComputeConfig");
 		m_lpKernelComputeMesh = lpProgram->addKernel("ComputeMesh");
+
+
+		//Load Marching Cubes tables
+		cl_image_format imageFormat;
+		imageFormat.image_channel_order = CL_R;
+		imageFormat.image_channel_data_type = CL_UNSIGNED_INT8;
+
+#ifdef CL_API_SUFFIX__VERSION_1_2
+		cl_int errNum;
+		cl_image_desc desc;
+		desc.image_type = CL_MEM_OBJECT_IMAGE2D;
+		desc.image_width = 256;
+		desc.image_height = 1;
+		desc.image_depth = 1;
+		desc.image_array_size = 1;
+		desc.image_row_pitch = 0;
+		desc.num_mip_levels = 0;
+		desc.num_samples = 0;
+		desc.buffer = NULL;
+
+		m_inMemVertexCountTable = clCreateImage(m_lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+					  	  	  	  	  	     &imageFormat, &desc, (void*) g_numVerticesTableCompact, &errNum );
+		if(errNum != CL_SUCCESS)
+			return ERR_GPUPOLY_TRITABLE_NOT_READ;
+
+		desc.image_width = 16;
+		desc.image_height = 256;
+		m_inMemTriangleTable = clCreateImage(m_lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+													&imageFormat, &desc, (void*) g_triTableCompact, &errNum);
+#else
+		cl_int errNum;
+		m_inMemVertexCountTable = clCreateImage2D(m_lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+													   &imageFormat, 256, 1, 0, (void*) g_numVerticesTableCompact, &errNum);
+		if(errNum != CL_SUCCESS)
+			return ERR_GPUPOLY_VERTEXTABLE_NOT_READ;
+
+		//Triangle Count Table
+		m_inMemTriangleTable = clCreateImage2D(m_lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+											   &imageFormat, 16, 256, 0, (void*) g_triTableCompact, &errNum);
+		if(errNum != CL_SUCCESS)
+			return ERR_GPUPOLY_TRITABLE_NOT_READ;
+#endif
+
 	}
 
 	//////////////////////////////////////////////////////////////////////
@@ -581,6 +628,10 @@ namespace HPC{
 		return 1;
 	}
 
+
+	/*!
+	 * Runs ComputeConfig and ComputeMesh kernels in tandem.
+	 */
 	int GPUPoly::runTandem(float cellsize)
 	{
 		//Clear previous mesh
@@ -601,46 +652,6 @@ namespace HPC{
 		m_param.ctTotalCells = m_param.ctNeededCells[0] * m_param.ctNeededCells[1] * m_param.ctNeededCells[2];
 		m_ctCells = m_param.ctTotalCells;
 		
-		//Load Marching Cubes tables
-		cl_image_format imageFormat;
-		imageFormat.image_channel_order = CL_R;
-		imageFormat.image_channel_data_type = CL_UNSIGNED_INT8;
-
-#ifdef CL_API_SUFFIX__VERSION_1_2
-		cl_int errNum;
-		cl_image_desc desc;
-		desc.image_type = CL_MEM_OBJECT_IMAGE2D;
-		desc.image_width = 256;
-		desc.image_height = 1;
-		desc.image_depth = 1;
-		desc.image_array_size = 1;
-		desc.image_row_pitch = 0;
-		desc.num_mip_levels = 0;
-		desc.num_samples = 0;
-		desc.buffer = NULL;
-
-		cl_mem inMemVertexCountTable = clCreateImage(m_lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-					  	  	  	  	  	     &imageFormat, &desc, (void*) g_numVerticesTableCompact, &errNum );
-		if(errNum != CL_SUCCESS)
-			return ERR_GPUPOLY_TRITABLE_NOT_READ;
-
-		desc.image_width = 16;
-		desc.image_height = 256;
-		cl_mem inMemTriTable = clCreateImage(m_lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-													&imageFormat, &desc, (void*) g_triTableCompact, &errNum);
-#else
-		cl_int errNum;
-		cl_mem inMemVertexCountTable = clCreateImage2D(m_lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-													   &imageFormat, 256, 1, 0, (void*) g_numVerticesTableCompact, &errNum);
-		if(errNum != CL_SUCCESS)
-			return ERR_GPUPOLY_VERTEXTABLE_NOT_READ;
-
-		//Triangle Count Table
-		cl_mem inMemTriTable = clCreateImage2D(m_lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-											   &imageFormat, 16, 256, 0, (void*) g_triTableCompact, &errNum);
-		if(errNum != CL_SUCCESS)
-			return ERR_GPUPOLY_TRITABLE_NOT_READ;
-#endif
 
 		//Input Pos
 		cl_mem inoutMemCellConfig;
@@ -702,7 +713,7 @@ namespace HPC{
 		m_lpKernelComputeConfig->setArg(2, sizeof(cl_mem), &inMemPrims);
 		m_lpKernelComputeConfig->setArg(3, sizeof(cl_mem), &inMemMtx);
 		m_lpKernelComputeConfig->setArg(4, sizeof(cl_mem), &inMemCellParams);
-		m_lpKernelComputeConfig->setArg(5, sizeof(cl_mem), &inMemVertexCountTable);
+		m_lpKernelComputeConfig->setArg(5, sizeof(cl_mem), &m_inMemVertexCountTable);
 		m_lpKernelComputeConfig->setArg(6, sizeof(cl_mem), &inoutMemCellConfig);
 		m_lpKernelComputeConfig->setArg(7, sizeof(cl_mem), &inoutMemVertexCount);
 	
@@ -718,10 +729,7 @@ namespace HPC{
 		cl_int err = clEnqueueNDRangeKernel(m_lpGPU->getCommandQ(), m_lpKernelComputeConfig->getKernel(),
 											3, NULL, szNeeded, NULL, 0, NULL, NULL);
 		if (err) {
-			char buffer[1024];
-			sprintf(buffer, "Error: Failed to execute ComputeConfig kernel! (%s)", ComputeDevice::oclErrorString(err));
-			LogError(buffer);
-			cerr << buffer << endl;
+			LogErrorArg1("Error: Failed to execute ComputeConfig kernel! (%s)", ComputeDevice::oclErrorString(err));
 			return EXIT_FAILURE;
 		}
 
@@ -733,9 +741,11 @@ namespace HPC{
 		U8* arrVertexCount = new U8[m_ctCells];
 		U8* arrConfigIndex = new U8[m_ctCells];		
 		U32* arrVertexBufferOffset = new U32[m_ctCells];
+		U32* arrTetMeshOffset = new U32[m_ctCells];
 
 		U32 ctSumVertices = 0;
-		U32 ctFilled = 0;
+		U32 ctCrossedOnly = 0;
+		U32 ctCrossedOrInside = 0;
 		if(m_lpGPU->enqueueReadBuffer(inoutMemVertexCount, sizeof(U8) * m_ctCells, arrVertexCount) &&
 		   m_lpGPU->enqueueReadBuffer(inoutMemCellConfig, sizeof(U8) * m_ctCells, arrConfigIndex))		  
 		{						
@@ -743,20 +753,39 @@ namespace HPC{
 			for(U32 i=0; i < m_ctCells; i++)
 			{
 				arrVertexBufferOffset[i] = ctSumVertices;
+				arrTetMeshOffset[i] = ctCrossedOrInside;
 				ctSumVertices += arrVertexCount[i];	
 			
 				if((arrConfigIndex[i] != 0)&&(arrConfigIndex[i] != 255))	
-					ctFilled ++;				
+					ctCrossedOnly ++;
+
+				if(arrConfigIndex[i] != 0)
+					ctCrossedOrInside ++;
 			}
 		}
 
+		//Memory Buffers for the TetMesh
+		//6 Tetrahedra per each inside cube
+		//TODO: Variable tetrahedra per crossed cube
+		U32 ctTets = ctCrossedOrInside * 6;
+		//(x,y,z) * number of cubes * 8 cube corners
+		cl_mem outMemTetMeshVertices = m_lpGPU->createMemBuffer(sizeof(float) * 3 * ctCrossedOrInside * 8, ComputeDevice::memWriteOnly);
+
+		//(a,b,c,d) * number of cubes * 6 Tetrahedra per cube
+		cl_mem outMemTetMeshIndices = m_lpGPU->createMemBuffer(sizeof(U32) * 4 * ctCrossedOrInside * 6, ComputeDevice::memWriteOnly);
+
+
+		//Vertex buffer offset
 		cl_mem inMemVertexBufferOffset;
 		inMemVertexBufferOffset = m_lpGPU->createMemBuffer(sizeof(U32) * m_ctCells, ComputeDevice::memReadOnly);
-		
-		//Write to Offset Buffer
 		if(!m_lpGPU->enqueueWriteBuffer(inMemVertexBufferOffset, sizeof(U32) * m_ctCells, arrVertexBufferOffset))
 			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
-		m_lpGPU->enqueueWriteBuffer(inMemVertexBufferOffset, sizeof(cl_mem), arrVertexBufferOffset);
+
+		//Tetmesh buffer offset
+		cl_mem inMemTetMeshBufferOffset;
+		inMemTetMeshBufferOffset = m_lpGPU->createMemBuffer(sizeof(U32) * m_ctCells, ComputeDevice::memReadOnly);
+		if(!m_lpGPU->enqueueWriteBuffer(inMemTetMeshBufferOffset, sizeof(U32) * m_ctCells, arrTetMeshOffset))
+			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
 
 		//////////////////////////////////////////////////////////////////////////
 		//Kernel2:
@@ -769,19 +798,19 @@ namespace HPC{
 		glGenBuffers(1, &m_vboVertex);
 		glBindBuffer(GL_ARRAY_BUFFER, m_vboVertex);
 		glBufferData(GL_ARRAY_BUFFER, szVertexBuffer, 0, GL_DYNAMIC_DRAW);
-		cl_mem outMemMeshVertex = clCreateFromGLBuffer(m_lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_vboVertex, NULL);
+		cl_mem outMemMeshVertex = m_lpGPU->createMemBufferFromGL(m_vboVertex, ComputeDevice::memWriteOnly);
 
 		//Color
 		glGenBuffers(1, &m_vboColor);
 		glBindBuffer(GL_ARRAY_BUFFER, m_vboColor);
 		glBufferData(GL_ARRAY_BUFFER, szVertexBuffer, 0, GL_DYNAMIC_DRAW);
-		cl_mem outMemMeshColor = clCreateFromGLBuffer(m_lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_vboColor, NULL);
+		cl_mem outMemMeshColor = m_lpGPU->createMemBufferFromGL(m_vboColor, ComputeDevice::memWriteOnly);
 
 		//Normal
 		glGenBuffers(1, &m_vboNormal);
 		glBindBuffer(GL_ARRAY_BUFFER, m_vboNormal);
 		glBufferData(GL_ARRAY_BUFFER, szNormalBuffer, 0, GL_DYNAMIC_DRAW);
-		cl_mem outMemMeshNormal = clCreateFromGLBuffer(m_lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_vboNormal, NULL);
+		cl_mem outMemMeshNormal = m_lpGPU->createMemBufferFromGL(m_vboNormal, ComputeDevice::memWriteOnly);
 
 		//Acquire Mesh for Writing
 		clEnqueueAcquireGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshVertex, 0, 0, 0);
@@ -793,13 +822,20 @@ namespace HPC{
 		m_lpKernelComputeMesh->setArg(2, sizeof(cl_mem), &inMemPrims);
 		m_lpKernelComputeMesh->setArg(3, sizeof(cl_mem), &inMemMtx);
 		m_lpKernelComputeMesh->setArg(4, sizeof(cl_mem), &inMemCellParams);
-		m_lpKernelComputeMesh->setArg(5, sizeof(cl_mem), &inMemTriTable);
+		m_lpKernelComputeMesh->setArg(5, sizeof(cl_mem), &m_inMemTriangleTable);
 		m_lpKernelComputeMesh->setArg(6, sizeof(cl_mem), &inoutMemCellConfig);
-		m_lpKernelComputeMesh->setArg(7, sizeof(cl_mem), &inoutMemVertexCount);
-		m_lpKernelComputeMesh->setArg(8, sizeof(cl_mem), &inMemVertexBufferOffset);
-		m_lpKernelComputeMesh->setArg(9, sizeof(cl_mem), &outMemMeshVertex);
-		m_lpKernelComputeMesh->setArg(10, sizeof(cl_mem), &outMemMeshColor);
-		m_lpKernelComputeMesh->setArg(11, sizeof(cl_mem), &outMemMeshNormal);
+		m_lpKernelComputeMesh->setArg(7, sizeof(cl_mem), &inMemVertexBufferOffset);
+
+		//Tetmesh
+		m_lpKernelComputeMesh->setArg(8, sizeof(cl_mem), &inMemTetMeshBufferOffset);
+		m_lpKernelComputeMesh->setArg(9, sizeof(cl_mem), &outMemTetMeshVertices);
+		m_lpKernelComputeMesh->setArg(10, sizeof(cl_mem), &outMemTetMeshIndices);
+
+
+		//Output mesh
+		m_lpKernelComputeMesh->setArg(11, sizeof(cl_mem), &outMemMeshVertex);
+		m_lpKernelComputeMesh->setArg(12, sizeof(cl_mem), &outMemMeshColor);
+		m_lpKernelComputeMesh->setArg(13, sizeof(cl_mem), &outMemMeshNormal);
 		
 
 		//Acquire Mesh for Writing
@@ -812,10 +848,7 @@ namespace HPC{
 		err = clEnqueueNDRangeKernel(m_lpGPU->getCommandQ(), m_lpKernelComputeMesh->getKernel(),
 									 3, NULL, szNeeded, NULL, 0, NULL, NULL);
 		if (err) {
-			char buffer[1024];
-			sprintf(buffer, "Error: Failed to execute ComputeMesh kernel! (%s)", ComputeDevice::oclErrorString(err));
-			psLog(buffer);
-			cerr << buffer << endl;
+			LogErrorArg1("Error: Failed to execute ComputeMesh kernel! (%s)", ComputeDevice::oclErrorString(err));
 			return EXIT_FAILURE;
 		}
 
@@ -830,12 +863,53 @@ namespace HPC{
 		m_ctVertices = ctSumVertices;
 		m_ctFaceElements = ctSumVertices;
 		//m_ctFaceElements = ctSumVertices / 3;
-		
-		//Export offsets
+
+		//Export VEGA
 		/*
 		{
+			U32 ctTetMeshVertices = ctCrossedOrInside * 8;
+			U32 ctTetMeshElements = ctCrossedOrInside * 6;
+			float* arrTetMeshVertices = new float[3 * ctTetMeshVertices];
+			U32* arrTetMeshIndices = new U32[4 * ctTetMeshElements];
+			m_lpGPU->enqueueReadBuffer(outMemTetMeshVertices, sizeof(float) * 3 * ctTetMeshVertices, arrTetMeshVertices);
+			m_lpGPU->enqueueReadBuffer(outMemTetMeshIndices, sizeof(U32) * 4 * ctTetMeshElements, arrTetMeshIndices);
+
+
 			ofstream ofs;
-			ofs.open("c:\\mesh_output_offsets.txt", ios::out);
+			ofs.open("tetmesh.veg", ios::out);
+			ofs << "# Vega Mesh File, Generated by FemBrain." << endl;
+			ofs << "# " << ctTetMeshVertices << " vertices, " << ctTetMeshElements << " elements" << endl;
+			ofs << endl;
+			ofs << "*VERTICES" << endl;
+			ofs << ctTetMeshVertices << " 3 0 0" << endl;
+			for(U32 i=0; i < ctTetMeshVertices; i++)
+			{
+				ofs << i+1 << " " << arrTetMeshVertices[i*3 + 0] << " " << arrTetMeshVertices[i*3 + 1] << " " << arrTetMeshVertices[i*3 + 2] << endl;
+			}
+
+			ofs << endl;
+			ofs << "*ELEMENTS" << endl;
+			ofs << "TET" << endl;
+			ofs << ctTetMeshElements << " 4 0"<< endl;
+			for(U32 i=0; i < ctTetMeshElements; i++)
+			{
+				ofs << i+1 << " " << arrTetMeshIndices[i*4 + 0] + 1 << " " << arrTetMeshIndices[i*4 + 1] + 1 << " " << arrTetMeshIndices[i*4 + 2] + 1 << " " << arrTetMeshIndices[i*4 + 3] + 1 << endl;
+			}
+
+			ofs << endl;
+			ofs << "*MATERIAL BODY" << endl;
+			ofs << "ENU, 1000, 10000000, 0.45" << endl;
+			ofs << endl;
+
+			ofs << "*REGION" << endl;
+			ofs << "allElements, BODY" << endl;
+			ofs.close();
+		}
+
+		//Export offsets
+		{
+			ofstream ofs;
+			ofs.open("mesh_output_offsets.txt", ios::out);
 			for(U32 i=0; i < m_ctCells; i++)
 			{
 				int ctVertices = arrVertexCount[i];
@@ -847,29 +921,30 @@ namespace HPC{
 			ofs.close();
 		}
 
-		float* arrMeshVertices = new float[4 * ctSumVertices];
-		if(m_lpGPU->enqueueReadBuffer(outMemMeshVertex, sizeof(float) * 4 * ctSumVertices, arrMeshVertices))
+		//Export output VBO
 		{
-			ofstream ofs;
-			ofs.open("c:\\mesh_output_vbo.txt", ios::out);
-			for(U32 i=0; i < ctSumVertices; i++)
+			float* arrMeshVertices = new float[4 * ctSumVertices];
+			if(m_lpGPU->enqueueReadBuffer(outMemMeshVertex, sizeof(float) * m_stepVertex * ctSumVertices, arrMeshVertices))
 			{
-				ofs << "\t Vertex " << i << " [";
-				for(U32 j=0; j<4; j++)
-					ofs << "\t" << arrMeshVertices[i*4+j]; 
-				 ofs << "]" << endl;
+				ofstream ofs;
+				ofs.open("mesh_output_vbo.txt", ios::out);
+				for(U32 i=0; i < ctSumVertices; i++)
+				{
+					ofs << "\t Vertex " << i << " [";
+					for(U32 j=0; j<4; j++)
+						ofs << "\t" << arrMeshVertices[i*4+j];
+					 ofs << "]" << endl;
+				}
+				ofs.close();
 			}
-			ofs.close();
+			SAFE_DELETE(arrMeshVertices);
 		}
 		*/
-
 
 		// Shutdown and cleanup
 		clReleaseMemObject(inoutMemCellConfig);
 		clReleaseMemObject(inoutMemVertexCount);
 
-		clReleaseMemObject(inMemTriTable);
-		clReleaseMemObject(inMemVertexCountTable);
 
 		clReleaseMemObject(inMemHeader);
 		clReleaseMemObject(inMemOps);
@@ -880,17 +955,9 @@ namespace HPC{
 		SAFE_DELETE(arrConfigIndex);
 		SAFE_DELETE(arrVertexCount);
 		SAFE_DELETE(arrVertexBufferOffset);
+		SAFE_DELETE(arrTetMeshOffset);
 		return 1;
 	}
-
-	int Run_MeshCentroidKernel(float* arrVertices, U32* arrFaces, 
-		U32 ctVertices, U32 ctFaces,
-		float*& lpCentriods)
-	{
-
-		return 1;
-	}
-
 
 
 	int Run_SphereDistKernel()

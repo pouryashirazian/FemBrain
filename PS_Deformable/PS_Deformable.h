@@ -38,15 +38,17 @@ public:
 	 * Constructs a deformable model from the veg file and the rendereable mesh
 	 * from the obj file. Fixed vertices are setup in the ini file.
 	 */
-	Deformable(const char* lpVegFilePath,
-				const char* lpObjFilePath,
-				std::vector<int>& vFixedVertices);
+	explicit Deformable(const char* lpVegFilePath,
+						   const char* lpObjFilePath,
+						   std::vector<int>& vFixedVertices);
 
 	/*!
 	 * Constructs a deformable model from the BlobTree by performing a round of
 	 * polygonization.
 	 */
-	//Deformable()
+	explicit Deformable(U32 ctVertices, double* lpVertices,
+						   U32 ctElements, int* lpElements,
+						   std::vector<int>& vFixedVertices);
 
 	virtual ~Deformable();
 
@@ -116,6 +118,10 @@ private:
 	void setup(const char* lpVegFilePath,
 			    const char* lpObjFilePath,
 			    std::vector<int>& vFixedVertices);
+
+	void setup(U32 ctVertices, double* lpVertices,
+				U32 ctElements, int* lpElements,
+				std::vector<int>& vFixedVertices);
 
 	void setupIntegrator();
 

@@ -579,6 +579,19 @@ cl_mem ComputeDevice::createMemBuffer(const U32 size, MEMACCESSMODE mode)
     return output;
 }
 
+cl_mem ComputeDevice::createMemBufferFromGL(U32 glBuffer, MEMACCESSMODE mode)
+{
+	cl_mem output = clCreateFromGLBuffer(m_clContext, mode, glBuffer, NULL);
+    if (!output)
+    {
+        cerr << "Error: Failed to allocate device gl-interop memory!" << endl;
+        ReportError("Error: Failed to allocate device gl-interop memory!");
+        FlushAllErrors();
+    }
+
+    return output;
+}
+
 /*!
  * Enqueues a write operation in the command queue
  */
