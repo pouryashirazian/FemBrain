@@ -33,6 +33,7 @@ using namespace PS::HPC;
 #define ERR_GPUPOLY_BUFFER_NOT_READ -3
 #define ERR_GPUPOLY_TRITABLE_NOT_READ -4
 #define ERR_GPUPOLY_VERTEXTABLE_NOT_READ -5
+#define ERR_NO_CROSSED_CELLS -6
 
 #define MAX_VERTICES_COUNT_PER_CELL		15
 #define MAX_TRIANGLES_COUNT_PER_CELL	5
@@ -109,8 +110,10 @@ namespace HPC{
 		for(U32 i=0; i < tempPrims.count; i++)
 		{
 			//Update Parent/Link and Link Properties
-			m_arrPrims[i * DATASIZE_PRIMITIVE + 0] = static_cast<float>(tempPrims.type[i]);
-			m_arrPrims[i * DATASIZE_PRIMITIVE + 1] = static_cast<float>(tempPrims.idxMatrix[i]);
+			m_arrPrims[i * DATASIZE_PRIMITIVE + OFFSET_PRIM_TYPE] = static_cast<float>(tempPrims.type[i]);
+			m_arrPrims[i * DATASIZE_PRIMITIVE + OFFSET_PRIM_IDX_MATRIX] = static_cast<float>(tempPrims.idxMatrix[i]);
+			m_arrPrims[i * DATASIZE_PRIMITIVE + OFFSET_PRIM_LINK_FLAGS] = 0;
+			m_arrPrims[i * DATASIZE_PRIMITIVE + OFFSET_PRIM_PARENT_LINK] = 0;
 
 			//Pos
 			m_arrPrims[i * DATASIZE_PRIMITIVE + 4] = tempPrims.posX[i];
@@ -143,12 +146,12 @@ namespace HPC{
 			for(U32 i=0; i < tempOps.count; i++)
 			{
 				//Update Parent/Link and Link Properties
-				m_arrOps[i * DATASIZE_OPERATOR + 0] = static_cast<float>(tempOps.type[i]);
-				m_arrOps[i * DATASIZE_OPERATOR + 1] = static_cast<float>(tempOps.opFlags[i]);
+				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_TYPE] = static_cast<float>(tempOps.type[i]);
 
 				U32 opLeftRightChild = (tempOps.opLeftChild[i] << 16) | tempOps.opRightChild[i];
-				m_arrOps[i * DATASIZE_OPERATOR + 2] = static_cast<float>(opLeftRightChild);
-				//m_arrOps[i * DATASIZE_OPERATOR + 3] = static_cast<float>();
+				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_CHILDREN] = static_cast<float>(opLeftRightChild);
+				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS] = static_cast<float>(tempOps.opFlags[i]);
+				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_PARENT_LINK] = 0;
 
 				m_arrOps[i * DATASIZE_OPERATOR + 4] = static_cast<float>(tempOps.resX[i]);
 				m_arrOps[i * DATASIZE_OPERATOR + 5] = static_cast<float>(tempOps.resY[i]);
@@ -191,36 +194,33 @@ namespace HPC{
 				//LC
 				if(isLCOp)
 				{
-					m_arrOps[idxLC * DATASIZE_OPERATOR + OFFSET_OP_PARENT_LINK] = static_cast<float>(linkLC);
 					U32 flags = static_cast<U32>(m_arrOps[idxLC * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS]);
 					flags |= (linkFlagLC << 16);
 					m_arrOps[idxLC * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS] = (float)flags;
+					m_arrOps[idxLC * DATASIZE_OPERATOR + OFFSET_OP_PARENT_LINK] = static_cast<float>(linkLC);
+
 					stkOps.push(idxLC);
 				}
 				else
 				{
+					m_arrPrims[idxLC * DATASIZE_PRIMITIVE + OFFSET_PRIM_LINK_FLAGS] = (float)(linkFlagLC << 16);
 					m_arrPrims[idxLC * DATASIZE_PRIMITIVE + OFFSET_PRIM_PARENT_LINK] = static_cast<float>(linkLC);
-					U32 flags = static_cast<U32>(m_arrPrims[idxLC * DATASIZE_PRIMITIVE + OFFSET_PRIM_PARENT_LINK]);
-					flags |= (linkFlagLC << 16);
-					m_arrPrims[idxLC * DATASIZE_PRIMITIVE + OFFSET_PRIM_LINK_FLAGS] = (float)flags;
 				}
 
 
 				//RC
 				if(isRCOp)
 				{
-					m_arrOps[idxRC * DATASIZE_OPERATOR + OFFSET_OP_PARENT_LINK] = static_cast<float>(linkRC);
 					U32 flags = static_cast<U32>(m_arrOps[idxRC * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS]);
 					flags |= (linkFlagRC << 16);
 					m_arrOps[idxRC * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS] = (float)flags;
+					m_arrOps[idxRC * DATASIZE_OPERATOR + OFFSET_OP_PARENT_LINK] = static_cast<float>(linkRC);
 					stkOps.push(idxRC);
 				}
 				else
 				{
+					m_arrPrims[idxRC * DATASIZE_PRIMITIVE + OFFSET_PRIM_LINK_FLAGS] = (float)(linkFlagRC << 16);
 					m_arrPrims[idxRC * DATASIZE_PRIMITIVE + OFFSET_PRIM_PARENT_LINK] = static_cast<float>(linkRC);
-					U32 flags = static_cast<U32>(m_arrPrims[idxRC * DATASIZE_PRIMITIVE + OFFSET_PRIM_PARENT_LINK]);
-					flags |= (linkFlagRC << 16);
-					m_arrPrims[idxRC * DATASIZE_PRIMITIVE + OFFSET_PRIM_LINK_FLAGS] = (float)flags;
 				}
 
 			}
@@ -651,7 +651,19 @@ namespace HPC{
 		m_param.ctNeededCells[2] = (U32)ceil(temp.z) + 1;
 		m_param.ctTotalCells = m_param.ctNeededCells[0] * m_param.ctNeededCells[1] * m_param.ctNeededCells[2];
 		m_ctCells = m_param.ctTotalCells;
-		
+
+		//Check Matrices
+		for(int i = 0; i < m_mtxNode.count; i++)
+		{
+			printf("PRIM MTX: %d\n", i);
+			for(int j=0;j < PRIM_MATRIX_STRIDE; j++)
+			{
+				printf("%.2f, ", m_mtxNode.matrix[i * PRIM_MATRIX_STRIDE + j]);
+				if((j+1) % 4 == 0)
+					printf("\n");
+			}
+			//printf("\n");
+		}
 
 		//Input Pos
 		cl_mem inoutMemCellConfig;
@@ -671,7 +683,7 @@ namespace HPC{
 		inMemHeader = m_lpGPU->createMemBuffer(sizeof(float) * DATASIZE_HEADER, ComputeDevice::memReadOnly);
 		inMemOps  	= m_lpGPU->createMemBuffer(sizeof(float) * DATASIZE_OPERATOR * ctOpsToCopy, ComputeDevice::memReadOnly);
 		inMemPrims  = m_lpGPU->createMemBuffer(sizeof(float) * DATASIZE_PRIMITIVE * ctPrimsToCopy, ComputeDevice::memReadOnly);		
-		inMemMtx	= m_lpGPU->createMemBuffer(sizeof(float) * PRIM_MATRIX_STRIDE, ComputeDevice::memReadOnly);
+		inMemMtx	= m_lpGPU->createMemBuffer(sizeof(float) * PRIM_MATRIX_STRIDE * m_mtxNode.count, ComputeDevice::memReadOnly);
 		inMemCellParams = m_lpGPU->createMemBuffer(sizeof(CellParam), ComputeDevice::memReadOnly);
 
 		// Transfer the input vector into device memory.
@@ -688,7 +700,7 @@ namespace HPC{
 			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
 
 		//Matrix
-		if(!m_lpGPU->enqueueWriteBuffer(inMemMtx, sizeof(float) * PRIM_MATRIX_STRIDE * m_mtxNode.count, m_mtxNode.matrix))	
+		if(!m_lpGPU->enqueueWriteBuffer(inMemMtx, sizeof(float) * PRIM_MATRIX_STRIDE * m_mtxNode.count, m_mtxNode.matrix))
 			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
 
 		//Needed
@@ -700,7 +712,7 @@ namespace HPC{
 		__kernel void ComputeConfig(__global float4* arrInHeader4,
 							__global float4* arrInOps4,										 
 							__global float4* arrInPrims4,											 
-	 					    __global float4* arrInMtxNode4,
+	 					    __global float4* arrInMtxNodes4,
 							__constant struct CellParam* inCellParams,
 							__read_only image2d_t texInVertexCountTable,
 							__global uchar* arrOutCellConfig,
@@ -716,6 +728,7 @@ namespace HPC{
 		m_lpKernelComputeConfig->setArg(5, sizeof(cl_mem), &m_inMemVertexCountTable);
 		m_lpKernelComputeConfig->setArg(6, sizeof(cl_mem), &inoutMemCellConfig);
 		m_lpKernelComputeConfig->setArg(7, sizeof(cl_mem), &inoutMemVertexCount);
+
 	
 		size_t local = m_lpGPU->getKernelWorkgroupSize(m_lpKernelComputeConfig);
 
@@ -762,6 +775,12 @@ namespace HPC{
 				if(arrConfigIndex[i] != 0)
 					ctCrossedOrInside ++;
 			}
+		}
+
+		//if we return here
+		if(ctCrossedOnly == 0)
+		{
+			LogWarning("No cells crossed by the boundary surface.");
 		}
 
 		//Memory Buffers for the TetMesh

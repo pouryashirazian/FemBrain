@@ -14,9 +14,8 @@ bool ComputeKernel::setArg(U32 idxArg, U32 size, const void * lpArg)
 	cl_int err  = clSetKernelArg(m_clKernel, idxArg, size, lpArg);
 	if(err != CL_SUCCESS)
 	{
-        cerr << "Error: Failed to set kernel arguments! " << err << endl;
-        ReportError("Error: Failed to set kernel arguments!");
-        FlushAllErrors();
+		LogErrorArg2("Kernel Title: %s Failed to set kernel arguments! Ocl Error: %s",
+					 m_strTitle.c_str(), ComputeDevice::oclErrorString(err));
         return false;
 	}
 
@@ -40,8 +39,7 @@ ComputeKernel* ComputeProgram::addKernel(const char *chrKernelTitle)
     // Create the compute kernel in the program
     cl_kernel k = clCreateKernel(m_clProgram, chrKernelTitle, &err);
     if (!k || err != CL_SUCCESS) {
-        ReportError("Error: Failed to create compute kernel!");
-        FlushAllErrors();
+    	LogError("Failed to create compute kernel");
         return NULL;
     }
 
@@ -58,7 +56,7 @@ bool ComputeProgram::saveBinary(const char* chrBinFilePath)
 	cl_int err = clGetProgramInfo(m_clProgram, CL_PROGRAM_BINARY_SIZES, sizeof(szBinFile), &szBinFile, NULL);
 	if(err != CL_SUCCESS)
 	{
-		ReportError("Unable to retrieve the size of the program binary.");
+		LogErrorArg1("Unable to retrieve the size of the program binary. Ocl Error: %s", ComputeDevice::oclErrorString(err));
 		return false;
 	}
 	else
@@ -67,7 +65,7 @@ bool ComputeProgram::saveBinary(const char* chrBinFilePath)
 		char* lpBinFile = new char[szBinFile + 64];
 		err = clGetProgramInfo(m_clProgram, CL_PROGRAM_BINARIES, szBinFile, lpBinFile, NULL);
 		if(err != CL_SUCCESS)		
-			ReportError("Unable to retrieve the program binary.");					
+			LogErrorArg1("Unable to retrieve the program binary. Ocl Error: %s", ComputeDevice::oclErrorString(err));
 		else
 		{
 			ofstream binFile;
@@ -571,9 +569,7 @@ cl_mem ComputeDevice::createMemBuffer(const U32 size, MEMACCESSMODE mode)
 	cl_mem output = clCreateBuffer(m_clContext, mode, size, NULL, NULL);
     if (!output)
     {
-        cerr << "Error: Failed to allocate device memory!" << endl;
-        ReportError("Error: Failed to allocate device memory!");
-        FlushAllErrors();
+    	LogError("Failed to allocate device memory!");
     }
 
     return output;
@@ -584,9 +580,7 @@ cl_mem ComputeDevice::createMemBufferFromGL(U32 glBuffer, MEMACCESSMODE mode)
 	cl_mem output = clCreateFromGLBuffer(m_clContext, mode, glBuffer, NULL);
     if (!output)
     {
-        cerr << "Error: Failed to allocate device gl-interop memory!" << endl;
-        ReportError("Error: Failed to allocate device gl-interop memory!");
-        FlushAllErrors();
+    	LogError("Error: Failed to allocate device gl-interop memory!");
     }
 
     return output;
@@ -601,9 +595,7 @@ bool ComputeDevice::enqueueWriteBuffer(cl_mem destMem, U32 size, const void* lpS
                                	   	  CL_TRUE, 0, size,
                                	   	  lpSource, 0, NULL, NULL);
     if (err != CL_SUCCESS) {
-        cerr << "Error: Failed to write to source array!" << endl;
-        ReportError("Error: Failed to write to source array!");
-        FlushAllErrors();
+    	LogErrorArg1("Failed to write to source array! Ocl Error: %s", oclErrorString(err));
         return false;
     }
 
@@ -619,10 +611,7 @@ bool ComputeDevice::enqueueReadBuffer(cl_mem srcMem, U32 size, void* lpDest)
     								 CL_TRUE, 0, size,
 								     lpDest, 0, NULL, NULL );
     if (err != CL_SUCCESS) {
-        cerr << "Error: Failed to read output array! " <<  err << endl;
-        ReportError("Error: Failed to read output array!");
-        FlushAllErrors();
-
+    	LogErrorArg1("Failed to read output array! Ocl Error: %s", oclErrorString(err));
         return false;
     }
 
@@ -679,8 +668,7 @@ ComputeProgram* ComputeDevice::addProgram(const char* chrComputeCode)
                                                   (const char **) &chrComputeCode,
                                                   NULL, &err);
     if (!program) {
-        ReportError("Error: Failed to create compute program!");
-        FlushAllErrors();
+    	LogErrorArg1("Failed to create compute program! Ocl Error: %s", oclErrorString(err));
         return NULL;
     }
 
@@ -690,13 +678,10 @@ ComputeProgram* ComputeDevice::addProgram(const char* chrComputeCode)
     {
         size_t len;
         char buffer[2048];
-        clGetProgramBuildInfo(program, m_clDeviceID, CL_PROGRAM_BUILD_LOG,
+        err = clGetProgramBuildInfo(program, m_clDeviceID, CL_PROGRAM_BUILD_LOG,
                               sizeof(buffer), buffer, &len);
-        cerr << buffer << endl;
-
-        ReportError("Error: Failed to build program executable!");
-        ReportError(buffer);
-        FlushAllErrors();
+        LogErrorArg1("Failed to build program executable! Ocl Reason: %s", oclErrorString(err));
+        LogErrorArg1("Build Error: %s", buffer);
         return NULL;
     }
 
@@ -715,7 +700,7 @@ U32 ComputeDevice::getKernelWorkgroupSize(ComputeKernel* lpKernel)
 										  sizeof(szWorkGroup), &szWorkGroup, NULL);
 	if (err != CL_SUCCESS) 
 	{
-		cerr << "Error: Failed to retrieve kernel work group info! " <<  err << endl;
+		LogErrorArg1("Failed to retrieve kernel work group info! Ocl Error: %s", oclErrorString(err));
 	}
 
 	return szWorkGroup;

@@ -250,6 +250,9 @@ void Deformable::setup(U32 ctVertices, double* lpVertices,
 	m_restVolume = this->computeVolume();
 }
 
+/*!
+ * Fill the record for reporting stats.
+ */
 void Deformable::statFillRecord(DBLogger::Record& rec) const
 {
 	rec.ctElements = m_lpTetMesh->getNumElements();

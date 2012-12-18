@@ -1,26 +1,16 @@
 /* Please Write the OpenCL Kernel(s) code here or load it from a text file *///OpenCL BlobTree Polygonizer: Pourya Shirazian
+
+//DATASIZES
 #define DATASIZE_HEADER		12
 #define DATASIZE_OPERATOR	8
 #define DATASIZE_PRIMITIVE	20
+#define PRIM_MATRIX_STRIDE 12
+#define BOX_MATRIX_STRIDE 16
 
 #define DATASIZE_OPERATOR_F4	DATASIZE_OPERATOR/4
 #define DATASIZE_PRIMITIVE_F4	DATASIZE_PRIMITIVE/4
-
-//OFFSETS in PRIMITIVES
-#define OFFSET4_PRIM_TYPE		0
-#define OFFSET4_PRIM_POS		1
-#define OFFSET4_PRIM_DIR		2
-#define OFFSET4_PRIM_RES		3
-#define OFFSET4_PRIM_COLOR		4
-
-//OFFSETS in OPERATORS
-#define OFFSET4_OP_TYPE			0
-#define OFFSET4_OP_RES			1
-
-#define OFFSET_OP_TYPE			0
-#define OFFSET_OP_FLAGS			1
-#define OFFSET_OP_LCRC			2
-#define OFFSET_OP_PARENTLINK	3
+#define PRIM_MATRIX_STRIDE_F4 	PRIM_MATRIX_STRIDE/4
+#define BOX_MATRIX_STRIDE_F4 	BOX_MATRIX_STRIDE/4
 
 
 //OFFSETS in HEADER
@@ -39,12 +29,33 @@
 #define OFFSET_HEADER_COUNT_MTX		10
 #define OFFSET_HEADER_CELLSIZE 		11
 
+//OFFSETS in OPERATORS
+#define OFFSET4_OP_TYPE			0
+#define OFFSET4_OP_RES			1
+
+#define OFFSET_OP_TYPE			0
+#define OFFSET_OP_FLAGS			1
+#define OFFSET_OP_LCRC			2
+#define OFFSET_OP_PARENTLINK	3
+
+//OFFSETS in PRIMITIVES
+#define OFFSET4_PRIM_TYPE		0
+#define OFFSET4_PRIM_POS		1
+#define OFFSET4_PRIM_DIR		2
+#define OFFSET4_PRIM_RES		3
+#define OFFSET4_PRIM_COLOR		4
+
+//Primitive
+#define OFFSET_PRIM_TYPE		0
+#define OFFSET_PRIM_LINK_FLAGS 	1
+#define OFFSET_PRIM_IDX_MATRIX 	2
+#define OFFSET_PRIM_PARENT_LINK 3
+
+
 //BlobTree
 #define MAX_TREE_DEPTH	 64
 #define MAX_TREE_NODES   1024
 #define MAX_MTX_NODES MAX_TREE_NODES * 2
-#define PRIM_MATRIX_STRIDE 12
-#define BOX_MATRIX_STRIDE 16
 
 #define ISO_VALUE 0.5f
 #define NORMAL_DELTA 0.0001f
@@ -110,6 +121,33 @@ typedef struct CellParam{
 	U32 ctTotalCells;
 }CellParam;
 
+typedef struct SimpleStack{
+	U16 values[MAX_TREE_NODES];
+	U16 count;
+}SimpleStack;
+
+//Stack Operations
+void StackPush(struct SimpleStack* lpStkOperators, U16 val)
+{
+	lpStkOperators->values[lpStkOperators->count] = val;
+	lpStkOperators->count++;			
+}
+
+void StackPop(struct SimpleStack* lpStkOperators)
+{
+	lpStkOperators->count--;
+}
+
+bool IsStackEmpty(struct SimpleStack* lpStkOperators)
+{
+	return (lpStkOperators->count == 0);
+}
+
+U16 StackTop(struct SimpleStack* lpStkOperators)
+{
+	return lpStkOperators->values[lpStkOperators->count - 1];
+}
+
 //Computes Wyvill Field-Function
 float ComputeWyvillField(float dd)
 {
@@ -122,7 +160,7 @@ float ComputeWyvillField(float dd)
 /*!
  * Compute field due to a primitive.
  */
-float ComputePrimitiveField(int idxPrimitive,
+float ComputePrimitiveField(U16 idxPrimitive,
 							float4 v,			
 							__global float4* arrOps4,
 							__global float4* arrPrims4, 
@@ -131,12 +169,15 @@ float ComputePrimitiveField(int idxPrimitive,
 	//Transform
 	int primType  = (int)(arrPrims4[idxPrimitive * DATASIZE_PRIMITIVE_F4].x);		
 	float4 vt = v;
-	{		
-		int idxMatrix = (int)(arrPrims4[idxPrimitive * DATASIZE_PRIMITIVE_F4].y) & 0xFFFF;		
-		float4 row0 = arrMtxNodes4[idxMatrix * 3];
-		float4 row1 = arrMtxNodes4[idxMatrix * 3 + 1];
-		float4 row2 = arrMtxNodes4[idxMatrix * 3 + 2];
-		//printf("MTX row0: %.2f\n", row0.x);
+	{		 
+		int idxMatrix = (int)(arrPrims4[idxPrimitive * DATASIZE_PRIMITIVE_F4].y);		
+		//printf("idxMatrix = %d, \n", idxMatrix);
+		//printf("V.W: %.2f \n", v.w);
+		
+		float4 row0 = arrMtxNodes4[idxMatrix * PRIM_MATRIX_STRIDE_F4];
+		float4 row1 = arrMtxNodes4[idxMatrix * PRIM_MATRIX_STRIDE_F4 + 1];
+		float4 row2 = arrMtxNodes4[idxMatrix * PRIM_MATRIX_STRIDE_F4 + 2];
+		//printf("idxPrim: %d, idxMatrix: %d, MTX row0: [%.2f, %.2f, %.2f, %.2f]\n", idxPrimitive, idxMatrix, row0.x, row0.y, row0.z, row0.w);
 		vt = (float4)(dot(row0, v), dot(row1, v), dot(row2, v), 0.0f);
 	}
 		
@@ -300,21 +341,114 @@ float ComputePrimitiveField(int idxPrimitive,
  	return ComputeWyvillField(dist2); 
 }
 
+/*!
+ * Compute field due to a primitive.
+ */
+float ComputeField(float4 v,			
+				   __global float4* arrHeader4,
+		  		   __global float4* arrOps4,
+		   	 	   __global float4* arrPrims4, 
+		   		   __global float4* arrMtxNodes4)
+{
+	//Count : Prims, Ops, Mtx ; CellSize
+	U32 ctPrims = (U32)arrHeader4[OFFSET4_HEADER_PARAMS].x;
+	U32 ctOps   = (U32)arrHeader4[OFFSET4_HEADER_PARAMS].y;
+	float cellsize = arrHeader4[OFFSET4_HEADER_PARAMS].w;
+	U16 idxOp = 0;
+	
+	//Should be in homogenous coordinates
+	v.w = 1.0;
+	
+	if(ctOps > 0)
+	{
+		SimpleStack stkOps;
+		stkOps.count = 0;
+		StackPush(&stkOps, idxOp);
+		
+		//printf("idxRootNode = %d \n", idxRootNode);
 
-float3 ComputeNormal(int idxPrimitive, float4 v, 
+		while(!IsStackEmpty(&stkOps))
+		{
+			idxOp = StackTop(&stkOps);
+			StackPop(&stkOps);
+			
+			U16 opType = (U16)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].x;
+			U16 opLeftChild = (U16)(((U32)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].y) >> 16);
+			U16 opRightChild = (U16)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].y;
+			
+			U32 flags = (U32)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].z;
+			float4 params = arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_RES];
+			
+			//Left and Right is Op
+			//bool bLeftChildOp = (flags & ofLeftChildIsOp) >> 1;
+			//bool bRightChildOp = (flags & ofRightChildIsOp);
+
+			//bReady = !((bLeftChildOp && (arrOpsFieldComputed[idxLC] == 0))||
+				//	   (bRightChildOp && (arrOpsFieldComputed[idxRC] == 0)));
+
+			
+			//Compute Primitive Fields
+			float fieldLeft = ComputePrimitiveField(opLeftChild, v, arrOps4, arrPrims4, arrMtxNodes4);
+			float fieldRight = ComputePrimitiveField(opRightChild, v, arrOps4, arrPrims4, arrMtxNodes4);
+			//printf("Left Child = %d, \n", opLeftChild);
+			//printf("Right Child = %d, \n", opRightChild);
+
+			//printf("idxRootNode = %d, opLeftChild = %d, opRightChild = %d \n", idxRootNode, opLeftChild, opRightChild);
+			
+			//Compute All Operators
+			float field = 0.0f;
+			switch(opType){
+			case(opBlend):{
+				field = fieldLeft + fieldRight;
+				break;
+			}
+			}
+			
+			return field;
+			/*
+			#define OFFSET_OP_TYPE			0
+			#define OFFSET_OP_FLAGS			1
+			#define OFFSET_OP_LCRC			2
+			#define OFFSET_OP_PARENTLINK	3
+
+			m_arrOps[i * DATASIZE_OPERATOR + 4] = static_cast<float>(tempOps.resX[i]);
+			m_arrOps[i * DATASIZE_OPERATOR + 5] = static_cast<float>(tempOps.resY[i]);
+			m_arrOps[i * DATASIZE_OPERATOR + 6] = static_cast<float>(tempOps.resZ[i]);
+			m_arrOps[i * DATASIZE_OPERATOR + 7] = static_cast<float>(tempOps.resW[i]);
+
+			idxLC = m_blobOps.opLeftChild[idxRootNode];
+			idxRC = m_blobOps.opRightChild[idxRootNode];
+			childKind = m_blobOps.opFlags[idxRootNode];
+			bUnary	   = (childKind & ofIsUnaryOp) >> 3;
+			bRange 	   = (childKind & ofChildIndexIsRange) >> 2;
+			bLeftChildOp = (childKind & ofLeftChildIsOp) >> 1;
+			bRightChildOp = (childKind & ofRightChildIsOp);
+			*/
+			
+		}
+		
+		return 0;
+	}
+	else
+		return ComputePrimitiveField(0, v, arrOps4, arrPrims4, arrMtxNodes4);
+}
+
+
+float3 ComputeNormal(float4 v,
+		   __global float4* arrHeader4, 
 		   __global float4* arrOps4,
 		   __global float4* arrPrims4,
 		   __global float4* arrMtxNodes4)
 {
 	const float deltaInv = -1.0f / NORMAL_DELTA;	
-	float inFieldValue = ComputePrimitiveField(0, v, arrOps4, arrPrims4, arrMtxNodes4);
+	float inFieldValue = ComputeField(v, arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);
 	//printf("FieldValue= %.2f \n", inFieldValue); 
 	
 	
 	float3 n;
-	n.x = ComputePrimitiveField(0, v + (float4)(NORMAL_DELTA,0,0,0), arrOps4, arrPrims4, arrMtxNodes4);
-	n.y = ComputePrimitiveField(0, v + (float4)(0, NORMAL_DELTA, 0, 0), arrOps4, arrPrims4, arrMtxNodes4);
-	n.z = ComputePrimitiveField(0, v + (float4)(0, 0, NORMAL_DELTA, 0), arrOps4, arrPrims4, arrMtxNodes4);
+	n.x = ComputeField(v + (float4)(NORMAL_DELTA,0,0,0), arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);
+	n.y = ComputeField(v + (float4)(0, NORMAL_DELTA, 0, 0), arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);
+	n.z = ComputeField(v + (float4)(0, 0, NORMAL_DELTA, 0), arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);
 	//n.w = 0.0f;
 
 	n = deltaInv * (n - (float3)(inFieldValue, inFieldValue, inFieldValue));
@@ -438,13 +572,13 @@ __kernel void ComputeConfigIndexVertexCount(__global float4* arrInHeader4,
  *  Compute the cell configuration by evaluating the field at 8 vertices of the cube.
  */
 __kernel void ComputeConfig(__global float4* arrInHeader4,
-							__global float4* arrInOps4,										 
-							__global float4* arrInPrims4,											 
-	 					    __global float4* arrInMtxNode4,
-							__constant struct CellParam* inCellParams,
-							__read_only image2d_t texInVertexCountTable,
-							__global uchar* arrOutCellConfig,
-							__global uchar* arrOutVertexCount)		
+			 __global float4* arrInOps4,										 
+			 __global float4* arrInPrims4,											 
+	 		 __global float4* arrInMtxNodes4,
+			 __constant struct CellParam* inCellParams,
+			 __read_only image2d_t texInVertexCountTable,
+			 __global uchar* arrOutCellConfig,
+			 __global uchar* arrOutVertexCount)		
 {
 	//Get XY plane index
 	int idX = get_global_id(0);
@@ -473,13 +607,13 @@ __kernel void ComputeConfig(__global float4* arrInHeader4,
 	arrVertices[5] = lower + cellsize * (float4)(1, 0, 1, 0);
   	arrVertices[6] = lower + cellsize * (float4)(1, 1, 0, 0);
 	arrVertices[7] = lower + cellsize * (float4)(1, 1, 1, 0);
-
+	
     //Compute Configuration index
     int idxConfig = 0;
 	for(int i=0; i<8; i++)
 	{
-		//arrFields[i] = ComputePrimitiveField(0, arrVertices[i], ops4, prims4, matrix4);
-		arrFields[i] = ComputePrimitiveField(0, arrVertices[i], arrInOps4, arrInPrims4, arrInMtxNode4);
+		//arrFields[i] = ComputePrimitiveField(0, arrVertices[i], arrInOps4, arrInPrims4, arrInMtxNode4);
+		arrFields[i] = ComputeField(arrVertices[i], arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
 		if(isgreaterequal(arrFields[i], ISO_VALUE))
 			idxConfig += (1 << i);
 	}
@@ -491,6 +625,7 @@ __kernel void ComputeConfig(__global float4* arrInHeader4,
 	arrOutCellConfig[idxCell] = idxConfig;
 	arrOutVertexCount[idxCell] = ctVertices;
 }
+
 
 /*
  * Extract mesh by computing its vertices
@@ -546,7 +681,7 @@ __kernel void ComputeMesh(__global float4* arrInHeader4,
     //Compute Configuration index
 	for(int i=0; i<8; i++)
 	{
-		arrFields[i] = ComputePrimitiveField(0, arrVertices[i], arrInOps4, arrInPrims4, arrInMtxNode4);
+		arrFields[i] = ComputeField(arrVertices[i], arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNode4);
 	}
 
 	//Tetrahedralize
@@ -635,7 +770,7 @@ __kernel void ComputeMesh(__global float4* arrInHeader4,
 		v = e1 + scale * (e2 - e1);
 
 		//Compute Normal
-		n = ComputeNormal(0, v, arrInOps4, arrInPrims4, arrInMtxNode4);
+		n = ComputeNormal(v, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNode4);
 
 		//MeshAttrib index
 		idxMeshAttrib = voffset + i;

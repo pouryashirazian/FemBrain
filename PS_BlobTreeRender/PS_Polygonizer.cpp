@@ -1923,6 +1923,7 @@ int FieldComputer::fieldValue(const Float_& pX, const Float_& pY, const Float_& 
 		while(!stkOps.empty())
 		{
 			idxRootNode = stkOps.top();
+			U16 opType =
 
 			idxLC = m_blobOps.opLeftChild[idxRootNode];
 			idxRC = m_blobOps.opRightChild[idxRootNode];

@@ -65,6 +65,7 @@ public:
 		this->ctLogsCollected = 0;
 		this->hapticMode = 0;
 		this->hapticForceCoeff = DEFAULT_FORCE_COEFF;
+		this->cellsize = DEFAULT_CELL_SIZE;
 	}
 
 public:
@@ -88,6 +89,7 @@ public:
 	int appHeight;
 	int hapticMode;
 
+	float cellsize;
 	//vec3d worldAvatarPos;
 	//vec3d worldDragStart;
 	//vec3d worldDragEnd;
@@ -630,6 +632,16 @@ void NormalKey(unsigned char key, int x, int y)
 	mtx.scale(vec3f(0.4, 0.4, 0.4));
 	switch(key)
 	{
+	case('+'):{
+		g_appSettings.cellsize += 0.01;
+		LogInfoArg1("Changed cellsize to: %.2f", g_appSettings.cellsize);
+		break;
+	}
+	case('-'):{
+		g_appSettings.cellsize -= 0.01;
+		LogInfoArg1("Changed cellsize to: %.2f", g_appSettings.cellsize);
+		break;
+	}
 	case('g'):{
 		SAFE_DELETE(g_lpAffineWidget);
 		g_lpAffineWidget = CreateAffineWidget(uitTranslate);
@@ -691,6 +703,13 @@ void SpecialKey(int key, int x, int y)
 			break;
 		}
 
+		case(GLUT_KEY_F3):
+		{
+			LogInfo("Re-Polygonize Model");
+			g_lpBlobRender->runTandem(g_appSettings.cellsize);
+			glutPostRedisplay();
+			break;
+		}
 
 		case(GLUT_KEY_F4):
 		{
@@ -821,6 +840,7 @@ void LoadSettings()
 	//System settings
 	g_appSettings.hapticForceCoeff = cfg.readInt("SYSTEM", "FORCECOEFF", DEFAULT_FORCE_COEFF);
 	g_appSettings.bLogSql = cfg.readBool("SYSTEM", "LOGSQL", g_appSettings.bLogSql);
+	g_appSettings.cellsize = cfg.readFloat("SYSTEM", "CELLSIZE", DEFAULT_CELL_SIZE);
 
 	//Create Deformable Model
 	g_lpDeformable = new Deformable(strVegFile.cptr(),
@@ -862,6 +882,9 @@ void SaveSettings()
 	cfg.writeVec3f("CAMERA", "CENTER", g_arcBallCam.getCenter());
 	cfg.writeVec3f("CAMERA", "ORIGIN", g_arcBallCam.getOrigin());
 	cfg.writeVec2f("CAMERA", "PAN", g_arcBallCam.getPan());
+
+	//Write Cellsize
+	cfg.writeFloat("SYSTEM", "CELLSIZE", g_appSettings.cellsize);
 }
 
 
@@ -938,7 +961,8 @@ int main(int argc, char* argv[])
 	LoadSettings();
 
 	DAnsiStr strFPModel = ExtractFilePath(GetExePath());
-	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/sphere.txt";
+	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/sphere.txt";
+	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/peanut.scene";
 	g_lpBlobRender = new GPUPoly();
 	g_lpBlobRender->readModel(strFPModel.cptr());
 	g_lpBlobRender->runTandem(0.10);
