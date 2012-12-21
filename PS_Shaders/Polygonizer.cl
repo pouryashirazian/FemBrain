@@ -365,8 +365,10 @@ float ComputeField(float4 v,
 		stkOps.count = 0;
 		StackPush(&stkOps, idxOp);
 		
-		//printf("idxRootNode = %d \n", idxRootNode);
-
+		//Final Field
+		float field = 0.0f;
+		
+		//Pop operators from stack and process
 		while(!IsStackEmpty(&stkOps))
 		{
 			idxOp = StackTop(&stkOps);
@@ -382,58 +384,115 @@ float ComputeField(float4 v,
 			//Left and Right is Op
 			//bool bLeftChildOp = (flags & ofLeftChildIsOp) >> 1;
 			//bool bRightChildOp = (flags & ofRightChildIsOp);
-
 			//bReady = !((bLeftChildOp && (arrOpsFieldComputed[idxLC] == 0))||
-				//	   (bRightChildOp && (arrOpsFieldComputed[idxRC] == 0)));
-
+			//(bRightChildOp && (arrOpsFieldComputed[idxRC] == 0)));
 			
 			//Compute Primitive Fields
 			float fieldLeft = ComputePrimitiveField(opLeftChild, v, arrOps4, arrPrims4, arrMtxNodes4);
 			float fieldRight = ComputePrimitiveField(opRightChild, v, arrOps4, arrPrims4, arrMtxNodes4);
-			//printf("Left Child = %d, \n", opLeftChild);
-			//printf("Right Child = %d, \n", opRightChild);
-
-			//printf("idxRootNode = %d, opLeftChild = %d, opRightChild = %d \n", idxRootNode, opLeftChild, opRightChild);
 			
-			//Compute All Operators
-			float field = 0.0f;
+			//Compute All Operators			
 			switch(opType){
 			case(opBlend):{
 				field = fieldLeft + fieldRight;
 				break;
 			}
-			}
-			
-			return field;
-			/*
-			#define OFFSET_OP_TYPE			0
-			#define OFFSET_OP_FLAGS			1
-			#define OFFSET_OP_LCRC			2
-			#define OFFSET_OP_PARENTLINK	3
-
-			m_arrOps[i * DATASIZE_OPERATOR + 4] = static_cast<float>(tempOps.resX[i]);
-			m_arrOps[i * DATASIZE_OPERATOR + 5] = static_cast<float>(tempOps.resY[i]);
-			m_arrOps[i * DATASIZE_OPERATOR + 6] = static_cast<float>(tempOps.resZ[i]);
-			m_arrOps[i * DATASIZE_OPERATOR + 7] = static_cast<float>(tempOps.resW[i]);
-
-			idxLC = m_blobOps.opLeftChild[idxRootNode];
-			idxRC = m_blobOps.opRightChild[idxRootNode];
-			childKind = m_blobOps.opFlags[idxRootNode];
-			bUnary	   = (childKind & ofIsUnaryOp) >> 3;
-			bRange 	   = (childKind & ofChildIndexIsRange) >> 2;
-			bLeftChildOp = (childKind & ofLeftChildIsOp) >> 1;
-			bRightChildOp = (childKind & ofRightChildIsOp);
-			*/
-			
+			}			
 		}
 		
-		return 0;
+		//Return final field
+		return field;
 	}
 	else
 		return ComputePrimitiveField(0, v, arrOps4, arrPrims4, arrMtxNodes4);
 }
 
+/*!
+ * Compute Field-Value and Color
+ */
+float ComputeFieldAndColor(float4 v,	
+							float4* lpOutColor,
+						   __global float4* arrHeader4,
+						   __global float4* arrOps4,
+						   __global float4* arrPrims4, 
+						   __global float4* arrMtxNodes4)
+{
+	//Count : Prims, Ops, Mtx ; CellSize
+	U32 ctPrims = (U32)arrHeader4[OFFSET4_HEADER_PARAMS].x;
+	U32 ctOps   = (U32)arrHeader4[OFFSET4_HEADER_PARAMS].y;
+	float cellsize = arrHeader4[OFFSET4_HEADER_PARAMS].w;
+	U16 idxOp = 0;
+	
+	//Should be in homogenous coordinates
+	v.w = 1.0;
+	
+	if(ctOps > 0)
+	{
+		SimpleStack stkOps;
+		stkOps.count = 0;
+		StackPush(&stkOps, idxOp);
+		
+		//Final Field
+		float field = 0.0f;
+		
+		//Pop operators from stack and process
+		while(!IsStackEmpty(&stkOps))
+		{
+			idxOp = StackTop(&stkOps);
+			StackPop(&stkOps);
+			
+			U16 opType = (U16)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].x;
+			U16 opLeftChild = (U16)(((U32)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].y) >> 16);
+			U16 opRightChild = (U16)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].y;
+			
+			U32 flags = (U32)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].z;
+			float4 params = arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_RES];
+			
+			//Left and Right is Op
+			//bool bLeftChildOp = (flags & ofLeftChildIsOp) >> 1;
+			//bool bRightChildOp = (flags & ofRightChildIsOp);
+			//bReady = !((bLeftChildOp && (arrOpsFieldComputed[idxLC] == 0))||
+			//(bRightChildOp && (arrOpsFieldComputed[idxRC] == 0)));
+			
+			//Compute Primitive Fields
+			float fieldLeft = ComputePrimitiveField(opLeftChild, v, arrOps4, arrPrims4, arrMtxNodes4);
+			float fieldRight = ComputePrimitiveField(opRightChild, v, arrOps4, arrPrims4, arrMtxNodes4);
+			
+			//Compute All Operators			
+			switch(opType){
+			case(opBlend):{
+				field = fieldLeft + fieldRight;
 
+				float lcf = 2.0 * (0.5 + fieldLeft) - 1.0;
+				float rcf = 2.0 * (0.5 + fieldRight) - 1.0;
+				(*lpOutColor) = lcf * arrPrims4[opLeftChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR] + 
+								rcf * arrPrims4[opRightChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
+				/*
+				Float_ lcf  = two * (half + leftChildField) - one;
+				Float_ rcf  = two * (half + rightChildField) - one;
+
+				outColorX = lcf * leftChildColorX + rcf * rightChildColorX;
+				outColorY = lcf * leftChildColorY + rcf * rightChildColorY;
+				outColorZ = lcf * leftChildColorZ + rcf * rightChildColorZ;
+				*/
+				break;
+			}
+			}			
+		}
+		
+		//Return final field
+		return field;
+	}
+	else
+	{
+		(*lpOutColor) = arrPrims4[OFFSET4_PRIM_COLOR];
+		return ComputePrimitiveField(0, v, arrOps4, arrPrims4, arrMtxNodes4);
+	}
+}
+
+/*!
+ * Compute Normal
+ */
 float3 ComputeNormal(float4 v,
 		   __global float4* arrHeader4, 
 		   __global float4* arrOps4,
@@ -456,13 +515,6 @@ float3 ComputeNormal(float4 v,
 	//printf("Prenormalized N= [%.2f, %.2f, %.2f, %.2f] \n", n.x, n.y, n.z, n.w); 
 	return n;
 }
-
-float4 ComputePrimitiveColor(int idxPrimitive, __global float4* arrPrims4)
-{
-	return arrPrims4[idxPrimitive * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
-}
-
-
 
 
 /*!
@@ -772,11 +824,15 @@ __kernel void ComputeMesh(__global float4* arrInHeader4,
 		//Compute Normal
 		n = ComputeNormal(v, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNode4);
 
+		//Compute Field and Color
+		float4 color;
+		ComputeFieldAndColor(v,	&color, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNode4);
+
 		//MeshAttrib index
 		idxMeshAttrib = voffset + i;
 		 
 		arrOutMeshVertex[idxMeshAttrib] = v;
-		arrOutMeshColor[idxMeshAttrib] = ComputePrimitiveColor(0, arrInPrims4);
+		arrOutMeshColor[idxMeshAttrib] = color;
 		arrOutMeshNormal[idxMeshAttrib * 3] = n.x;
 		arrOutMeshNormal[idxMeshAttrib * 3 + 1] = n.y;
 		arrOutMeshNormal[idxMeshAttrib * 3 + 2] = n.z;
