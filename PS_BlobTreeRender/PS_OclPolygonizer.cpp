@@ -562,7 +562,7 @@ namespace HPC{
 
 		// Execute the kernel over the vector using the
 		// maximum number of work group items for this device
-		U32 szNeeded[3];
+		size_t szNeeded[3];
 		for(int i=0; i<3; i++)
 			szNeeded[i] = m_param.ctNeededCells[i];
 
@@ -734,7 +734,7 @@ namespace HPC{
 
 		// Execute the kernel over the vector using the
 		// maximum number of work group items for this device
-		U32 szNeeded[3];
+		size_t szNeeded[3];
 		for(int i=0; i<3; i++)
 			szNeeded[i] = m_param.ctNeededCells[i];
 
