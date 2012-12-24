@@ -327,6 +327,7 @@ namespace HPC{
 		LogInfo("1.Setup compute device. Prefer AMD GPU.");
 		//Create a GPU Compute Device
 		m_lpGPU = new ComputeDevice(ComputeDevice::dtGPU, true, "AMD");
+		//m_lpGPU = new ComputeDevice(ComputeDevice::dtCPU, true, "Intel");
 		m_lpGPU->printInfo();
 		
 
@@ -376,15 +377,20 @@ namespace HPC{
 		m_inMemVertexCountTable = clCreateImage2D(m_lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
 													   &imageFormat, 256, 1, 0, (void*) g_numVerticesTableCompact, &errNum);
 		if(errNum != CL_SUCCESS)
+		{
+			LogErrorArg1("Failed to create VertexCountTable! Ocl Error: %s", ComputeDevice::oclErrorString(errNum));
 			return ERR_GPUPOLY_VERTEXTABLE_NOT_READ;
+		}
 
 		//Triangle Count Table
 		m_inMemTriangleTable = clCreateImage2D(m_lpGPU->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
 											   &imageFormat, 16, 256, 0, (void*) g_triTableCompact, &errNum);
 		if(errNum != CL_SUCCESS)
+		{
+			LogErrorArg1("Failed to create TriableTable! Ocl Error: %s", ComputeDevice::oclErrorString(errNum));
 			return ERR_GPUPOLY_TRITABLE_NOT_READ;
+		}
 #endif
-
 	}
 
 	//////////////////////////////////////////////////////////////////////

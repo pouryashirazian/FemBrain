@@ -7,6 +7,7 @@
 #include "PS_ReadSceneModel.h"
 #include "../PS_Graphics/PS_MATRIX4.h"
 #include "../PS_Base/PS_String.h"
+#include "../PS_Base/PS_Logger.h"
 #include <list>
 
 using namespace PS;
@@ -153,7 +154,7 @@ int ModelReader::read(const char* lpFilePath)
 	int nVersion = lpScript->readInt("Global", "FileVersion", 0);
 	if(nVersion < MIN_FILE_VERSION)
 	{
-		fprintf(stderr, "ERROR: Invalid file version. Minimum file version is %d. \n", MIN_FILE_VERSION);
+		LogErrorArg1("Invalid file version. Minimum file version is %d.", MIN_FILE_VERSION);
 		SAFE_DELETE(lpScript);
 		return ERR_INVALID_MODEL_FILE;
 	}
@@ -161,7 +162,7 @@ int ModelReader::read(const char* lpFilePath)
 	int ctLayers = lpScript->readInt("Global", "NumLayers", 0);
 	if(ctLayers == 0 || ctLayers > 1)
 	{
-		fprintf(stderr, "ERROR: Invalid scene file. There should be at least 1 layer. \n");
+		LogError("Invalid scene file. There should be at least 1 layer.");
 		SAFE_DELETE(lpScript);
 		return ERR_INVALID_LAYERS_COUNT;
 	}
@@ -170,7 +171,7 @@ int ModelReader::read(const char* lpFilePath)
 	int ctOps = lpScript->readInt("Global", "CountOperators", 0);
 	if((ctPrims > MAX_TREE_NODES)||(ctOps > MAX_TREE_NODES))
 	{
-		fprintf(stderr, "ERROR: MAX TREE NODES set at %d. Model has %d primitive %d operators.\n", MAX_TREE_NODES, ctPrims, ctOps);
+		LogErrorArg3("MAX TREE NODES set at %d. Model has %d primitive %d operators.", MAX_TREE_NODES, ctPrims, ctOps);
 		SAFE_DELETE(lpScript);
 		return ERR_NODE_OVERFLOW;
 	}
@@ -191,13 +192,13 @@ int ModelReader::read(const char* lpFilePath)
 	this->readNode(lpScript, ids[0]);
 	if(setAllInstancedNodes() == m_ctInstancedNodes)
 	{
-		printf("MODELREADER: %d instanced nodes are updated.\n", m_ctInstancedNodes);
+		LogInfoArg1("MODELREADER: %d instanced nodes are updated.", m_ctInstancedNodes);
 	}
 
 	int total = m_lpBlobOps->count + m_lpBlobPrims->count;
 	if((ctPrims + ctOps > 0)&&(total != (ctPrims + ctOps)))
 	{
-		fprintf(stderr, "ERROR: Not read all nodes [%d of %d].\n", total, ctPrims + ctOps);
+		LogErrorArg2("Not read all nodes [%d of %d].", total, ctPrims + ctOps);
 		ctErrors++;
 	}
 
@@ -207,19 +208,19 @@ int ModelReader::read(const char* lpFilePath)
 	int res = PrepareAllBoxes(*m_lpBlobOps, *m_lpBlobPrims, *m_lpMtxBox);
 	if(res != RET_SUCCESS)
 	{
-		printf("ERROR: Unable to compute bboxes.\n");
+		LogError("Unable to compute bboxes.");
 		return ERR_READ_MODEL_HAS_PROBLEMS;
 	}
 
 	ctErrors += CheckForBlobTreeErrors(*m_lpBlobOps, *m_lpBlobPrims, true);
 	if(ctErrors > 0)
 	{
-		printf("ERROR: %d errors found in the generated SOABlobTree.\n", ctErrors);
+		LogErrorArg1("%d errors found in the generated SOABlobTree.", ctErrors);
 		return ERR_READ_MODEL_HAS_PROBLEMS;
 	}
 	else
 	{
-		printf("MODELREADER: Model read successfully. FileVersion = %d \n", nVersion);
+		LogInfoArg1("MODELREADER: Model read successfully. FileVersion = %d", nVersion);
 		return MODELREAD_SUCCESS;
 	}
 }

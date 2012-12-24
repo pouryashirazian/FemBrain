@@ -48,16 +48,16 @@
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.base.128711701" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.base"/>
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.base.2033305238" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.base">
 								<option id="gnu.cpp.link.option.libs.776492898" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
+									<listOptionValue builtIn="false" value="OpenCL"/>
 									<listOptionValue builtIn="false" value="GLEW"/>
 									<listOptionValue builtIn="false" value="glut"/>
 									<listOptionValue builtIn="false" value="GLU"/>
 									<listOptionValue builtIn="false" value="GL"/>
 									<listOptionValue builtIn="false" value="rt"/>
 									<listOptionValue builtIn="false" value="tbb"/>
-									<listOptionValue builtIn="false" value="OpenCL"/>
 								</option>
 								<option id="gnu.cpp.link.option.paths.1451060664" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
-									<listOptionValue builtIn="false" value="/opt/AMDAPP/lib/x86"/>
+									<listOptionValue builtIn="false" value="/usr/lib64/fglrx"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/TBB/build/linux_intel64_gcc_cc4.6_libc2.15_kernel3.2.0_release"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/BOARD/lib"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/GLEW/lib"/>
