@@ -121,12 +121,12 @@ public:
     /*!
      * Create memory buffer for readonly or writeonly access.
      */
-    cl_mem createMemBuffer(const U32 size, MEMACCESSMODE mode);
+    cl_mem createMemBuffer(const size_t size, MEMACCESSMODE mode);
 
     /*!
      * Create memory buffer for readonly or writeonly access from a GL Buffer.
      */
-    cl_mem createMemBufferFromGL(U32 glBuffer, MEMACCESSMODE mode);
+    cl_mem createMemBufferFromGL(cl_GLuint glBuffer, MEMACCESSMODE mode);
 
     /*!
      * Enqueues a write operation in the command queue
@@ -144,7 +144,7 @@ public:
     void finishAllCommands();
 
 
-	U32 getKernelWorkgroupSize(ComputeKernel* lpKernel);
+	size_t getKernelWorkgroupSize(ComputeKernel* lpKernel);
 
     //Access
     cl_device_id getDevice() const {return m_clDeviceID;}

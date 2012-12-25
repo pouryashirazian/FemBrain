@@ -76,6 +76,7 @@ protected:
 
 
 protected:
+
 	//Index to the buffer objects
 	U32 m_vboVertex;
 	U32 m_vboColor;

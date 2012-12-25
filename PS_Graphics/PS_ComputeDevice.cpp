@@ -525,13 +525,13 @@ void ComputeDevice::printInfo()
     cout << "Name:\t" << buffer << endl;
 
     //Max compute units
-    U32 units;
+    size_t units;
     err = clGetDeviceInfo(m_clDeviceID, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(units), &units, NULL);
     if (err != CL_SUCCESS) {
         cerr << "Error: Failed to get CL_DEVICE_MAX_COMPUTE_UNITS" << endl;
         return;
     }
-    sprintf(buffer, "Max compute units = %u", units);
+    sprintf(buffer, "Max compute units = %lu", units);
     cout << buffer << endl;
 
 	//Max global memory size
@@ -559,12 +559,12 @@ void ComputeDevice::printInfo()
 		cerr << "Error: Failed to get CL_DEVICE_MAX_WORK_GROUP_SIZE" << endl;
 		return;
 	}
-	sprintf(buffer, "Max workgroup size = %u", units);
+	sprintf(buffer, "Max workgroup size = %lu", units);
 	cout << buffer << endl;
 }
 
 
-cl_mem ComputeDevice::createMemBuffer(const U32 size, MEMACCESSMODE mode)
+cl_mem ComputeDevice::createMemBuffer(const size_t size, MEMACCESSMODE mode)
 {
 	cl_mem output = clCreateBuffer(m_clContext, mode, size, NULL, NULL);
     if (!output)
@@ -575,12 +575,13 @@ cl_mem ComputeDevice::createMemBuffer(const U32 size, MEMACCESSMODE mode)
     return output;
 }
 
-cl_mem ComputeDevice::createMemBufferFromGL(U32 glBuffer, MEMACCESSMODE mode)
+cl_mem ComputeDevice::createMemBufferFromGL(cl_GLuint glBuffer, MEMACCESSMODE mode)
 {
-	cl_mem output = clCreateFromGLBuffer(m_clContext, mode, glBuffer, NULL);
+	cl_int errCode;
+	cl_mem output = clCreateFromGLBuffer(m_clContext, mode, glBuffer, &errCode);
     if (!output)
     {
-    	LogError("Error: Failed to allocate device gl-interop memory!");
+    	LogErrorArg1("Error: Failed to allocate device gl-interop memory! %s", oclErrorString(errCode));
     }
 
     return output;
@@ -691,9 +692,9 @@ ComputeProgram* ComputeDevice::addProgram(const char* chrComputeCode)
     return lpCompute;
 }
 
-U32 ComputeDevice::getKernelWorkgroupSize(ComputeKernel* lpKernel)
+size_t ComputeDevice::getKernelWorkgroupSize(ComputeKernel* lpKernel)
 {
-	U32 szWorkGroup = 0;
+	size_t szWorkGroup = 0;
 	cl_int err = clGetKernelWorkGroupInfo(lpKernel->getKernel(), 
 										  m_clDeviceID,
 										  CL_KERNEL_WORK_GROUP_SIZE,

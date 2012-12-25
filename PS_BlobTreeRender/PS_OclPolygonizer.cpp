@@ -816,14 +816,21 @@ namespace HPC{
 		//Kernel2:
 		m_stepVertex = 4;
 		m_stepColor = 4;
-		U32 szVertexBuffer = ctSumVertices * m_stepVertex * sizeof(float);
-		U32 szNormalBuffer = ctSumVertices * 3 * sizeof(float);
+		GLsizeiptr szVertexBuffer = ctSumVertices * m_stepVertex * sizeof(float);
+		GLsizeiptr szNormalBuffer = ctSumVertices * 3 * sizeof(float);
 
+		GLuint vboVertex;
 		//Vertex
-		glGenBuffers(1, &m_vboVertex);
-		glBindBuffer(GL_ARRAY_BUFFER, m_vboVertex);
+		glGenBuffers(1, &vboVertex);
+		GLenum glerr = glGetError();
+
+		glBindBuffer(GL_ARRAY_BUFFER, vboVertex);
+		glerr = glGetError();
+
 		glBufferData(GL_ARRAY_BUFFER, szVertexBuffer, 0, GL_DYNAMIC_DRAW);
-		cl_mem outMemMeshVertex = m_lpGPU->createMemBufferFromGL(m_vboVertex, ComputeDevice::memWriteOnly);
+		glerr = glGetError();
+
+		cl_mem outMemMeshVertex = m_lpGPU->createMemBufferFromGL(vboVertex, ComputeDevice::memWriteOnly);
 
 		//Color
 		glGenBuffers(1, &m_vboColor);
