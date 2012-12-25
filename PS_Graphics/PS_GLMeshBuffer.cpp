@@ -41,8 +41,7 @@ void GLMeshBuffer::cleanup()
 		glDeleteBuffers(1, &m_vboNormal);
 	if(m_isValidIndex)
 		glDeleteBuffers(1, &m_iboFaces);
-	m_isValidColor = m_isValidIndex = m_isValidNormal = false;
-	m_isValidTexCoord = m_isValidVertex = false;
+	m_isValidColor = m_isValidIndex = m_isValidNormal = m_isValidTexCoord = m_isValidVertex = false;
 }
 
 void GLMeshBuffer::setupVertexAttribs(const vector<float>& arrAttribs, int step, VertexAttribType attribKind)

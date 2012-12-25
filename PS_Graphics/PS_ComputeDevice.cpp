@@ -559,7 +559,17 @@ void ComputeDevice::printInfo()
 		cerr << "Error: Failed to get CL_DEVICE_MAX_WORK_GROUP_SIZE" << endl;
 		return;
 	}
-	sprintf(buffer, "Max workgroup size = %lu", units);
+	sprintf(buffer, "CL_DEVICE_MAX_WORK_GROUP_SIZE = %lu", units);
+	cout << buffer << endl;
+
+	//Max workitem sizes
+	size_t dims[3];
+	err = clGetDeviceInfo(m_clDeviceID, CL_DEVICE_MAX_WORK_ITEM_SIZES, sizeof(size_t) * 3, &dims[0], NULL);
+	if (err != CL_SUCCESS) {
+		cerr << "Error: Failed to get CL_DEVICE_MAX_WORK_ITEM_SIZES" << endl;
+		return;
+	}
+	sprintf(buffer, "CL_DEVICE_MAX_WORK_ITEM_SIZES = [%lu, %lu, %lu]", dims[0], dims[1], dims[2]);
 	cout << buffer << endl;
 }
 

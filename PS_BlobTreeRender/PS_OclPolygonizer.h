@@ -37,7 +37,7 @@ using namespace PS::FUNCTIONALMATH;
 #define OFFSET_COUNT_PRIMS 		8
 #define OFFSET_COUNT_OPS 		9
 #define OFFSET_COUNT_MTXNODES	10
-#define OFFSET_CELLSIZE 		11
+#define OFFSET_COUNT_INSTANCE 	11
 
 namespace PS{
 namespace HPC{
@@ -68,6 +68,9 @@ public:
 	 */
 	int runTandem(float cellsize = DEFAULT_CELL_SIZE);
 
+	//Multi-Pass polygonization
+	int runMultiPass(float cellsize = DEFAULT_CELL_SIZE);
+
 	//Draws the mesh using accelerated memory buffer objects
 	void drawBBox();
 
@@ -77,11 +80,6 @@ private:
 	 */
 	int init();
 
-	/*!
-	*@param cellsize the cubic cellsize for the polygonizer
-	*@return true when done
-	*/
-	int run(float cellsize = DEFAULT_CELL_SIZE);
 
 private:
     struct CellParam{
@@ -90,6 +88,7 @@ private:
 		U8 edgeaxis[12];
 		U32 ctNeededCells[3];
 		U32 ctTotalCells;
+		float cellsize;
 	};
 
 	CellParam m_param;
@@ -99,10 +98,18 @@ private:
 	PS::HPC::ComputeKernel* m_lpKernelCellConfig;
 	PS::HPC::ComputeKernel* m_lpKernelComputeConfig;
 	PS::HPC::ComputeKernel* m_lpKernelComputeMesh;
+	PS::HPC::ComputeKernel* m_lpKernelComputeAllFields;
 
 	//Reusable vars
 	cl_mem m_inMemVertexCountTable;
 	cl_mem m_inMemTriangleTable;
+
+	cl_mem m_inMemHeader;
+	cl_mem m_inMemOps;
+	cl_mem m_inMemPrims;
+	cl_mem m_inMemMtx;
+	bool m_bModelLoaded;
+
 
 	//Inputs:
 	//BlobNode Matrix

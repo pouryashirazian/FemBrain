@@ -706,7 +706,8 @@ void SpecialKey(int key, int x, int y)
 		case(GLUT_KEY_F3):
 		{
 			LogInfo("Re-Polygonize Model");
-			g_lpBlobRender->runTandem(g_appSettings.cellsize);
+			//g_lpBlobRender->runTandem(g_appSettings.cellsize);
+			g_lpBlobRender->runMultiPass(g_appSettings.cellsize);
 			glutPostRedisplay();
 			break;
 		}
@@ -965,7 +966,7 @@ int main(int argc, char* argv[])
 	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/peanut.scene";
 	g_lpBlobRender = new GPUPoly();
 	g_lpBlobRender->readModel(strFPModel.cptr());
-	g_lpBlobRender->runTandem(0.10);
+	g_lpBlobRender->runTandem(g_appSettings.cellsize);
 
 
 	/*

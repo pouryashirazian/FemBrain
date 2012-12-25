@@ -34,7 +34,7 @@ using namespace PS::MATH;
 
 enum VertexAttribType {vatPosition, vatNormal, vatColor, vatTexCoord};
 
-enum FaceType {ftLines = 0x0001, ftLineLoop = 0x0002, ftLineStrip = 0x0003,
+enum FaceType {ftPoints = 0x0000, ftLines = 0x0001, ftLineLoop = 0x0002, ftLineStrip = 0x0003,
 			   ftTriangles = 0x0004, ftTriangleStrip = 0x0005, ftTriangleFan = 0x0006,
 			   ftQuads = 0x0007, ftQuadStrip = 0x0008, ftPolygon = 0x0009};
 

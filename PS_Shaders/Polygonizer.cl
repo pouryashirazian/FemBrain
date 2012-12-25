@@ -4,8 +4,8 @@
 #define DATASIZE_HEADER		12
 #define DATASIZE_OPERATOR	8
 #define DATASIZE_PRIMITIVE	20
-#define PRIM_MATRIX_STRIDE 12
-#define BOX_MATRIX_STRIDE 16
+#define PRIM_MATRIX_STRIDE  12
+#define BOX_MATRIX_STRIDE   16
 
 #define DATASIZE_OPERATOR_F4	DATASIZE_OPERATOR/4
 #define DATASIZE_PRIMITIVE_F4	DATASIZE_PRIMITIVE/4
@@ -27,7 +27,7 @@
 #define OFFSET_HEADER_COUNT_PRIMS 	8
 #define OFFSET_HEADER_COUNT_OPS 	9
 #define OFFSET_HEADER_COUNT_MTX		10
-#define OFFSET_HEADER_CELLSIZE 		11
+#define OFFSET_HEADER_COUNT_INST 	11
 
 //OFFSETS in OPERATORS
 #define OFFSET4_OP_TYPE			0
@@ -119,6 +119,7 @@ typedef struct CellParam{
 	U8 edgeaxis[12];
 	U32 ctNeededCells[3];
 	U32 ctTotalCells;
+	float cellsize;
 }CellParam;
 
 typedef struct SimpleStack{
@@ -353,11 +354,10 @@ float ComputeField(float4 v,
 	//Count : Prims, Ops, Mtx ; CellSize
 	U32 ctPrims = (U32)arrHeader4[OFFSET4_HEADER_PARAMS].x;
 	U32 ctOps   = (U32)arrHeader4[OFFSET4_HEADER_PARAMS].y;
-	float cellsize = arrHeader4[OFFSET4_HEADER_PARAMS].w;
 	U16 idxOp = 0;
 	
 	//Should be in homogenous coordinates
-	v.w = 1.0;
+	v.w = 1.0f;
 	
 	if(ctOps > 0)
 	{
@@ -420,11 +420,10 @@ float ComputeFieldAndColor(float4 v,
 	//Count : Prims, Ops, Mtx ; CellSize
 	U32 ctPrims = (U32)arrHeader4[OFFSET4_HEADER_PARAMS].x;
 	U32 ctOps   = (U32)arrHeader4[OFFSET4_HEADER_PARAMS].y;
-	float cellsize = arrHeader4[OFFSET4_HEADER_PARAMS].w;
 	U16 idxOp = 0;
 	
 	//Should be in homogenous coordinates
-	v.w = 1.0;
+	v.w = 1.0f;
 	
 	if(ctOps > 0)
 	{
@@ -524,8 +523,8 @@ __kernel void ComputeConfig(__global float4* arrInHeader4,
 			 __global float4* arrInOps4,										 
 			 __global float4* arrInPrims4,											 
 	 		 __global float4* arrInMtxNodes4,
-			 __constant struct CellParam* inCellParams,
 			 __read_only image2d_t texInVertexCountTable,
+			 __constant struct CellParam* inCellParams,
 			 __global uchar* arrOutCellConfig,
 			 __global uchar* arrOutVertexCount)		
 {
@@ -539,11 +538,12 @@ __kernel void ComputeConfig(__global float4* arrInHeader4,
 	if(idxCell > inCellParams->ctTotalCells)
 		return;
 	
-	//float cellsize = arrInHeader4[OFFSET_HEADER_CELLSIZE];	
+	float cellsize = inCellParams->cellsize;
+	//printf("Cellsize: %.2f\n", cellsize);
+
 	//Count : Prims, Ops, Mtx ; CellSize
 	U32 ctPrims = (U32)arrInHeader4[OFFSET4_HEADER_PARAMS].x;
 	U32 ctOps   = (U32)arrInHeader4[OFFSET4_HEADER_PARAMS].y;
-	float cellsize = arrInHeader4[OFFSET4_HEADER_PARAMS].w;
 	float4 lower = arrInHeader4[OFFSET4_HEADER_LOWER] + cellsize * (float4)(idX, idY, idZ, 0.0f);
 
 	float arrFields[8];
@@ -582,9 +582,9 @@ __kernel void ComputeConfig(__global float4* arrInHeader4,
 __kernel void ComputeMesh(__global float4* arrInHeader4,
 						  __global float4* arrInOps4,										 
 						  __global float4* arrInPrims4,											 
-						  __global float4* arrInMtxNode4,
-					      __constant struct CellParam* inCellParams,
+						  __global float4* arrInMtxNode4,					      
 						  __read_only image2d_t texInTriangleTable,
+						  __constant struct CellParam* inCellParams,
 						  __global U8* arrInCellConfig,						
 						  __global U32* arrInVertexBufferOffset,
 						  
@@ -609,11 +609,8 @@ __kernel void ComputeMesh(__global float4* arrInHeader4,
 	//We need complete insiders too
 	if(arrInCellConfig[idxCell] == 0)
 		return;
-	//if(arrInVertexCount[idxCell] == 0)
-		//return;
-	
-	//float cellsize = arrInHeader4[OFFSET_HEADER_CELLSIZE];	
-	float cellsize = arrInHeader4[OFFSET4_HEADER_PARAMS].w;
+
+	float cellsize = inCellParams->cellsize;
 	float4 lower = arrInHeader4[OFFSET4_HEADER_LOWER] + cellsize * (float4)(idX, idY, idZ, 0.0f);
 	float arrFields[8];
 	float4 arrVertices[8];
@@ -735,4 +732,32 @@ __kernel void ComputeMesh(__global float4* arrInHeader4,
 		arrOutMeshNormal[idxMeshAttrib * 3 + 2] = n.z;
 	//	printf("n = [%.2f, %.2f, %.2f] \n", n.x, n.y, n.z);  
 	}
+}
+
+
+__kernel void ComputeAllFields(__global float4* arrInHeader4,
+							   __global float4* arrInOps4,										 
+							   __global float4* arrInPrims4,											 
+							   __global float4* arrInMtxNodes4,
+							   __constant struct CellParam* inCellParams,
+							   __global float4* arrOutMeshVertex,
+							   __global float4* arrOutMeshColor,
+							   __global float* arrOutMeshNormal)			
+{
+	int idX = get_global_id(0);
+	int idY = get_global_id(1);
+	int idZ = get_global_id(2);
+	if((idX >= inCellParams->ctNeededCells[0])||(idY >= inCellParams->ctNeededCells[1])||(idZ >= inCellParams->ctNeededCells[2]))
+		return;
+	uint idxCell = idZ * (inCellParams->ctNeededCells[0] * inCellParams->ctNeededCells[1]) + idY * inCellParams->ctNeededCells[0] + idX;
+	if(idxCell > inCellParams->ctTotalCells)
+		return;
+	
+	float cellsize = inCellParams->cellsize;	
+	float4 n = (float4)(1,0,0,1);
+	arrOutMeshVertex[idxCell] = arrInHeader4[OFFSET4_HEADER_LOWER] + cellsize * (float4)(idX, idY, idZ, 0.0f); 
+	arrOutMeshColor[idxCell] = (float4)(1, 0, 0, 1);
+	arrOutMeshNormal[idxCell * 3 + 0] = n.x;
+	arrOutMeshNormal[idxCell * 3 + 1] = n.y;
+	arrOutMeshNormal[idxCell * 3 + 2] = n.z;
 }
