@@ -84,8 +84,12 @@ private:
 	int init();
 
 
+	//Polygonizer Passes
 	int computeAllFields(float cellsize);
 	int computeEdgeTable();
+	int computeVertexAttribs(U32 ctVertices);
+	//int computeCellConfigs();
+	//int computeElements();
 
 private:
     struct CellParam{

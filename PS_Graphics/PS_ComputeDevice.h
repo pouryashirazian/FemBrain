@@ -50,6 +50,16 @@ public:
 
     size_t getKernelWorkGroupSize() const {return m_szWorkGroupSize;}
     void setKernelWorkGroupSize(size_t szWorkgroup) { m_szWorkGroupSize = szWorkgroup;}
+
+
+    //These functions help in computing indices
+    static size_t ToMultipleOf(size_t N, size_t base)
+    {
+    	return (ceil((double)N / (double)base) * base);
+    }
+
+    static void ComputeLocalIndexSpace(int dim, size_t szKernelWorkGroup, size_t* arrOutLocalIndex);
+    static void ComputeGlobalIndexSpace(int dim, size_t* arrInLocalIndex, size_t* arrInOutGlobalIndex);
 private:
    size_t m_szWorkGroupSize;
    cl_kernel m_clKernel;

@@ -794,6 +794,7 @@ __kernel void ComputeAllFields(__global float4* arrInHeader4,
 	U32 idxVertex = idZ * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + idY * inGridParam->ctGridPoints[0] + idX;
 	if(idxVertex > inGridParam->ctTotalPoints)
 		return;
+	//printf("IDXVertex = %d\n", idxVertex);
 	
 	float cellsize = inGridParam->cellsize;		
 	float4 v = arrInHeader4[OFFSET4_HEADER_LOWER] + cellsize * (float4)(idX, idY, idZ, 0.0f);
@@ -817,8 +818,7 @@ __kernel void ComputeEdgeTable(__global float4* arrInFields,
 	U32 idxVertex = idZ * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + idY * inGridParam->ctGridPoints[0] + idX;
 	if(idxVertex > inGridParam->ctTotalPoints)
 		return;
-		
-		
+
 	bool bHot = isgreaterequal(arrInFields[idxVertex].w, ISO_VALUE); 
 	bool bHotNbor = false;
 	U32 idxVertexNbor = 0;
@@ -869,8 +869,137 @@ __kernel void ComputeEdgeTable(__global float4* arrInFields,
 	arrOutHighEdgesFlags[idxVertex] = flag; 
 }
 
+//Compute Vertex Attribs
+__kernel void ComputeVertexAttribs(__global float4* arrInHeader4,
+								   __global float4* arrInOps4,										 
+								   __global float4* arrInPrims4,											 
+								   __global float4* arrInMtxNodes4,
+								   __global float4* arrInFields,
+								   __global U32* arrInHighEdgesCount,
+								   __global U32* arrInHighEdgesOffset,
+								   __global U8* arrInHighEdgesFlags,
+								   __constant struct GridParam* inGridParam,
+								   __global float4* arrOutMeshVertex,
+								   __global float4* arrOutMeshColor,
+								   __global float* arrOutMeshNormal)						  								   
+{
+	int idX = get_global_id(0);
+	int idY = get_global_id(1);
+	int idZ = get_global_id(2);
+	if((idX >= inGridParam->ctGridPoints[0])||(idY >= inGridParam->ctGridPoints[1])||(idZ >= inGridParam->ctGridPoints[2]))
+		return;
+	U32 idxVertex = idZ * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + idY * inGridParam->ctGridPoints[0] + idX;
+	if(idxVertex > inGridParam->ctTotalPoints)
+		return;
+	
+	//IF This vertex has no hot edges then return
+	U32 ctVertices = arrInHighEdgesCount[idxVertex]; 
+	if(ctVertices == 0)
+		return;
 
+	float4 va = arrInFields[idxVertex];
+	float fa = va.w;
+	float fb;
+	va.w = 0;
+	
+	float4 vb;
+	U8 flag = arrInHighEdgesFlags[idxVertex];
+	U32 idxVertexNbor = 0;
+	U32 idxStore = arrInHighEdgesOffset[idxVertex];
+	
+	//XYZ: 421
+	//Compute Left Right Edge
+	if(flag & 0x04)
+	{
+		idxVertexNbor = idZ * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + idY * inGridParam->ctGridPoints[0] + (idX+1);
+		vb = arrInFields[idxVertexNbor];
+		fb = vb.w;
+		vb.w = 0;
 
+		//Compute Scale
+		float scale = (ISO_VALUE - fa)/(fb - fa);
+
+		//Use Linear Interpolation for now. Upgrade to Newton-Raphson (Gradient Marching)
+		float4 v = va + scale * (vb - va);
+
+		//Compute Normal
+		float3 n = ComputeNormal(v, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+
+		//Compute Field and Color
+		float4 color;
+		ComputeFieldAndColor(v, &color, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+
+		//Save 
+		arrOutMeshVertex[idxStore] = v;
+		arrOutMeshColor[idxStore] = color;
+		arrOutMeshNormal[idxStore * 3] = n.x;
+		arrOutMeshNormal[idxStore * 3 + 1] = n.y;
+		arrOutMeshNormal[idxStore * 3 + 2] = n.z;
+
+		idxStore++;
+	}
+
+	//Compute Bottom Top Edge
+	if(flag & 0x02)
+	{
+		idxVertexNbor = idZ * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + (idY+1) * inGridParam->ctGridPoints[0] + idX;
+		vb = arrInFields[idxVertexNbor];
+		fb = vb.w;
+		vb.w = 0;
+
+		//Compute Scale
+		float scale = (ISO_VALUE - fa)/(fb - fa);
+
+		//Use Linear Interpolation for now. Upgrade to Newton-Raphson (Gradient Marching)
+		float4 v = va + scale * (vb - va);
+
+		//Compute Normal
+		float3 n = ComputeNormal(v, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+
+		//Compute Field and Color
+		float4 color;
+		ComputeFieldAndColor(v, &color, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+
+		//Save 
+		arrOutMeshVertex[idxStore] = v;
+		arrOutMeshColor[idxStore] = color;
+		arrOutMeshNormal[idxStore * 3] = n.x;
+		arrOutMeshNormal[idxStore * 3 + 1] = n.y;
+		arrOutMeshNormal[idxStore * 3 + 2] = n.z;
+
+		idxStore++;
+	}
+
+	//Compute Near Far Edge
+	if(flag & 0x01)
+	{
+		idxVertexNbor = (idZ+1) * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + idY * inGridParam->ctGridPoints[0] + idX;
+		vb = arrInFields[idxVertexNbor];
+		fb = vb.w;
+		vb.w = 0;
+
+		//Compute Scale
+		float scale = (ISO_VALUE - fa)/(fb - fa);
+
+		//Use Linear Interpolation for now. Upgrade to Newton-Raphson (Gradient Marching)
+		float4 v = va + scale * (vb - va);
+
+		//Compute Normal
+		float3 n = ComputeNormal(v, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+
+		//Compute Field and Color
+		float4 color;
+		ComputeFieldAndColor(v, &color, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+
+		//Save 
+		arrOutMeshVertex[idxStore] = v;
+		arrOutMeshColor[idxStore] = color;
+		arrOutMeshNormal[idxStore * 3] = n.x;
+		arrOutMeshNormal[idxStore * 3 + 1] = n.y;
+		arrOutMeshNormal[idxStore * 3 + 2] = n.z;
+		idxStore++;
+	}
+} 
 
 
 

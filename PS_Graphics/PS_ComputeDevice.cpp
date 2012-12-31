@@ -22,6 +22,32 @@ bool ComputeKernel::setArg(U32 idxArg, U32 size, const void * lpArg)
 	return true;
 }
 
+
+void ComputeKernel::ComputeLocalIndexSpace(int dim, size_t szKernelWorkGroup, size_t* arrOutLocalIndex)
+{
+	for(int i=0; i<dim; i++)
+		arrOutLocalIndex[i] = 1;
+
+	size_t szMultiple = 1;
+	int i=0;
+	do{
+		arrOutLocalIndex[i] <<=1;
+		szMultiple = 1;
+		for(int j=0; j<dim; j++)
+			szMultiple *= arrOutLocalIndex[j];
+		//Increment index
+		i = (i + 1)%dim;
+	}while(szMultiple < szKernelWorkGroup);
+}
+
+void ComputeKernel::ComputeGlobalIndexSpace(int dim, size_t* arrInLocalIndex, size_t* arrInOutGlobalIndex)
+{
+	for(int i=0; i<dim; i++)
+	{
+		arrInOutGlobalIndex[i] = ToMultipleOf(arrInOutGlobalIndex[i], arrInLocalIndex[i]);
+	}
+}
+
 /////////////////////////////////////////////////////////////////////////////////////
 ComputeProgram::~ComputeProgram()
 {

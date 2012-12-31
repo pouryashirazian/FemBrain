@@ -749,16 +749,29 @@ namespace HPC{
 		computeEdgeTable();
 
 		//Readback EdgeCount
-		U32* lpEdgeTableHighEdgesCount = new U32[m_gridParam.ctTotalPoints];
-		m_lpGPU->enqueueReadBuffer(m_inoutHighEdgesCount, m_gridParam.ctTotalPoints, lpEdgeTableHighEdgesCount);
-
-		PrintArray(lpEdgeTableHighEdgesCount, m_gridParam.ctTotalPoints);
+		U32* lpEdgeTableOffsets = new U32[m_gridParam.ctTotalPoints];
+		m_lpGPU->enqueueReadBuffer(m_inoutHighEdgesCount, sizeof(U32) * m_gridParam.ctTotalPoints, lpEdgeTableOffsets);
+		//PrintArray(lpEdgeTableHighEdgesCount, m_gridParam.ctTotalPoints);
 
 		//3. SumScan to compute crossed edges
-		U32 ctVertices = m_lpOclSumScan->compute(lpEdgeTableHighEdgesCount, m_gridParam.ctTotalPoints);
+		U32 ctVertices = m_lpOclSumScan->compute(lpEdgeTableOffsets, m_gridParam.ctTotalPoints);
+		//PrintArray(lpEdgeTableHighEdgesCount, m_gridParam.ctTotalPoints);
 
-		PrintArray(lpEdgeTableHighEdgesCount, m_gridParam.ctTotalPoints);
+		//4. Compute VertexAttribs
+		computeVertexAttribs(ctVertices);
 
+
+		return 1;
+	}
+
+	int GPUPoly::computeVertexAttribs(U32 ctVertices){
+		size_t arrLocalIndex[3];
+		size_t arrGlobalIndex[3];
+		for(int i=0; i<3; i++)
+			arrGlobalIndex[i] = m_gridParam.ctGridPoints[i];
+
+		ComputeKernel::ComputeLocalIndexSpace(3, m_lpKernelComputeEdgeTable->getKernelWorkGroupSize(), arrLocalIndex);
+		ComputeKernel::ComputeGlobalIndexSpace(3, arrLocalIndex, arrGlobalIndex);
 
 
 		return 1;
@@ -766,9 +779,13 @@ namespace HPC{
 
 	int GPUPoly::computeEdgeTable()
 	{
-		size_t szNeeded[3];
+		size_t arrLocalIndex[3];
+		size_t arrGlobalIndex[3];
 		for(int i=0; i<3; i++)
-			szNeeded[i] = m_gridParam.ctGridPoints[i];
+			arrGlobalIndex[i] = m_gridParam.ctGridPoints[i];
+
+		ComputeKernel::ComputeLocalIndexSpace(3, m_lpKernelComputeEdgeTable->getKernelWorkGroupSize(), arrLocalIndex);
+		ComputeKernel::ComputeGlobalIndexSpace(3, arrLocalIndex, arrGlobalIndex);
 
 		//Buffers for edge table
 		m_inoutHighEdgesCount = m_lpGPU->createMemBuffer(sizeof(U32) * m_gridParam.ctTotalPoints, ComputeDevice::memReadWrite);
@@ -787,7 +804,7 @@ namespace HPC{
 
 
 		cl_int err = clEnqueueNDRangeKernel(m_lpGPU->getCommandQ(), m_lpKernelComputeEdgeTable->getKernel(),
-									 	    3, NULL, szNeeded, NULL, 0, NULL, NULL);
+									 	    3, NULL, arrGlobalIndex, arrLocalIndex, 0, NULL, NULL);
 		if (err) {
 			LogErrorArg1("Error: Failed to execute ComputeAllFields kernel! (%s)", ComputeDevice::oclErrorString(err));
 			return EXIT_FAILURE;
@@ -806,7 +823,6 @@ namespace HPC{
 		svec3f lower = svec3f(m_arrHeader[0], m_arrHeader[1], m_arrHeader[2]);
 		svec3f upper = svec3f(m_arrHeader[4], m_arrHeader[5], m_arrHeader[6]);
 		svec3f temp = vscale3f(1.0f/ cellsize, vsub3f(upper, lower));
-		size_t szWG = m_lpKernelComputeAllFields->getKernelWorkGroupSize();
 
 		//Cell Params
 		m_cellParam.ctNeededCells[0] = (U32)ceil(temp.x) + 1;
@@ -822,9 +838,14 @@ namespace HPC{
 		m_gridParam.ctTotalPoints = m_gridParam.ctGridPoints[0] * m_gridParam.ctGridPoints[1] * m_gridParam.ctGridPoints[2];
 		m_gridParam.cellsize = cellsize;
 
-		size_t szNeeded[3];
+
+		size_t arrLocalIndex[3];
+		size_t arrGlobalIndex[3];
 		for(int i=0; i<3; i++)
-			szNeeded[i] = m_gridParam.ctGridPoints[i];
+			arrGlobalIndex[i] = m_gridParam.ctGridPoints[i];
+
+		ComputeKernel::ComputeLocalIndexSpace(3, m_lpKernelComputeAllFields->getKernelWorkGroupSize(), arrLocalIndex);
+		ComputeKernel::ComputeGlobalIndexSpace(3, arrLocalIndex, arrGlobalIndex);
 
 		//CellParams
 		m_inMemGridParam = m_lpGPU->createMemBuffer(sizeof(GridParam), ComputeDevice::memReadOnly);
@@ -833,7 +854,6 @@ namespace HPC{
 
 		//Create Memory for all field points
 		m_inoutAllFields = m_lpGPU->createMemBuffer(sizeof(float) * 4 * m_gridParam.ctTotalPoints, ComputeDevice::memReadWrite);
-
 
 		/*
 		__kernel void ComputeAllFields(__global float4* arrInHeader4,
@@ -853,7 +873,7 @@ namespace HPC{
 		// Execute the kernel over the vector using the
 		// maximum number of work group items for this device
 		cl_int err = clEnqueueNDRangeKernel(m_lpGPU->getCommandQ(), m_lpKernelComputeAllFields->getKernel(),
-									 	    3, NULL, szNeeded, NULL, 0, NULL, NULL);
+									 	    3, NULL, arrGlobalIndex, arrLocalIndex, 0, NULL, NULL);
 		if (err) {
 			LogErrorArg1("Error: Failed to execute ComputeAllFields kernel! (%s)", ComputeDevice::oclErrorString(err));
 			return EXIT_FAILURE;
