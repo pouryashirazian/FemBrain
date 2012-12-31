@@ -11,7 +11,8 @@
 #include "PS_ReadSceneModel.h"
 #include "_CellConfigTable.h"
 #include "_CellConfigTableCompact.h"
-
+#include "../PS_Graphics/PS_DebugUtils.h"
+#include "../PS_Graphics/PS_OclSumScan.h"
 
 #include <iostream>
 #include <GL/glew.h>
@@ -23,11 +24,9 @@
 
 using namespace std;
 using namespace PS;
+using namespace PS::DEBUG;
 using namespace PS::FILESTRINGUTILS;
 using namespace PS::HPC;
-
-
-#define DATA_SIZE (1024*512)
 
 #define SUCCESS 1
 #define ERR_GPUPOLY_KERNEL_NOT_BUILT -1
@@ -35,23 +34,15 @@ using namespace PS::HPC;
 #define ERR_GPUPOLY_BUFFER_NOT_READ -3
 #define ERR_GPUPOLY_TRITABLE_NOT_READ -4
 #define ERR_GPUPOLY_VERTEXTABLE_NOT_READ -5
+#define ERR_GPUPOLY_FIELDSTABLE	-6
 #define ERR_NO_CROSSED_CELLS -6
+
 
 #define MAX_VERTICES_COUNT_PER_CELL		15
 #define MAX_TRIANGLES_COUNT_PER_CELL	5
 
 
-const char *KernelSource = "\n"		      \
-        "__kernel void square(                    \n" \
-        "   __global float* input,                \n" \
-        "   __global float* output,               \n" \
-        "   const unsigned int count)             \n" \
-        "{                                        \n" \
-        "   int i = get_global_id(0);             \n" \
-        "   if(i < count)                         \n" \
-        "       output[i] = input[i] * input[i];  \n" \
-        "}                                        \n" \
-        "\n";
+
 
 
 namespace PS{
@@ -84,6 +75,7 @@ namespace HPC{
 		clReleaseMemObject(m_inMemTriangleTable);
 		clReleaseMemObject(m_inMemVertexCountTable);
 		SAFE_DELETE(m_lpGPU);
+		SAFE_DELETE(m_lpOclSumScan);
 	}
 
 	
@@ -241,9 +233,9 @@ namespace HPC{
 		//const int edgeaxis[12]   = {AAZ,AAZ,AAY,AAY,AAZ,AAZ,AAY,AAY,AAX,AAX,AAX,AAX};
 		for(int i=0; i<12; i++)
 		{
-			m_param.corner1[i] = (U8)corner1[i];
-			m_param.corner2[i] = (U8)corner2[i];
-			m_param.edgeaxis[i] = (U8)edgeaxis[i];
+			m_cellParam.corner1[i] = (U8)corner1[i];
+			m_cellParam.corner2[i] = (U8)corner2[i];
+			m_cellParam.edgeaxis[i] = (U8)edgeaxis[i];
 		}		
 
 		//Model memories
@@ -380,6 +372,10 @@ namespace HPC{
 		m_lpKernelComputeConfig = lpProgram->addKernel("ComputeConfig");
 		m_lpKernelComputeMesh = lpProgram->addKernel("ComputeMesh");
 		m_lpKernelComputeAllFields = lpProgram->addKernel("ComputeAllFields");
+		m_lpGPU->getKernelWorkgroupSize(m_lpKernelComputeAllFields);
+
+		m_lpKernelComputeEdgeTable = lpProgram->addKernel("ComputeEdgeTable");
+		m_lpGPU->getKernelWorkgroupSize(m_lpKernelComputeEdgeTable);
 
 
 		//Load Marching Cubes tables
@@ -429,9 +425,11 @@ namespace HPC{
 		}
 #endif
 
+		m_lpOclSumScan = new SumScan();
 		m_bModelLoaded = false;
 		return 1;
 	}
+
 
 
 	/*!
@@ -448,12 +446,11 @@ namespace HPC{
 		svec3f temp = vscale3f(1.0f/ cellsize, vsub3f(upper, lower));
 		
 		//Cell Params
-		m_param.ctNeededCells[0] = (U32)ceil(temp.x) + 1;
-		m_param.ctNeededCells[1] = (U32)ceil(temp.y) + 1;
-		m_param.ctNeededCells[2] = (U32)ceil(temp.z) + 1;
-		m_param.ctTotalCells = m_param.ctNeededCells[0] * m_param.ctNeededCells[1] * m_param.ctNeededCells[2];
-		m_param.cellsize = cellsize;
-		m_ctCells = m_param.ctTotalCells;
+		m_cellParam.ctNeededCells[0] = (U32)ceil(temp.x) + 1;
+		m_cellParam.ctNeededCells[1] = (U32)ceil(temp.y) + 1;
+		m_cellParam.ctNeededCells[2] = (U32)ceil(temp.z) + 1;
+		m_cellParam.ctTotalCells = m_cellParam.ctNeededCells[0] * m_cellParam.ctNeededCells[1] * m_cellParam.ctNeededCells[2];
+		m_cellParam.cellsize = cellsize;
 
 		//Check Matrices
 		for(U32 i = 0; i < m_mtxNode.count; i++)
@@ -469,12 +466,12 @@ namespace HPC{
 		}
 
 		//CellConfig and VertexCount
-		cl_mem inoutMemCellConfig = m_lpGPU->createMemBuffer(sizeof(U8) * m_ctCells, ComputeDevice::memReadWrite);
-		cl_mem inoutMemVertexCount = m_lpGPU->createMemBuffer(sizeof(U8) * m_ctCells, ComputeDevice::memReadWrite);
+		cl_mem inoutMemCellConfig = m_lpGPU->createMemBuffer(sizeof(U8) * m_cellParam.ctTotalCells, ComputeDevice::memReadWrite);
+		cl_mem inoutMemVertexCount = m_lpGPU->createMemBuffer(sizeof(U8) * m_cellParam.ctTotalCells, ComputeDevice::memReadWrite);
 			
 		//CellParams
 		cl_mem inMemCellParams = m_lpGPU->createMemBuffer(sizeof(CellParam), ComputeDevice::memReadOnly);
-		if(!m_lpGPU->enqueueWriteBuffer(inMemCellParams, sizeof(CellParam), &m_param))
+		if(!m_lpGPU->enqueueWriteBuffer(inMemCellParams, sizeof(CellParam), &m_cellParam))
 			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
 		
 		//Kernel1
@@ -506,7 +503,7 @@ namespace HPC{
 		// maximum number of work group items for this device
 		size_t szNeeded[3];
 		for(int i=0; i<3; i++)
-			szNeeded[i] = m_param.ctNeededCells[i];
+			szNeeded[i] = m_cellParam.ctNeededCells[i];
 
 		//Run Config Kernel to classify the cells
 		cl_int err = clEnqueueNDRangeKernel(m_lpGPU->getCommandQ(), m_lpKernelComputeConfig->getKernel(),
@@ -521,19 +518,19 @@ namespace HPC{
 
 		///////////////////////////////////////////////////////////////////////////////
 		// Read back the results from the device to verify the output
-		U8* arrVertexCount = new U8[m_ctCells];
-		U8* arrConfigIndex = new U8[m_ctCells];		
-		U32* arrVertexBufferOffset = new U32[m_ctCells];
-		U32* arrTetMeshOffset = new U32[m_ctCells];
+		U8* arrVertexCount = new U8[m_cellParam.ctTotalCells];
+		U8* arrConfigIndex = new U8[m_cellParam.ctTotalCells];
+		U32* arrVertexBufferOffset = new U32[m_cellParam.ctTotalCells];
+		U32* arrTetMeshOffset = new U32[m_cellParam.ctTotalCells];
 
 		U32 ctSumVertices = 0;
 		U32 ctCrossedOnly = 0;
 		U32 ctCrossedOrInside = 0;
-		if(m_lpGPU->enqueueReadBuffer(inoutMemVertexCount, sizeof(U8) * m_ctCells, arrVertexCount) &&
-		   m_lpGPU->enqueueReadBuffer(inoutMemCellConfig, sizeof(U8) * m_ctCells, arrConfigIndex))		  
+		if(m_lpGPU->enqueueReadBuffer(inoutMemVertexCount, sizeof(U8) * m_cellParam.ctTotalCells, arrVertexCount) &&
+		   m_lpGPU->enqueueReadBuffer(inoutMemCellConfig, sizeof(U8) * m_cellParam.ctTotalCells, arrConfigIndex))
 		{						
 			//Compute Vertex Buffer offsets for writing the output to
-			for(U32 i=0; i < m_ctCells; i++)
+			for(U32 i=0; i < m_cellParam.ctTotalCells; i++)
 			{
 				arrVertexBufferOffset[i] = ctSumVertices;
 				arrTetMeshOffset[i] = ctCrossedOrInside;
@@ -566,14 +563,14 @@ namespace HPC{
 
 		//Vertex buffer offset
 		cl_mem inMemVertexBufferOffset;
-		inMemVertexBufferOffset = m_lpGPU->createMemBuffer(sizeof(U32) * m_ctCells, ComputeDevice::memReadOnly);
-		if(!m_lpGPU->enqueueWriteBuffer(inMemVertexBufferOffset, sizeof(U32) * m_ctCells, arrVertexBufferOffset))
+		inMemVertexBufferOffset = m_lpGPU->createMemBuffer(sizeof(U32) * m_cellParam.ctTotalCells, ComputeDevice::memReadOnly);
+		if(!m_lpGPU->enqueueWriteBuffer(inMemVertexBufferOffset, sizeof(U32) * m_cellParam.ctTotalCells, arrVertexBufferOffset))
 			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
 
 		//Tetmesh buffer offset
 		cl_mem inMemTetMeshBufferOffset;
-		inMemTetMeshBufferOffset = m_lpGPU->createMemBuffer(sizeof(U32) * m_ctCells, ComputeDevice::memReadOnly);
-		if(!m_lpGPU->enqueueWriteBuffer(inMemTetMeshBufferOffset, sizeof(U32) * m_ctCells, arrTetMeshOffset))
+		inMemTetMeshBufferOffset = m_lpGPU->createMemBuffer(sizeof(U32) * m_cellParam.ctTotalCells, ComputeDevice::memReadOnly);
+		if(!m_lpGPU->enqueueWriteBuffer(inMemTetMeshBufferOffset, sizeof(U32) * m_cellParam.ctTotalCells, arrTetMeshOffset))
 			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
 
 		//////////////////////////////////////////////////////////////////////////
@@ -745,82 +742,116 @@ namespace HPC{
 		//Clear previous mesh
 		GLMeshBuffer::cleanup();
 
+		//1. Compute All Fields
+		computeAllFields(cellsize);
+
+		//2. Compute Edge Table
+		computeEdgeTable();
+
+		//Readback EdgeCount
+		U32* lpEdgeTableHighEdgesCount = new U32[m_gridParam.ctTotalPoints];
+		m_lpGPU->enqueueReadBuffer(m_inoutHighEdgesCount, m_gridParam.ctTotalPoints, lpEdgeTableHighEdgesCount);
+
+		PrintArray(lpEdgeTableHighEdgesCount, m_gridParam.ctTotalPoints);
+
+		//3. SumScan to compute crossed edges
+		U32 ctVertices = m_lpOclSumScan->compute(lpEdgeTableHighEdgesCount, m_gridParam.ctTotalPoints);
+
+		PrintArray(lpEdgeTableHighEdgesCount, m_gridParam.ctTotalPoints);
+
+
+
+		return 1;
+	}
+
+	int GPUPoly::computeEdgeTable()
+	{
+		size_t szNeeded[3];
+		for(int i=0; i<3; i++)
+			szNeeded[i] = m_gridParam.ctGridPoints[i];
+
+		//Buffers for edge table
+		m_inoutHighEdgesCount = m_lpGPU->createMemBuffer(sizeof(U32) * m_gridParam.ctTotalPoints, ComputeDevice::memReadWrite);
+		m_inoutHighEdgesFlags = m_lpGPU->createMemBuffer(sizeof(U8) * m_gridParam.ctTotalPoints, ComputeDevice::memReadWrite);
+
+		/*
+		 * __kernel void ComputeEdgeTable(__global float4* arrInFields,
+							   __constant struct GridParam* inGridParam,
+							   __global U32* arrOutHighEdgesCount,
+							   __global U8* arrOutHighEdgesFlags)
+		 */
+		m_lpKernelComputeEdgeTable->setArg(0, sizeof(cl_mem), &m_inoutAllFields);
+		m_lpKernelComputeEdgeTable->setArg(1, sizeof(cl_mem), &m_inMemGridParam);
+		m_lpKernelComputeEdgeTable->setArg(2, sizeof(cl_mem), &m_inoutHighEdgesCount);
+		m_lpKernelComputeEdgeTable->setArg(3, sizeof(cl_mem), &m_inoutHighEdgesFlags);
+
+
+		cl_int err = clEnqueueNDRangeKernel(m_lpGPU->getCommandQ(), m_lpKernelComputeEdgeTable->getKernel(),
+									 	    3, NULL, szNeeded, NULL, 0, NULL, NULL);
+		if (err) {
+			LogErrorArg1("Error: Failed to execute ComputeAllFields kernel! (%s)", ComputeDevice::oclErrorString(err));
+			return EXIT_FAILURE;
+		}
+
+		// Wait for all commands to complete
+		m_lpGPU->finishAllCommands();
+
+
+		return 1;
+	}
+
+	int GPUPoly::computeAllFields(float cellsize)
+	{
 		//BBOX
 		svec3f lower = svec3f(m_arrHeader[0], m_arrHeader[1], m_arrHeader[2]);
 		svec3f upper = svec3f(m_arrHeader[4], m_arrHeader[5], m_arrHeader[6]);
 		svec3f temp = vscale3f(1.0f/ cellsize, vsub3f(upper, lower));
+		size_t szWG = m_lpKernelComputeAllFields->getKernelWorkGroupSize();
 
 		//Cell Params
-		m_param.ctNeededCells[0] = (U32)ceil(temp.x) + 1;
-		m_param.ctNeededCells[1] = (U32)ceil(temp.y) + 1;
-		m_param.ctNeededCells[2] = (U32)ceil(temp.z) + 1;
-		m_param.ctTotalCells = m_param.ctNeededCells[0] * m_param.ctNeededCells[1] * m_param.ctNeededCells[2];
-		m_param.cellsize = cellsize;
-		m_ctCells = m_param.ctTotalCells;
+		m_cellParam.ctNeededCells[0] = (U32)ceil(temp.x) + 1;
+		m_cellParam.ctNeededCells[1] = (U32)ceil(temp.y) + 1;
+		m_cellParam.ctNeededCells[2] = (U32)ceil(temp.z) + 1;
+		m_cellParam.ctTotalCells = m_cellParam.ctNeededCells[0] * m_cellParam.ctNeededCells[1] * m_cellParam.ctNeededCells[2];
+		m_cellParam.cellsize = cellsize;
+
+		//Grid Params
+		m_gridParam.ctGridPoints[0] = m_cellParam.ctNeededCells[0] + 1;
+		m_gridParam.ctGridPoints[1] = m_cellParam.ctNeededCells[1] + 1;
+		m_gridParam.ctGridPoints[2] = m_cellParam.ctNeededCells[2] + 1;
+		m_gridParam.ctTotalPoints = m_gridParam.ctGridPoints[0] * m_gridParam.ctGridPoints[1] * m_gridParam.ctGridPoints[2];
+		m_gridParam.cellsize = cellsize;
+
+		size_t szNeeded[3];
+		for(int i=0; i<3; i++)
+			szNeeded[i] = m_gridParam.ctGridPoints[i];
 
 		//CellParams
-		cl_mem inMemCellParams = m_lpGPU->createMemBuffer(sizeof(CellParam), ComputeDevice::memReadOnly);
-		if(!m_lpGPU->enqueueWriteBuffer(inMemCellParams, sizeof(CellParam), &m_param))
+		m_inMemGridParam = m_lpGPU->createMemBuffer(sizeof(GridParam), ComputeDevice::memReadOnly);
+		if(!m_lpGPU->enqueueWriteBuffer(m_inMemGridParam, sizeof(GridParam), &m_gridParam))
 			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
 
+		//Create Memory for all field points
+		m_inoutAllFields = m_lpGPU->createMemBuffer(sizeof(float) * 4 * m_gridParam.ctTotalPoints, ComputeDevice::memReadWrite);
 
-		//GLBUFFERS
-		m_stepVertex = 4;
-		m_stepColor = 4;
-		GLsizeiptr szVertexBuffer = m_ctCells * m_stepVertex * sizeof(float);
-		GLsizeiptr szNormalBuffer = m_ctCells * 3 * sizeof(float);
-
-		//Vertex
-		glGenBuffers(1, &m_vboVertex);
-		glBindBuffer(GL_ARRAY_BUFFER, m_vboVertex);
-		glBufferData(GL_ARRAY_BUFFER, szVertexBuffer, 0, GL_DYNAMIC_DRAW);
-		cl_mem outMemMeshVertex = m_lpGPU->createMemBufferFromGL(m_vboVertex, ComputeDevice::memWriteOnly);
-
-		//Color
-		glGenBuffers(1, &m_vboColor);
-		glBindBuffer(GL_ARRAY_BUFFER, m_vboColor);
-		glBufferData(GL_ARRAY_BUFFER, szVertexBuffer, 0, GL_DYNAMIC_DRAW);
-		cl_mem outMemMeshColor = m_lpGPU->createMemBufferFromGL(m_vboColor, ComputeDevice::memWriteOnly);
-
-		//Normal
-		glGenBuffers(1, &m_vboNormal);
-		glBindBuffer(GL_ARRAY_BUFFER, m_vboNormal);
-		glBufferData(GL_ARRAY_BUFFER, szNormalBuffer, 0, GL_DYNAMIC_DRAW);
-		cl_mem outMemMeshNormal = m_lpGPU->createMemBufferFromGL(m_vboNormal, ComputeDevice::memWriteOnly);
 
 		/*
 		__kernel void ComputeAllFields(__global float4* arrInHeader4,
 									   __global float4* arrInOps4,
 									   __global float4* arrInPrims4,
 									   __global float4* arrInMtxNodes4,
-									   __constant struct CellParam* inCellParams,
-									   __global float4* arrOutMeshVertex,
-									   __global float4* arrOutMeshColor,
-									   __global float* arrOutMeshNormal)
-		*/
+									   __constant struct GridParam* inGridParam,
+									   __global float4* arrOutFields)
+									   */
 		m_lpKernelComputeAllFields->setArg(0, sizeof(cl_mem), &m_inMemHeader);
 		m_lpKernelComputeAllFields->setArg(1, sizeof(cl_mem), &m_inMemOps);
 		m_lpKernelComputeAllFields->setArg(2, sizeof(cl_mem), &m_inMemPrims);
 		m_lpKernelComputeAllFields->setArg(3, sizeof(cl_mem), &m_inMemMtx);
-		m_lpKernelComputeAllFields->setArg(4, sizeof(cl_mem), &inMemCellParams);
-
-		//Output mesh
-		m_lpKernelComputeAllFields->setArg(5, sizeof(cl_mem), &outMemMeshVertex);
-		m_lpKernelComputeAllFields->setArg(6, sizeof(cl_mem), &outMemMeshColor);
-		m_lpKernelComputeAllFields->setArg(7, sizeof(cl_mem), &outMemMeshNormal);
-
-
-		//Acquire Mesh for Writing
-		clEnqueueAcquireGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshVertex, 0, 0, 0);
-		clEnqueueAcquireGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshColor, 0, 0, 0);
-		clEnqueueAcquireGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshNormal, 0, 0, 0);
+		m_lpKernelComputeAllFields->setArg(4, sizeof(cl_mem), &m_inMemGridParam);
+		m_lpKernelComputeAllFields->setArg(5, sizeof(cl_mem), &m_inoutAllFields);
 
 		// Execute the kernel over the vector using the
 		// maximum number of work group items for this device
-		size_t szNeeded[3];
-		for(int i=0; i<3; i++)
-			szNeeded[i] = m_param.ctNeededCells[i];
-
 		cl_int err = clEnqueueNDRangeKernel(m_lpGPU->getCommandQ(), m_lpKernelComputeAllFields->getKernel(),
 									 	    3, NULL, szNeeded, NULL, 0, NULL, NULL);
 		if (err) {
@@ -831,482 +862,13 @@ namespace HPC{
 		// Wait for all commands to complete
 		m_lpGPU->finishAllCommands();
 
-		//Release Mesh for Writing
-		clEnqueueReleaseGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshVertex, 0, 0, 0);
-		clEnqueueReleaseGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshColor, 0, 0, 0);
-		clEnqueueReleaseGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshNormal, 0, 0, 0);
-		m_isValidVertex = m_isValidColor = m_isValidNormal = true;
-		m_ctVertices = m_ctCells;
-		m_ctFaceElements = m_ctCells;
-		m_faceMode = ftPoints;
-
-		clReleaseMemObject(inMemCellParams);
-
 		return 1;
 	}
 
-	int Run_SphereDistKernel()
-	{
-		DAnsiStr strFP = ExtractOneLevelUp(ExtractFilePath(GetExePath()));
-		strFP += DAnsiStr("/PS_OpenCLKernels/SphereDist.cl");
-		PS::HPC::ComputeDevice* lpGPU = new ComputeDevice(ComputeDevice::dtGPU);
-		lpGPU->printInfo();
 
-		ComputeProgram* lpProgram = lpGPU->addProgramFromFile(strFP.cptr());
-		if(lpProgram)
-		{
-			ComputeKernel* lpKernel = lpProgram->addKernel("distSphere");
-
-			//Input Pos
-			float* arrPosX = new float[DATA_SIZE];
-			float* arrPosY = new float[DATA_SIZE];
-			float* arrPosZ = new float[DATA_SIZE];
-
-			//Output Dist
-			float* arrDist = new float[DATA_SIZE];
-
-			//Number of correct results returned
-			unsigned int correct;
-			cl_mem inMemPosX;
-			cl_mem inMemPosY;
-			cl_mem inMemPosZ;
-			cl_mem outMemDist;
-
-			// Fill the vector with random float values
-			U32 count = DATA_SIZE;
-			for(U32 i = 0; i < count; i++)
-			{
-				arrPosX[i] = rand() / (float)RAND_MAX;
-				arrPosY[i] = rand() / (float)RAND_MAX;
-				arrPosZ[i] = rand() / (float)RAND_MAX;
-			}
-
-
-			// Create the device memory vectors
-			inMemPosX = lpGPU->createMemBuffer(sizeof(float) * count, ComputeDevice::memReadOnly);
-			inMemPosY = lpGPU->createMemBuffer(sizeof(float) * count, ComputeDevice::memReadOnly);
-			inMemPosZ = lpGPU->createMemBuffer(sizeof(float) * count, ComputeDevice::memReadOnly);
-			outMemDist = lpGPU->createMemBuffer(sizeof(float) * count, ComputeDevice::memWriteOnly);
-
-			// Transfer the input vector into device memory.
-			//PosX
-			if(!lpGPU->enqueueWriteBuffer(inMemPosX, sizeof(float) * count, arrPosX))
-				return -1;
-
-			//PosY
-			if(!lpGPU->enqueueWriteBuffer(inMemPosY, sizeof(float) * count, arrPosY))
-				return -1;
-
-			//PosZ
-			if(!lpGPU->enqueueWriteBuffer(inMemPosZ, sizeof(float) * count, arrPosZ))
-				return -1;
-
-			// Set the arguments to the compute kernel
-			lpKernel->setArg(0, sizeof(cl_mem), &inMemPosX);
-			lpKernel->setArg(1, sizeof(cl_mem), &inMemPosY);
-			lpKernel->setArg(2, sizeof(cl_mem), &inMemPosZ);
-			lpKernel->setArg(3, sizeof(cl_mem), &outMemDist);
-			lpKernel->setArg(4, sizeof(U32), &count);
-
-			size_t local;
-			size_t global;
-			// Get the maximum work group size for executing the kernel on the device
-			cl_int err = clGetKernelWorkGroupInfo(lpKernel->getKernel(),
-				lpGPU->getDevice(),
-				CL_KERNEL_WORK_GROUP_SIZE,
-				sizeof(local), &local, NULL);
-			if (err != CL_SUCCESS) {
-				cerr << "Error: Failed to retrieve kernel work group info! "
-					<<  err << endl;
-				exit(1);
-			}
-
-			// Execute the kernel over the vector using the
-			// maximum number of work group items for this device
-			global = count;
-			err = clEnqueueNDRangeKernel(lpGPU->getCommandQ(), lpKernel->getKernel(),
-				1, NULL, &global, &local,
-				0, NULL, NULL);
-			if (err) {
-				cerr << "Error: Failed to execute kernel!" << endl;
-				return EXIT_FAILURE;
-			}
-
-			// Wait for all commands to complete
-			lpGPU->finishAllCommands();
-
-			// Read back the results from the device to verify the output
-			if(!lpGPU->enqueueReadBuffer(outMemDist, sizeof(float) * count, arrDist))
-			{
-				return -1;
-			}
-
-			// Validate our results
-			//
-			correct = 0;
-			float current;
-			float v;
-			for(U32 i = 0; i < count; i++)
-			{
-				current = arrDist[i];
-				v =	arrPosX[i] * arrPosX[i] + arrPosY[i] * arrPosY[i] + arrPosZ[i] * arrPosZ[i];
-				if(FLOAT_EQ(current, v))
-					correct++;
-			}
-
-			// Print a brief summary detailing the results
-			cout << "Computed " << correct << "/" << count << " correct values" << endl;
-			cout << "Computed " << 100.f * (float)correct/(float)count
-				<< "% correct values" << endl;
-
-			// Shutdown and cleanup
-			SAFE_DELETE_ARRAY(arrPosX);
-			SAFE_DELETE_ARRAY(arrPosY);
-			SAFE_DELETE_ARRAY(arrPosZ);
-			SAFE_DELETE_ARRAY(arrDist);
-
-			clReleaseMemObject(inMemPosX);
-			clReleaseMemObject(inMemPosY);
-			clReleaseMemObject(inMemPosZ);
-			clReleaseMemObject(outMemDist);
-		}
-
-
-		SAFE_DELETE(lpGPU);
-		return 1;
-	}
-
-/*
-
-	int GPUPoly::run(float cellsize)
-	{
-		m_meshBuffer.cleanup();
-
-		DAnsiStr strFP = ExtractFilePath(GetExePath());
-		strFP = ExtractOneLevelUp(strFP);
-		strFP += DAnsiStr("/AA_Shaders/Polygonizer.cl");
-		PS::HPC::ComputeDevice* lpGPU = new ComputeDevice(ComputeDevice::dtGPU, true);
-		lpGPU->printInfo();
-
-		ComputeProgram* lpProgram = lpGPU->addProgramFromFile(strFP.cptr());
-		if(lpProgram == NULL)
-			return ERR_GPUPOLY_KERNEL_NOT_BUILT;
-
-		ComputeKernel* lpKernel = lpProgram->addKernel("poly");
-
-		//Buffers
-		glGenBuffers(1, &m_meshBuffer.vboVertex);
-		glBindBuffer(GL_ARRAY_BUFFER, m_meshBuffer.vboVertex);
-		glBufferData(GL_ARRAY_BUFFER, DATA_SIZE * 4 * sizeof(float), 0, GL_DYNAMIC_DRAW);
-		cl_mem outMemMeshVertex = clCreateFromGLBuffer(lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_meshBuffer.vboVertex, NULL);
-
-		glGenBuffers(1, &m_meshBuffer.vboColor);
-		glBindBuffer(GL_ARRAY_BUFFER, m_meshBuffer.vboColor);
-		glBufferData(GL_ARRAY_BUFFER, DATA_SIZE * 4 * sizeof(float), 0, GL_DYNAMIC_DRAW);
-		cl_mem outMemMeshColor = clCreateFromGLBuffer(lpGPU->getContext(), CL_MEM_WRITE_ONLY, m_meshBuffer.vboColor, NULL);
-
-
-		//Input Pos
-		cl_mem inMemPosX;
-		cl_mem inMemPosY;
-		cl_mem inMemPosZ;
-
-		// Fill the vector with random float values
-		U32 count = DATA_SIZE;
-		float* arrPosX = new float[DATA_SIZE];
-		float* arrPosY = new float[DATA_SIZE];
-		float* arrPosZ = new float[DATA_SIZE];
-		for(U32 i = 0; i < DATA_SIZE; i++)
-		{
-			arrPosX[i] = rand() / (float)RAND_MAX;
-			arrPosY[i] = rand() / (float)RAND_MAX;
-			arrPosZ[i] = rand() / (float)RAND_MAX;
-		}
-
-
-		// Create the device memory vectors
-		inMemPosX = lpGPU->createMemBuffer(sizeof(float) * count, ComputeDevice::memReadOnly);
-		inMemPosY = lpGPU->createMemBuffer(sizeof(float) * count, ComputeDevice::memReadOnly);
-		inMemPosZ = lpGPU->createMemBuffer(sizeof(float) * count, ComputeDevice::memReadOnly);
-
-		// Transfer the input vector into device memory.
-		//PosX
-		if(!lpGPU->enqueueWriteBuffer(inMemPosX, sizeof(float) * count, arrPosX))
-			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
-
-		//PosY
-		if(!lpGPU->enqueueWriteBuffer(inMemPosY, sizeof(float) * count, arrPosY))
-			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
-
-		//PosZ
-		if(!lpGPU->enqueueWriteBuffer(inMemPosZ, sizeof(float) * count, arrPosZ))
-			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
-
-
-		// Set the arguments to the compute kernel
-		lpKernel->setArg(0, sizeof(cl_mem), &outMemMeshVertex);
-		lpKernel->setArg(1, sizeof(cl_mem), &outMemMeshColor);
-		lpKernel->setArg(2, sizeof(cl_mem), &inMemPosX);
-		lpKernel->setArg(3, sizeof(cl_mem), &inMemPosY);
-		lpKernel->setArg(4, sizeof(cl_mem), &inMemPosZ);
-		lpKernel->setArg(5, sizeof(U32), &count);
-
-		//Acquire Mesh for Writing
-		clEnqueueAcquireGLObjects(lpGPU->getCommandQ(), 1, &outMemMeshVertex, 0, 0, 0);
-		clEnqueueAcquireGLObjects(lpGPU->getCommandQ(), 1, &outMemMeshColor, 0, 0, 0);
-
-
-		size_t local;
-		size_t global;
-		// Get the maximum work group size for executing the kernel on the device
-		cl_int err = clGetKernelWorkGroupInfo(lpKernel->getKernel(),
-				lpGPU->getDevice(),
-				CL_KERNEL_WORK_GROUP_SIZE,
-				sizeof(local), &local, NULL);
-		if (err != CL_SUCCESS) {
-			cerr << "Error: Failed to retrieve kernel work group info! "
-					<<  err << endl;
-			exit(1);
-		}
-
-		// Execute the kernel over the vector using the
-		// maximum number of work group items for this device
-		global = count;
-		err = clEnqueueNDRangeKernel(lpGPU->getCommandQ(), lpKernel->getKernel(),
-				1, NULL, &global, &local,
-				0, NULL, NULL);
-		if (err) {
-			char buffer[1024];
-			sprintf(buffer, "Error: Failed to execute kernel! (%s)", ComputeDevice::oclErrorString(err));
-			cerr << buffer << endl;
-			return EXIT_FAILURE;
-		}
-
-		// Wait for all commands to complete
-		lpGPU->finishAllCommands();
-
-		//Release Mesh for Writing
-		clEnqueueReleaseGLObjects(lpGPU->getCommandQ(), 1, &outMemMeshVertex, 0, 0, 0);
-		clEnqueueReleaseGLObjects(lpGPU->getCommandQ(), 1, &outMemMeshColor, 0, 0, 0);
-
-		m_meshBuffer.bIsValid = true;
-
-
-		// Shutdown and cleanup
-		SAFE_DELETE_ARRAY(arrPosX);
-		SAFE_DELETE_ARRAY(arrPosY);
-		SAFE_DELETE_ARRAY(arrPosZ);
-
-		clReleaseMemObject(inMemPosX);
-		clReleaseMemObject(inMemPosY);
-		clReleaseMemObject(inMemPosZ);
-
-
-
-		SAFE_DELETE(lpGPU);
-		return 1;
-	}
-	*/
 
 }
 }
 
 
-int Run_ArrayTestKernel()
-{
-    int devType=CL_DEVICE_TYPE_GPU;
-
-    cl_int err;     // error code returned from api calls
-
-    size_t global;  // global domain size for our calculation
-    size_t local;   // local domain size for our calculation
-
-    cl_platform_id cpPlatform; // OpenCL platform
-    cl_device_id device_id;    // compute device id
-    cl_context context;        // compute context
-    cl_command_queue commands; // compute command queue
-    cl_program program;        // compute program
-    cl_kernel kernel;          // compute kernel
-
-    // Connect to a compute device
-    err = clGetPlatformIDs(1, &cpPlatform, NULL);
-    if (err != CL_SUCCESS) {
-        cerr << "Error: Failed to find a platform!" << endl;
-        return EXIT_FAILURE;
-    }
-
-    //Get Platform Info
-    char buffer[1024];
-    err = clGetPlatformInfo(cpPlatform, CL_PLATFORM_NAME, sizeof(buffer), buffer, NULL);
-    if (err != CL_SUCCESS) {
-        cerr << "Error: Failed to get CL_PLATFORM_NAME" << endl;
-        return EXIT_FAILURE;
-    }
-    cout << buffer << endl;
-
-
-    // Get a device of the appropriate type
-    err = clGetDeviceIDs(cpPlatform, devType, 1, &device_id, NULL);
-    if (err != CL_SUCCESS) {
-        cerr << "Error: Failed to create a device group!" << endl;
-        return EXIT_FAILURE;
-    }
-
-    err = clGetDeviceInfo(device_id, CL_DEVICE_NAME, sizeof(buffer), buffer, NULL);
-    if (err != CL_SUCCESS) {
-        cerr << "Error: Failed to get CL_DEVICE_NAME" << endl;
-        return EXIT_FAILURE;
-    }
-    cout << buffer << endl;
-    err = clGetDeviceInfo(device_id, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(buffer), buffer, NULL);
-    if (err != CL_SUCCESS) {
-        cerr << "Error: Failed to get CL_DEVICE_MAX_COMPUTE_UNITS" << endl;
-        return EXIT_FAILURE;
-    }
-    cout << buffer << endl;
-
-
-
-    // Create a compute context
-    context = clCreateContext(0, 1, &device_id, NULL, NULL, &err);
-    if (!context) {
-        cerr << "Error: Failed to create a compute context!" << endl;
-        return EXIT_FAILURE;
-    }
-
-    // Create a command commands
-    commands = clCreateCommandQueue(context, device_id, 0, &err);
-    if (!commands) {
-        cerr << "Error: Failed to create a command queue!" << endl;
-        return EXIT_FAILURE;
-    }
-
-    // Create the compute program from the source buffer
-    program = clCreateProgramWithSource(context, 1,
-                                        (const char **) &KernelSource,
-                                        NULL, &err);
-    if (!program) {
-        cerr << "Error: Failed to create compute program!" << endl;
-        return EXIT_FAILURE;
-    }
-
-    // Build the program executable
-    err = clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
-    if (err != CL_SUCCESS) {
-        size_t len;
-        char buffer[2048];
-
-        cerr << "Error: Failed to build program executable!" << endl;
-        clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG,
-                              sizeof(buffer), buffer, &len);
-        cerr << buffer << endl;
-        exit(1);
-    }
-
-    // Create the compute kernel in the program
-    kernel = clCreateKernel(program, "square", &err);
-    if (!kernel || err != CL_SUCCESS) {
-        cerr << "Error: Failed to create compute kernel!" << endl;
-        exit(1);
-    }
-
-    // create data for the run
-    float* data = new float[DATA_SIZE];    // original data set given to device
-    float* results = new float[DATA_SIZE]; // results returned from device
-    unsigned int correct;               // number of correct results returned
-    cl_mem input;                       // device memory used for the input array
-    cl_mem output;                      // device memory used for the output array
-
-    // Fill the vector with random float values
-    U32 count = DATA_SIZE;
-    for(U32 i = 0; i < count; i++)
-        data[i] = rand() / (float)RAND_MAX;
-
-    // Create the device memory vectors
-    //
-    input = clCreateBuffer(context,  CL_MEM_READ_ONLY,
-                           sizeof(float) * count, NULL, NULL);
-    output = clCreateBuffer(context, CL_MEM_WRITE_ONLY,
-                            sizeof(float) * count, NULL, NULL);
-    if (!input || !output) {
-        cerr << "Error: Failed to allocate device memory!" << endl;
-        exit(1);
-    }
-
-    // Transfer the input vector into device memory
-    err = clEnqueueWriteBuffer(commands, input,
-                               CL_TRUE, 0, sizeof(float) * count,
-                               data, 0, NULL, NULL);
-    if (err != CL_SUCCESS) {
-        cerr << "Error: Failed to write to source array!" << endl;
-        exit(1);
-    }
-
-    // Set the arguments to the compute kernel
-    err = 0;
-    err  = clSetKernelArg(kernel, 0, sizeof(cl_mem), &input);
-    err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &output);
-    err |= clSetKernelArg(kernel, 2, sizeof(unsigned int), &count);
-    if (err != CL_SUCCESS) {
-        cerr << "Error: Failed to set kernel arguments! " << err << endl;
-        exit(1);
-    }
-
-    // Get the maximum work group size for executing the kernel on the device
-    err = clGetKernelWorkGroupInfo(kernel, device_id,
-                                   CL_KERNEL_WORK_GROUP_SIZE,
-                                   sizeof(local), &local, NULL);
-    if (err != CL_SUCCESS) {
-        cerr << "Error: Failed to retrieve kernel work group info! "
-             <<  err << endl;
-        exit(1);
-    }
-
-    // Execute the kernel over the vector using the
-    // maximum number of work group items for this device
-    global = count;
-    err = clEnqueueNDRangeKernel(commands, kernel,
-                                 1, NULL, &global, &local,
-                                 0, NULL, NULL);
-    if (err) {
-        cerr << "Error: Failed to execute kernel!" << endl;
-        return EXIT_FAILURE;
-    }
-
-    // Wait for all commands to complete
-    clFinish(commands);
-
-    // Read back the results from the device to verify the output
-    err = clEnqueueReadBuffer( commands, output,
-                               CL_TRUE, 0, sizeof(float) * count,
-                               results, 0, NULL, NULL );
-    if (err != CL_SUCCESS) {
-        cerr << "Error: Failed to read output array! " <<  err << endl;
-        exit(1);
-    }
-
-    // Validate our results
-    correct = 0;
-    for(U32 i = 0; i < count; i++) {
-        if(results[i] == data[i] * data[i])
-            correct++;
-    }
-
-    // Print a brief summary detailing the results
-    cout << "Computed " << correct << "/" << count << " correct values" << endl;
-    cout << "Computed " << 100.f * (float)correct/(float)count
-         << "% correct values" << endl;
-
-    // Shutdown and cleanup
-    delete [] data; delete [] results;
-
-    clReleaseMemObject(input);
-    clReleaseMemObject(output);
-    clReleaseProgram(program);
-    clReleaseKernel(kernel);
-    clReleaseCommandQueue(commands);
-    clReleaseContext(context);
-
-    return 0;
-}
 

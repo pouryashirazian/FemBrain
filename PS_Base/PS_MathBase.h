@@ -101,6 +101,11 @@ const float EPSILON  = 0.0001f;
 #define ZERO_CLAMP(x)	((((x) > 0 && ((x) < EPSILON)) || ((x) < 0 && ((x) > -EPSILON)))?0.0f:(x) )
 
 //////////////////////////////////////////////////////////////////////////
+inline bool IsPow2(U32 x)
+{
+    return ((x&(x-1))==0);
+}
+
 inline int Log2f(float x)
 {
     unsigned int ix = (unsigned int&)x;
@@ -109,7 +114,7 @@ inline int Log2f(float x)
     return log2;
 }
 
-inline int Log2i(unsigned int x)
+inline int Log2i(U32 x)
 {
     return Log2f((float)x);
 }

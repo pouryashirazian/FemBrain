@@ -12,7 +12,7 @@
 
 //Passed down with -D option on clBuildProgram
 //Must be a power of two
-//#define WORKGROUP_SIZE 256
+#define WORKGROUP_SIZE 256
 
 
 

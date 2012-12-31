@@ -39,7 +39,7 @@ ComputeKernel* ComputeProgram::addKernel(const char *chrKernelTitle)
     // Create the compute kernel in the program
     cl_kernel k = clCreateKernel(m_clProgram, chrKernelTitle, &err);
     if (!k || err != CL_SUCCESS) {
-    	LogError("Failed to create compute kernel");
+    	LogErrorArg1("Failed to create compute kernel. Ocl Error: %s", ComputeDevice::oclErrorString(err));
         return NULL;
     }
 
@@ -702,6 +702,21 @@ ComputeProgram* ComputeDevice::addProgram(const char* chrComputeCode)
     return lpCompute;
 }
 
+void ComputeDevice::removeProgram(const ComputeProgram* lpProgram)
+{
+	U32 index = 0;
+	for(U32 i=0; i<m_lstPrograms.size(); i++)
+	{
+		if(m_lstPrograms[i] == lpProgram)
+		{
+			index = i;
+			break;
+		}
+	}
+
+	m_lstPrograms.erase(m_lstPrograms.begin() + index);
+}
+
 size_t ComputeDevice::getKernelWorkgroupSize(ComputeKernel* lpKernel)
 {
 	size_t szWorkGroup = 0;
@@ -713,6 +728,9 @@ size_t ComputeDevice::getKernelWorkgroupSize(ComputeKernel* lpKernel)
 	{
 		LogErrorArg1("Failed to retrieve kernel work group info! Ocl Error: %s", oclErrorString(err));
 	}
+
+	//Set Kernel WorkGroup Size
+	lpKernel->setKernelWorkGroupSize(szWorkGroup);
 
 	return szWorkGroup;
 }

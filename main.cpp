@@ -966,7 +966,9 @@ int main(int argc, char* argv[])
 	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/peanut.scene";
 	g_lpBlobRender = new GPUPoly();
 	g_lpBlobRender->readModel(strFPModel.cptr());
-	g_lpBlobRender->runTandem(g_appSettings.cellsize);
+	g_lpBlobRender->runMultiPass(g_appSettings.cellsize);
+	//g_lpBlobRender->runTandem(g_appSettings.cellsize);
+	//g_lpBlobRender->testScan();
 
 
 	/*
@@ -986,6 +988,7 @@ int main(int argc, char* argv[])
    // g_lpSurface->saveAsPPM("/home/pourya/Desktop/110.ppm");
 
 
+
 	glutPostRedisplay();
 
 	
@@ -995,3 +998,4 @@ int main(int argc, char* argv[])
 
 	return 0;
 }
+

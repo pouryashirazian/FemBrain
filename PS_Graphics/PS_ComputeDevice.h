@@ -34,7 +34,7 @@ public:
         m_strTitle = strTitle;
     }
 
-    ~ComputeKernel() {
+    virtual ~ComputeKernel() {
         clReleaseKernel(m_clKernel);
     }
 
@@ -47,7 +47,11 @@ public:
     bool setArg(U32 idxArg, U32 size, const void* lpArg);
     cl_kernel getKernel() const {return m_clKernel;}
     std::string getTitle() const {return m_strTitle;}
+
+    size_t getKernelWorkGroupSize() const {return m_szWorkGroupSize;}
+    void setKernelWorkGroupSize(size_t szWorkgroup) { m_szWorkGroupSize = szWorkgroup;}
 private:
+   size_t m_szWorkGroupSize;
    cl_kernel m_clKernel;
    std::string m_strTitle;
 };
@@ -62,7 +66,7 @@ public:
     {
         m_clProgram = program;
     }
-    ~ComputeProgram();
+    virtual ~ComputeProgram();
 
 	bool saveBinary(const char* chrBinFilePath);
     ComputeKernel* addKernel(const char* chrKernelTitle);
@@ -112,6 +116,9 @@ public:
      * @return pointer to the ComputeProgram object created.
      */
     ComputeProgram* addProgramFromFile(const char* chrFilePath);
+
+    //Remove program
+    void removeProgram(const ComputeProgram* lpProgram);
 
     /*!
      * Prints device info to default output screen.

@@ -1,9 +1,11 @@
+#ifndef PS_OCLSCAN_H
+#define PS_OCLSCAN_H
+
 #include "PS_ComputeDevice.h"
 
 namespace PS{
 namespace HPC{
 
-	static const char *COMPILER_OPTIONS = "-D WORKGROUP_SIZE=256";
 
 	class Scan
 	{
@@ -37,16 +39,18 @@ namespace HPC{
 		static const U32 MIN_LARGE_ARRAY_SIZE = 8 * WORKGROUP_SIZE;
 		static const U32 MAX_LARGE_ARRAY_SIZE = 4 * WORKGROUP_SIZE * WORKGROUP_SIZE;
 
-		//Program
-		ComputeProgram* m_lpProgram;
+		//Keep compute device
+		ComputeDevice* m_lpDevice;
 
 		//OpenCL scan kernel handles
 		ComputeKernel* m_lpKernelScanExclusiveLocal1;
 		ComputeKernel* m_lpKernelScanExclusiveLocal2;
 		ComputeKernel* m_lpKernelUniformUpdate;
 
-		cl_command_queue m_clCommandQ;
+		//Dest Buffer
 		cl_mem m_dstBuffer;		
 	};
 }
 }
+
+#endif

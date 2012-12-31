@@ -1,12 +1,16 @@
 #include "PS_OclScan.h"
 #include "../PS_Base/PS_FileDirectory.h"
-#include "../PS_Base/PS_ErrorManager.h"
+#include "../PS_Base/PS_Logger.h"
 
 using namespace PS;
 using namespace PS::FILESTRINGUTILS;
 
+
+
 namespace PS{
 	namespace HPC{
+
+		static const char *COMPILER_OPTIONS = "-D WORKGROUP_SIZE=256";
 
 		Scan::Scan(ComputeDevice* lpDevice)
 		{
@@ -21,58 +25,29 @@ namespace PS{
 		{
 			DAnsiStr strFP = ExtractFilePath(GetExePath());
 			strFP = ExtractOneLevelUp(strFP);
-			strFP += DAnsiStr("/AA_Shaders/Scan.cl");
+			strFP += DAnsiStr("PS_Shaders/Scan.cl");
 
-			m_lpProgram = lpDevice->addProgramFromFile(strFP.cptr());
-			assert(m_lpProgram != NULL);
+			m_lpDevice = lpDevice;
+			ComputeProgram* lpProgram = m_lpDevice->addProgramFromFile(strFP.cptr());
+			assert(lpProgram != NULL);
 
-			m_lpKernelScanExclusiveLocal1 = m_lpProgram->addKernel("scanExclusiveLocal1");
-			m_lpKernelScanExclusiveLocal2 = m_lpProgram->addKernel("scanExclusiveLocal2");
-			m_lpKernelUniformUpdate = m_lpProgram->addKernel("uniformUpdate");
-
-			//shrLog( " ...checking minimum supported workgroup size\n");
+			m_lpKernelScanExclusiveLocal1 = lpProgram->addKernel("scanExclusiveLocal1");
+			m_lpKernelScanExclusiveLocal2 = lpProgram->addKernel("scanExclusiveLocal2");
+			m_lpKernelUniformUpdate = lpProgram->addKernel("uniformUpdate");
 
 			//Check for work group size
-			cl_device_id device;
-			size_t szScanExclusiveLocal1, szScanExclusiveLocal2, szUniformUpdate;
-			cl_int ciErrNum;
-			ciErrNum  = clGetCommandQueueInfo(lpDevice->getCommandQ(), CL_QUEUE_DEVICE, sizeof(cl_device_id), &device, NULL);
-			ciErrNum |= clGetKernelWorkGroupInfo(m_lpKernelScanExclusiveLocal1->getKernel(), 
-				lpDevice->getDevice(), 
-				CL_KERNEL_WORK_GROUP_SIZE, 
-				sizeof(size_t), 
-				&szScanExclusiveLocal1, NULL);
-
-			ciErrNum |= clGetKernelWorkGroupInfo(m_lpKernelScanExclusiveLocal2->getKernel(), 
-				lpDevice->getDevice(), 
-				CL_KERNEL_WORK_GROUP_SIZE, 
-				sizeof(size_t), 
-				&szScanExclusiveLocal2, NULL);
-
-			ciErrNum |= clGetKernelWorkGroupInfo(m_lpKernelUniformUpdate->getKernel(), 
-				lpDevice->getDevice(), 
-				CL_KERNEL_WORK_GROUP_SIZE, 
-				sizeof(size_t), 
-				&szUniformUpdate, NULL);
-			if(ciErrNum != CL_SUCCESS)		
-				ReportErrorExt("ERROR: %s", lpDevice->oclErrorString(ciErrNum));
-			//oclCheckError(ciErrNum, CL_SUCCESS);
+			size_t szScanExclusiveLocal1 = m_lpDevice->getKernelWorkgroupSize(m_lpKernelScanExclusiveLocal1);
+			size_t szScanExclusiveLocal2 = m_lpDevice->getKernelWorkgroupSize(m_lpKernelScanExclusiveLocal2);
+			size_t szUniformUpdate = m_lpDevice->getKernelWorkgroupSize(m_lpKernelUniformUpdate);
 
 			if( (szScanExclusiveLocal1 < WORKGROUP_SIZE) || (szScanExclusiveLocal2 < WORKGROUP_SIZE) || (szUniformUpdate < WORKGROUP_SIZE) ){
-				ReportErrorExt("ERROR: Minimum work-group size %u required by this application is not supported on this device.\n", WORKGROUP_SIZE);
-				exit(0);
+				LogErrorArg1("Minimum work-group size %u required by this application is not supported on this device.", WORKGROUP_SIZE);
+				return;
 			}
 
-			//shrLog(" ...allocating internal buffers\n");
-			m_dstBuffer = clCreateBuffer(lpDevice->getContext(), 
-				CL_MEM_READ_WRITE, 
-				(MAX_BATCH_ELEMENTS / (4 * WORKGROUP_SIZE)) * sizeof(U32), 
-				NULL, &ciErrNum);
-			ReportErrorExt("ERROR: %s", lpDevice->oclErrorString(ciErrNum));
-			//oclCheckError(ciErrNum, CL_SUCCESS);
-
-			m_clCommandQ = lpDevice->getCommandQ();
+			m_dstBuffer = m_lpDevice->createMemBuffer((MAX_BATCH_ELEMENTS / (4 * WORKGROUP_SIZE)) * sizeof(U32), ComputeDevice::memReadWrite);
 		}
+
 		////////////////////////////////////////////////////////////////////////////////
 		// Short scan launcher
 		////////////////////////////////////////////////////////////////////////////////
@@ -81,20 +56,19 @@ namespace PS{
 			cl_int ciErrNum;
 			size_t localWorkSize, globalWorkSize;
 
-			ciErrNum  = clSetKernelArg(m_lpKernelScanExclusiveLocal1->getKernel(), 0, sizeof(cl_mem), (void *)&d_Dst);
-			ciErrNum |= clSetKernelArg(m_lpKernelScanExclusiveLocal1->getKernel(), 1, sizeof(cl_mem), (void *)&d_Src);
-			ciErrNum |= clSetKernelArg(m_lpKernelScanExclusiveLocal1->getKernel(), 2, 2 * WORKGROUP_SIZE * sizeof(U32), NULL);
-			ciErrNum |= clSetKernelArg(m_lpKernelScanExclusiveLocal1->getKernel(), 3, sizeof(U32), (void *)&size);
-			//oclCheckError(ciErrNum, CL_SUCCESS);
+			m_lpKernelScanExclusiveLocal1->setArg(0, sizeof(cl_mem), (void *)&d_Dst);
+			m_lpKernelScanExclusiveLocal1->setArg(1, sizeof(cl_mem), (void *)&d_Src);
+			m_lpKernelScanExclusiveLocal1->setArg(2, 2 * WORKGROUP_SIZE * sizeof(U32), NULL);
+			m_lpKernelScanExclusiveLocal1->setArg(3, sizeof(U32), (void *)&size);
 
 			localWorkSize = WORKGROUP_SIZE;
 			globalWorkSize = (n * size) / 4;
 
-			ciErrNum = clEnqueueNDRangeKernel(m_clCommandQ, 
-				m_lpKernelScanExclusiveLocal1->getKernel(), 
-				1, NULL, 
-				&globalWorkSize, &localWorkSize, 0, NULL, NULL);
-			//oclCheckError(ciErrNum, CL_SUCCESS);
+			ciErrNum = clEnqueueNDRangeKernel(m_lpDevice->getCommandQ(),
+											  m_lpKernelScanExclusiveLocal1->getKernel(),
+											  1, NULL,
+											  &globalWorkSize,
+											  &localWorkSize, 0, NULL, NULL);
 
 			return localWorkSize;
 		}
@@ -127,18 +101,23 @@ namespace PS{
 				size_t localWorkSize, globalWorkSize;
 
 				U32 elements = n * size;
-				ciErrNum  = clSetKernelArg(m_lpKernelScanExclusiveLocal2->getKernel(), 0, sizeof(cl_mem), (void *)&d_Buffer);
-				ciErrNum |= clSetKernelArg(m_lpKernelScanExclusiveLocal2->getKernel(), 1, sizeof(cl_mem), (void *)&d_Dst);
-				ciErrNum |= clSetKernelArg(m_lpKernelScanExclusiveLocal2->getKernel(), 2, sizeof(cl_mem), (void *)&d_Src);
-				ciErrNum |= clSetKernelArg(m_lpKernelScanExclusiveLocal2->getKernel(), 3, 2 * WORKGROUP_SIZE * sizeof(U32), NULL);
-				ciErrNum |= clSetKernelArg(m_lpKernelScanExclusiveLocal2->getKernel(), 4, sizeof(U32), (void *)&elements);
-				ciErrNum |= clSetKernelArg(m_lpKernelScanExclusiveLocal2->getKernel(), 5, sizeof(U32), (void *)&size);
+				m_lpKernelScanExclusiveLocal2->setArg(0, sizeof(cl_mem), (void *)&d_Buffer);
+				m_lpKernelScanExclusiveLocal2->setArg(1, sizeof(cl_mem), (void *)&d_Dst);
+				m_lpKernelScanExclusiveLocal2->setArg(2, sizeof(cl_mem), (void *)&d_Src);
+				m_lpKernelScanExclusiveLocal2->setArg(3, 2 * WORKGROUP_SIZE * sizeof(U32), NULL);
+				m_lpKernelScanExclusiveLocal2->setArg(4, sizeof(U32), (void *)&elements);
+				m_lpKernelScanExclusiveLocal2->setArg(5, sizeof(U32), (void *)&size);
 				assert(ciErrNum == CL_SUCCESS);
 
 				localWorkSize = WORKGROUP_SIZE;
 				globalWorkSize = iSnapUp(elements, WORKGROUP_SIZE);
 
-				ciErrNum = clEnqueueNDRangeKernel(m_clCommandQ, m_lpKernelScanExclusiveLocal2->getKernel(), 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+				ciErrNum = clEnqueueNDRangeKernel(m_lpDevice->getCommandQ(),
+												  m_lpKernelScanExclusiveLocal2->getKernel(),
+												  1, NULL,
+												  &globalWorkSize,
+												  &localWorkSize,
+												  0, NULL, NULL);
 				assert(ciErrNum == CL_SUCCESS);
 		}
 
@@ -154,7 +133,12 @@ namespace PS{
 				localWorkSize = WORKGROUP_SIZE;
 				globalWorkSize = n * WORKGROUP_SIZE;
 
-				ciErrNum = clEnqueueNDRangeKernel(m_clCommandQ, m_lpKernelUniformUpdate->getKernel(), 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+				ciErrNum = clEnqueueNDRangeKernel(m_lpDevice->getCommandQ(),
+												  m_lpKernelUniformUpdate->getKernel(),
+												  1, NULL,
+												  &globalWorkSize,
+												  &localWorkSize,
+												  0, NULL, NULL);
 				assert(ciErrNum == CL_SUCCESS);
 
 				return localWorkSize;

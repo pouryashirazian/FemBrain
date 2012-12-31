@@ -11,6 +11,8 @@
 #include "../PS_Graphics/PS_ComputeDevice.h"
 #include "../PS_Graphics/PS_VectorMath.h"
 #include "../PS_Graphics/PS_GLMeshBuffer.h"
+#include "../PS_Graphics/PS_OclScan.h"
+#include "../PS_Graphics/PS_OclSumScan.h"
 
 using namespace PS::SIMDPOLY;
 using namespace PS::HPC;
@@ -63,6 +65,7 @@ public:
 	bool readModel(const char* lpFilePath);
 
 
+	void testScan();
 	/*!
 	 * Run the algorithm in tandem
 	 */
@@ -81,6 +84,9 @@ private:
 	int init();
 
 
+	int computeAllFields(float cellsize);
+	int computeEdgeTable();
+
 private:
     struct CellParam{
 		U8 corner1[12];
@@ -91,14 +97,30 @@ private:
 		float cellsize;
 	};
 
-	CellParam m_param;
+    //Grid Points
+    struct GridParam{
+    	U32 ctGridPoints[3];
+    	U32 ctTotalPoints;
+    	float cellsize;
+    };
+
+    SumScan* m_lpOclSumScan;
+	CellParam m_cellParam;
+	GridParam m_gridParam;
+
+	//GPU Device
+	ComputeDevice* m_lpGPU;
 
 	//Compute Kernels
-	PS::HPC::ComputeDevice* m_lpGPU;
-	PS::HPC::ComputeKernel* m_lpKernelCellConfig;
-	PS::HPC::ComputeKernel* m_lpKernelComputeConfig;
-	PS::HPC::ComputeKernel* m_lpKernelComputeMesh;
-	PS::HPC::ComputeKernel* m_lpKernelComputeAllFields;
+	ComputeKernel* m_lpKernelCellConfig;
+	ComputeKernel* m_lpKernelComputeConfig;
+	ComputeKernel* m_lpKernelComputeMesh;
+
+
+	//Kernels for the multipass polygonizer
+	ComputeKernel* m_lpKernelComputeAllFields;
+	ComputeKernel* m_lpKernelComputeEdgeTable;
+
 
 	//Reusable vars
 	cl_mem m_inMemVertexCountTable;
@@ -108,6 +130,12 @@ private:
 	cl_mem m_inMemOps;
 	cl_mem m_inMemPrims;
 	cl_mem m_inMemMtx;
+	cl_mem m_inMemCellParam;
+	cl_mem m_inMemGridParam;
+
+	cl_mem m_inoutHighEdgesCount;
+	cl_mem m_inoutHighEdgesFlags;
+	cl_mem m_inoutAllFields;
 	bool m_bModelLoaded;
 
 
@@ -131,7 +159,6 @@ private:
 	//Count of primitives and ops
 	U32 m_ctPrims;
 	U32 m_ctOps;
-	U32 m_ctCells;
 };
 
 

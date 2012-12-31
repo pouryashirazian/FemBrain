@@ -6,11 +6,17 @@
  */
 #include "PS_DebugUtils.h"
 #include "../PS_Base/PS_FileDirectory.h"
+#include <iostream>
+#include <stdio.h>
 
+using namespace std;
 using namespace PS;
 using namespace PS::FILESTRINGUTILS;
 
-int Debug_SaveArrayCSV(const char* lpArrayName, float* lpArray, U32 count)
+namespace PS{
+namespace DEBUG{
+
+int SaveArrayCSV(const char* lpArrayName, float* lpArray, U32 count)
 {
 
 	DAnsiStr strPath = ExtractFilePath(GetExePath());
@@ -28,4 +34,36 @@ int Debug_SaveArrayCSV(const char* lpArrayName, float* lpArray, U32 count)
 	return count;
 }
 
+void PrintArray(U32* lpData, U32 count)
+{
+	printf("\n");
+	for(U32 i=0; i<count; i++)
+	{
+		printf("%d, ", lpData[i]);
+	}
+	printf("\n");
+}
 
+void PrintArrayF(float* lpData, U32 count)
+{
+	for(U32 i=0; i<count; i++)
+	{
+		printf("%.2f, ", lpData[i]);
+	}
+	printf("\n");
+}
+
+void FillArray(U32* lpData, U32 count, U32 nMin, U32 nMax)
+{
+	for(int i=0; i < count; i++)
+		lpData[i] = static_cast<U32>(RandRangeT<float>(nMin, nMax));
+}
+
+void FillArrayF(float* lpData, U32 count, float nMin, float nMax)
+{
+	for(int i=0; i < count; i++)
+		lpData[i] = RandRangeT<float>(nMin, nMax);
+}
+
+}
+}

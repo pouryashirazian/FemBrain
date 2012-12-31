@@ -27,6 +27,7 @@
 								<option id="gnu.cpp.compiler.option.debugging.level.163294574" name="Debug Level" superClass="gnu.cpp.compiler.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.2115444334" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/OPENCL/common/inc"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/GLUI/src/include"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/GLEW/include"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/TBB/include"/>

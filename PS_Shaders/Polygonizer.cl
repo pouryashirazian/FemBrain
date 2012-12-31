@@ -69,6 +69,43 @@
 #define MAX_TRIANGLES_COUNT_PER_CELL	5
 
 
+//MPU GRID
+#define GRID_DIM_8
+
+#ifdef GRID_DIM_32
+#define GRID_DIM 32
+#define CELLID_SHIFT_X 0
+#define CELLID_SHIFT_Y 5
+#define CELLID_SHIFT_Z 10
+#define CELLID_BITMASK 0x1F
+#endif
+
+#ifdef GRID_DIM_16
+#define GRID_DIM 16
+#define CELLID_SHIFT_X 0
+#define CELLID_SHIFT_Y 4
+#define CELLID_SHIFT_Z 8
+#define CELLID_BITMASK 0x0F
+#endif
+
+#ifdef GRID_DIM_8
+#define GRID_DIM 8
+#define CELLID_SHIFT_X 0
+#define CELLID_SHIFT_Y 3
+#define CELLID_SHIFT_Z 6
+#define CELLID_BITMASK 0x07
+#endif
+
+#define CELLID_HASHSIZE (size_t)(1<<(3*CELLID_SHIFT_Y))
+#define CELLID_FROM_IDX(i,j,k) ((((k) & CELLID_BITMASK) << CELLID_SHIFT_Z) | (((j) & CELLID_BITMASK) << CELLID_SHIFT_Y) | ((i) & CELLID_BITMASK))
+#define EDGETABLE_DEPTH 8
+
+//Return codes
+#define RET_PARAM_ERROR -1
+#define RET_NOT_ENOUGH_MEM -2
+#define RET_INVALID_BVH -3
+#define RET_SUCCESS 1
+
 //Comfort Types
 typedef unsigned char		U8;
 typedef unsigned short		U16;
@@ -121,6 +158,13 @@ typedef struct CellParam{
 	U32 ctTotalCells;
 	float cellsize;
 }CellParam;
+
+typedef struct GridParam{
+	U32 ctGridPoints[3];
+	U32 ctTotalPoints;
+	float cellsize;
+}GridParam;
+
 
 typedef struct SimpleStack{
 	U16 values[MAX_TREE_NODES];
@@ -739,25 +783,106 @@ __kernel void ComputeAllFields(__global float4* arrInHeader4,
 							   __global float4* arrInOps4,										 
 							   __global float4* arrInPrims4,											 
 							   __global float4* arrInMtxNodes4,
-							   __constant struct CellParam* inCellParams,
-							   __global float4* arrOutMeshVertex,
-							   __global float4* arrOutMeshColor,
-							   __global float* arrOutMeshNormal)			
+							   __constant struct GridParam* inGridParam,
+							   __global float4* arrOutFields)			
 {
 	int idX = get_global_id(0);
 	int idY = get_global_id(1);
 	int idZ = get_global_id(2);
-	if((idX >= inCellParams->ctNeededCells[0])||(idY >= inCellParams->ctNeededCells[1])||(idZ >= inCellParams->ctNeededCells[2]))
+	if((idX >= inGridParam->ctGridPoints[0])||(idY >= inGridParam->ctGridPoints[1])||(idZ >= inGridParam->ctGridPoints[2]))
 		return;
-	uint idxCell = idZ * (inCellParams->ctNeededCells[0] * inCellParams->ctNeededCells[1]) + idY * inCellParams->ctNeededCells[0] + idX;
-	if(idxCell > inCellParams->ctTotalCells)
+	U32 idxVertex = idZ * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + idY * inGridParam->ctGridPoints[0] + idX;
+	if(idxVertex > inGridParam->ctTotalPoints)
 		return;
 	
-	float cellsize = inCellParams->cellsize;	
-	float4 n = (float4)(1,0,0,1);
-	arrOutMeshVertex[idxCell] = arrInHeader4[OFFSET4_HEADER_LOWER] + cellsize * (float4)(idX, idY, idZ, 0.0f); 
-	arrOutMeshColor[idxCell] = (float4)(1, 0, 0, 1);
-	arrOutMeshNormal[idxCell * 3 + 0] = n.x;
-	arrOutMeshNormal[idxCell * 3 + 1] = n.y;
-	arrOutMeshNormal[idxCell * 3 + 2] = n.z;
+	float cellsize = inGridParam->cellsize;		
+	float4 v = arrInHeader4[OFFSET4_HEADER_LOWER] + cellsize * (float4)(idX, idY, idZ, 0.0f);
+	float field	= ComputeField(v, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+	
+	v.w = field;		
+	arrOutFields[idxVertex] = v;
 }
+
+//Computes the edgetable for polygonizer
+__kernel void ComputeEdgeTable(__global float4* arrInFields,
+							   __constant struct GridParam* inGridParam,
+							   __global U32* arrOutHighEdgesCount,
+							   __global U8* arrOutHighEdgesFlags)
+{
+	int idX = get_global_id(0);
+	int idY = get_global_id(1);
+	int idZ = get_global_id(2);
+	if((idX >= inGridParam->ctGridPoints[0])||(idY >= inGridParam->ctGridPoints[1])||(idZ >= inGridParam->ctGridPoints[2]))
+		return;
+	U32 idxVertex = idZ * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + idY * inGridParam->ctGridPoints[0] + idX;
+	if(idxVertex > inGridParam->ctTotalPoints)
+		return;
+		
+		
+	bool bHot = isgreaterequal(arrInFields[idxVertex].w, ISO_VALUE); 
+	bool bHotNbor = false;
+	U32 idxVertexNbor = 0;
+	
+	//high edges
+	U8 ctCrossed = 0;
+	U8 flag = 0;
+	
+	//XYZ: 421
+	//X
+	idxVertexNbor = idZ * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + idY * inGridParam->ctGridPoints[0] + (idX+1);
+	if((idxVertexNbor < inGridParam->ctTotalPoints) && ((idX+1) < inGridParam->ctGridPoints[0]))
+	{
+		bHotNbor = isgreaterequal(arrInFields[idxVertexNbor].w, ISO_VALUE); 
+		if(bHot ^ bHotNbor)
+		{
+			ctCrossed ++;
+			flag |= 4;
+		}
+	}
+
+	//Y
+	idxVertexNbor = idZ * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + (idY+1) * inGridParam->ctGridPoints[0] + idX;
+	if((idxVertexNbor < inGridParam->ctTotalPoints) && ((idY+1) < inGridParam->ctGridPoints[1]))
+	{
+		bHotNbor = isgreaterequal(arrInFields[idxVertexNbor].w, ISO_VALUE); 
+		if(bHot ^ bHotNbor)
+		{
+			ctCrossed ++;
+			flag |= 2;
+		}
+	}
+
+	//Z
+	idxVertexNbor = (idZ+1) * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + idY * inGridParam->ctGridPoints[0] + idX;
+	if((idxVertexNbor < inGridParam->ctTotalPoints) && ((idZ+1) < inGridParam->ctGridPoints[2]))
+	{
+		bHotNbor = isgreaterequal(arrInFields[idxVertexNbor].w, ISO_VALUE); 
+		if(bHot ^ bHotNbor)
+		{
+			ctCrossed ++;
+			flag |= 1;
+		}
+	}
+
+	//Write to output
+	arrOutHighEdgesCount[idxVertex] = ctCrossed;
+	arrOutHighEdgesFlags[idxVertex] = flag; 
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
