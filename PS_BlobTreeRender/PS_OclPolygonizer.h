@@ -108,9 +108,11 @@ private:
     	float cellsize;
     };
 
-    SumScan* m_lpOclSumScan;
 	CellParam m_cellParam;
 	GridParam m_gridParam;
+
+	//SumScan
+    SumScan* m_lpOclSumScan;
 
 	//GPU Device
 	ComputeDevice* m_lpGPU;
@@ -169,6 +171,7 @@ private:
 	//Operators Data
 	float PS_SIMD_ALIGN(m_arrOps[PS_SIMD_PADSIZE(MAX_TREE_NODES*DATASIZE_OPERATOR)]);
 
+	//AABB
 	svec3f m_bboxLo;
 	svec3f m_bboxHi;
 

@@ -173,8 +173,8 @@ public:
 	 */
 	bool enqueueNDRangeKernel(ComputeKernel* lpKernel, int dim, size_t* arrGlobalIndex, size_t* arrLocalIndex);
 
-	bool acquireGLObject(cl_uint count, const cl_mem* arrMemObjects);
-	bool releaseGLObject(cl_uint count, const cl_mem* arrMemObjects);
+	bool enqueueAcquireGLObject(cl_uint count, const cl_mem* arrMemObjects);
+	bool enqueueReleaseGLObject(cl_uint count, const cl_mem* arrMemObjects);
 
     //Access
     cl_device_id getDevice() const {return m_clDeviceID;}

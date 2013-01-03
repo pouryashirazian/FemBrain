@@ -56,7 +56,7 @@ public:
 	void setTilt(float tiltVDeg);
 
 	//Zoom
-	float getCurrentZoom() const {return m_rho;}
+	float getZoom() const {return m_rho;}
 	void setZoom(float r);
 
 	//Pan

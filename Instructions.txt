@@ -1,0 +1,8 @@
+To Create mesh using blender:
+
+1. Design model in blender and export as obj file. 
+2. Use meshconvert tool in ~/Desktop/WorkTools to convert from obj to off: ./meshconv ~/Desktop/Models/pyramid/pyramid.obj -c off
+2. Use tetgen in ~/Desktop/WorkTools to produce tetrahedra mesh from off file and output: 
+	.node and .ele files. Example: ./tetgen /home/pourya/Desktop/disc/disc.off
+3. Use FemBrain VegWriter class in PS_Deformable Package to produce the .veg file. 
+Just pass the .node file and it will find the .ele file by itself and produces the mesh.

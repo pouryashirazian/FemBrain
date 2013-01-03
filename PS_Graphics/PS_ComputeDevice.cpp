@@ -777,14 +777,28 @@ bool ComputeDevice::enqueueNDRangeKernel(ComputeKernel* lpKernel, int dim, size_
 		return true;
 }
 
-bool ComputeDevice::acquireGLObject(cl_uint count, const cl_mem* arrMemObjects)
+bool ComputeDevice::enqueueAcquireGLObject(cl_uint count, const cl_mem* arrMemObjects)
 {
-	clEnqueueAcquireGLObjects(m_clCommandQueue, count, arrMemObjects, 0, 0, 0);
+	cl_int err = clEnqueueAcquireGLObjects(m_clCommandQueue, count, arrMemObjects, 0, 0, 0);
+	if (err) {
+		LogErrorArg1("Failed to acquire OpenGL object! Ocl Error: %s",
+					 ComputeDevice::oclErrorString(err));
+		return false;
+	}
+	else
+		return true;
 }
 
-bool ComputeDevice::releaseGLObject(cl_uint count, const cl_mem* arrMemObjects)
+bool ComputeDevice::enqueueReleaseGLObject(cl_uint count, const cl_mem* arrMemObjects)
 {
-	clEnqueueReleaseGLObjects(m_clCommandQueue, count, arrMemObjects, 0, 0, 0);
+	cl_int err = clEnqueueReleaseGLObjects(m_clCommandQueue, count, arrMemObjects, 0, 0, 0);
+	if (err) {
+		LogErrorArg1("Failed to release OpenGL object! Ocl Error: %s",
+					 ComputeDevice::oclErrorString(err));
+		return false;
+	}
+	else
+		return true;
 }
 
 const char* ComputeDevice::oclErrorString(cl_int error)

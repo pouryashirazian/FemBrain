@@ -635,11 +635,13 @@ void NormalKey(unsigned char key, int x, int y)
 	case('+'):{
 		g_appSettings.cellsize += 0.01;
 		LogInfoArg1("Changed cellsize to: %.2f", g_appSettings.cellsize);
+		g_lpBlobRender->runMultiPass(g_appSettings.cellsize);
 		break;
 	}
 	case('-'):{
 		g_appSettings.cellsize -= 0.01;
 		LogInfoArg1("Changed cellsize to: %.2f", g_appSettings.cellsize);
+		g_lpBlobRender->runMultiPass(g_appSettings.cellsize);
 		break;
 	}
 	case('g'):{
@@ -688,6 +690,16 @@ void NormalKey(unsigned char key, int x, int y)
 
 		break;
 	}
+	case('['):{
+		g_arcBallCam.setZoom(g_arcBallCam.getZoom() + 0.5);
+		glutPostRedisplay();
+		break;
+	}
+	case(']'):{
+		g_arcBallCam.setZoom(g_arcBallCam.getZoom() - 0.5);
+		glutPostRedisplay();
+		break;
+	}
 
 	}
 }
@@ -706,7 +718,6 @@ void SpecialKey(int key, int x, int y)
 		case(GLUT_KEY_F3):
 		{
 			LogInfo("Re-Polygonize Model");
-			//g_lpBlobRender->runTandem(g_appSettings.cellsize);
 			g_lpBlobRender->runMultiPass(g_appSettings.cellsize);
 			glutPostRedisplay();
 			break;
@@ -879,7 +890,7 @@ void SaveSettings()
 	CSketchConfig cfg(ChangeFileExt(GetExePath(), ".ini"), CSketchConfig::fmReadWrite);
 	cfg.writeFloat("CAMERA", "ROLL", g_arcBallCam.getRoll());
 	cfg.writeFloat("CAMERA", "TILT", g_arcBallCam.getTilt());
-	cfg.writeFloat("CAMERA", "ZOOM", g_arcBallCam.getCurrentZoom());
+	cfg.writeFloat("CAMERA", "ZOOM", g_arcBallCam.getZoom());
 	cfg.writeVec3f("CAMERA", "CENTER", g_arcBallCam.getCenter());
 	cfg.writeVec3f("CAMERA", "ORIGIN", g_arcBallCam.getOrigin());
 	cfg.writeVec2f("CAMERA", "PAN", g_arcBallCam.getPan());

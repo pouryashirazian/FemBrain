@@ -63,6 +63,10 @@ namespace HPC{
 	{
 		GLMeshBuffer::cleanup();
 
+		//Clear MC Tables
+		clReleaseMemObject(m_inMemTriangleTable);
+		clReleaseMemObject(m_inMemVertexCountTable);
+
 		//Clear Mem Objects
 		if(m_bModelLoaded)
 		{
@@ -72,8 +76,6 @@ namespace HPC{
 			clReleaseMemObject(m_inMemMtx);
 		}
 
-		clReleaseMemObject(m_inMemTriangleTable);
-		clReleaseMemObject(m_inMemVertexCountTable);
 		SAFE_DELETE(m_lpGPU);
 		SAFE_DELETE(m_lpOclSumScan);
 	}
@@ -749,6 +751,9 @@ namespace HPC{
 	//Runs a multipass High Performance Polygonizer
 	int GPUPoly::runMultiPass(float cellsize)
 	{
+		if(DefinitelyLessThan(cellsize, 0.01, EPSILON))
+			return -1;
+
 		//Clear previous mesh
 		GLMeshBuffer::cleanup();
 
@@ -761,11 +766,11 @@ namespace HPC{
 			//Read-back EdgeTable Count
 			U32* lpEdgeTableOffsets = new U32[m_gridParam.ctTotalPoints];
 			m_lpGPU->enqueueReadBuffer(m_inoutMemHighEdgesCount, sizeof(U32) * m_gridParam.ctTotalPoints, lpEdgeTableOffsets);
-			PrintArray(lpEdgeTableOffsets, m_gridParam.ctTotalPoints);
+			//PrintArray(lpEdgeTableOffsets, m_gridParam.ctTotalPoints);
 
 			//3. SumScan to compute crossed edges
 			m_ctVertices = m_lpOclSumScan->compute(lpEdgeTableOffsets, m_gridParam.ctTotalPoints);
-			PrintArray(lpEdgeTableOffsets, m_gridParam.ctTotalPoints);
+			//PrintArray(lpEdgeTableOffsets, m_gridParam.ctTotalPoints);
 
 			//Write Edge Offsets to device memory
 			m_inMemHighEdgesOffset = m_lpGPU->createMemBuffer(sizeof(U32) * m_gridParam.ctTotalPoints, ComputeDevice::memReadOnly);
@@ -782,11 +787,11 @@ namespace HPC{
 			//Read-back Elements Count
 			U32* lpCellElementsOffset = new U32[m_cellParam.ctTotalCells];
 			m_lpGPU->enqueueReadBuffer(m_inoutMemCellElementsCount, sizeof(U32) * m_cellParam.ctTotalCells, lpCellElementsOffset);
-			PrintArray(lpCellElementsOffset, m_cellParam.ctTotalCells);
+			//PrintArray(lpCellElementsOffset, m_cellParam.ctTotalCells);
 
 			//6. SumScan to read all elements
 			m_ctFaceElements = m_lpOclSumScan->compute(lpCellElementsOffset, m_cellParam.ctTotalCells);
-			PrintArray(lpCellElementsOffset, m_cellParam.ctTotalCells);
+			//PrintArray(lpCellElementsOffset, m_cellParam.ctTotalCells);
 
 			//Write Element Offsets
 			m_inMemCellElementsOffset = m_lpGPU->createMemBuffer(sizeof(U32) * m_cellParam.ctTotalCells, ComputeDevice::memReadOnly);
@@ -809,6 +814,19 @@ namespace HPC{
 		m_faceMode = ftPoints;
 		*/
 
+		//Release all temp vars
+		clReleaseMemObject(m_inMemCellParam);
+		clReleaseMemObject(m_inMemGridParam);
+
+		clReleaseMemObject(m_inoutMemAllFields);
+		clReleaseMemObject(m_inoutMemHighEdgesCount);
+		clReleaseMemObject(m_inoutMemHighEdgesFlags);
+		clReleaseMemObject(m_inMemHighEdgesOffset);
+
+		clReleaseMemObject(m_inoutMemCellConfig);
+		clReleaseMemObject(m_inoutMemCellElementsCount);
+		clReleaseMemObject(m_inMemCellElementsOffset);
+
 
 		return 1;
 	}
@@ -829,7 +847,7 @@ namespace HPC{
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(U32) * ctElements, 0, GL_DYNAMIC_DRAW);
 		cl_mem outMemMeshElements = m_lpGPU->createMemBufferFromGL(m_iboFaces, ComputeDevice::memWriteOnly);
 
-		clEnqueueAcquireGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshElements, 0, 0, 0);
+		m_lpGPU->enqueueAcquireGLObject(1, &outMemMeshElements);
 		/*
 		__kernel void ComputeElements(__global U32* arrInHighEdgesOffset,
 				   	   	   	   	   	  __global U8* arrInHighEdgesFlags,
@@ -854,9 +872,16 @@ namespace HPC{
 		m_lpGPU->enqueueNDRangeKernel(m_lpKernelComputeElements, 3, arrGlobalIndex, arrLocalIndex);
 		m_lpGPU->finishAllCommands();
 
-		clEnqueueReleaseGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshElements, 0, 0, 0);
+		m_lpGPU->enqueueReleaseGLObject(1, &outMemMeshElements);
+		m_lpGPU->finishAllCommands();
 
 		//Check Indices
+		/*
+		U32* arrIndices = new U32[m_ctFaceElements];
+		m_lpGPU->enqueueReadBuffer(outMemMeshElements, sizeof(U32) * m_ctFaceElements, arrIndices);
+		SAFE_DELETE(arrIndices);
+		*/
+		/*
 		U32* arrIndices = new U32[m_ctFaceElements];
 		if(m_lpGPU->enqueueReadBuffer(outMemMeshElements, sizeof(U32) * m_ctFaceElements, arrIndices))
 		{
@@ -869,7 +894,8 @@ namespace HPC{
 			}
 			printf("Error: %d\n", ctErrors);
 		}
-
+		SAFE_DELETE(arrIndices);
+		*/
 
 		return 1;
 	}
@@ -943,9 +969,9 @@ namespace HPC{
 		cl_mem outMemMeshNormal = m_lpGPU->createMemBufferFromGL(m_vboNormal, ComputeDevice::memWriteOnly);
 
 		//Acquire Mesh for Writing
-		clEnqueueAcquireGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshVertex, 0, 0, 0);
-		clEnqueueAcquireGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshColor, 0, 0, 0);
-		clEnqueueAcquireGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshNormal, 0, 0, 0);
+		m_lpGPU->enqueueAcquireGLObject(1, &outMemMeshVertex);
+		m_lpGPU->enqueueAcquireGLObject(1, &outMemMeshColor);
+		m_lpGPU->enqueueAcquireGLObject(1, &outMemMeshNormal);
 
 		/*
 		__kernel void ComputeVertexAttribs(__global float4* arrInHeader4,
@@ -979,10 +1005,10 @@ namespace HPC{
 		m_lpGPU->finishAllCommands();
 
 
-		//Release Mesh for Writing
-		clEnqueueReleaseGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshVertex, 0, 0, 0);
-		clEnqueueReleaseGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshColor, 0, 0, 0);
-		clEnqueueReleaseGLObjects(m_lpGPU->getCommandQ(), 1, &outMemMeshNormal, 0, 0, 0);
+		//Release Object
+		m_lpGPU->enqueueReleaseGLObject(1, &outMemMeshVertex);
+		m_lpGPU->enqueueReleaseGLObject(1, &outMemMeshColor);
+		m_lpGPU->enqueueReleaseGLObject(1, &outMemMeshNormal);
 
 		//Vertices
 		m_isValidVertex = m_isValidColor = m_isValidNormal = true;
@@ -991,10 +1017,15 @@ namespace HPC{
 		//Read Vertices
 		/*
 		float* arrVertices = new float[m_ctVertices*4];
-		if(m_lpGPU->enqueueReadBuffer(outMemMeshVertex, sizeof(float) * 4 * m_ctVertices, arrVertices))
-			PrintArrayF(arrVertices, 4 * m_ctVertices);
+		m_lpGPU->enqueueReadBuffer(outMemMeshVertex, sizeof(float) * 4 * m_ctVertices, arrVertices);
+			//PrintArrayF(arrVertices, 4 * m_ctVertices);
 		SAFE_DELETE(arrVertices);
 		*/
+
+		//Release OCL Mem
+		clReleaseMemObject(outMemMeshVertex);
+		clReleaseMemObject(outMemMeshColor);
+		clReleaseMemObject(outMemMeshNormal);
 
 		return 1;
 	}
@@ -1024,13 +1055,8 @@ namespace HPC{
 		m_lpKernelComputeEdgeTable->setArg(2, sizeof(cl_mem), &m_inoutMemHighEdgesCount);
 		m_lpKernelComputeEdgeTable->setArg(3, sizeof(cl_mem), &m_inoutMemHighEdgesFlags);
 
-
-		cl_int err = clEnqueueNDRangeKernel(m_lpGPU->getCommandQ(), m_lpKernelComputeEdgeTable->getKernel(),
-									 	    3, NULL, arrGlobalIndex, arrLocalIndex, 0, NULL, NULL);
-		if (err) {
-			LogErrorArg1("Error: Failed to execute ComputeAllFields kernel! (%s)", ComputeDevice::oclErrorString(err));
-			return EXIT_FAILURE;
-		}
+		//ComputeEdgeTable
+		m_lpGPU->enqueueNDRangeKernel(m_lpKernelComputeEdgeTable, 3, arrGlobalIndex, arrLocalIndex);
 
 		// Wait for all commands to complete
 		m_lpGPU->finishAllCommands();
@@ -1099,12 +1125,7 @@ namespace HPC{
 
 		// Execute the kernel over the vector using the
 		// maximum number of work group items for this device
-		cl_int err = clEnqueueNDRangeKernel(m_lpGPU->getCommandQ(), m_lpKernelComputeAllFields->getKernel(),
-									 	    3, NULL, arrGlobalIndex, arrLocalIndex, 0, NULL, NULL);
-		if (err) {
-			LogErrorArg1("Error: Failed to execute ComputeAllFields kernel! (%s)", ComputeDevice::oclErrorString(err));
-			return EXIT_FAILURE;
-		}
+		m_lpGPU->enqueueNDRangeKernel(m_lpKernelComputeAllFields, 3, arrGlobalIndex, arrLocalIndex);
 
 		// Wait for all commands to complete
 		m_lpGPU->finishAllCommands();
