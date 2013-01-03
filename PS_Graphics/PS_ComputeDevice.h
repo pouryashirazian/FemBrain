@@ -163,10 +163,24 @@ public:
 
 	size_t getKernelWorkgroupSize(ComputeKernel* lpKernel);
 
+	/*!
+	 * Enqueues Kernel For running.
+	 * @lpKernel ComputeKernel to run
+	 * @dim dimension of NDRange
+	 * @arrGlobalIndex range of global index space
+	 * @arrLocalIndex range of local index space
+	 * @return true if successful
+	 */
+	bool enqueueNDRangeKernel(ComputeKernel* lpKernel, int dim, size_t* arrGlobalIndex, size_t* arrLocalIndex);
+
+	bool acquireGLObject(cl_uint count, const cl_mem* arrMemObjects);
+	bool releaseGLObject(cl_uint count, const cl_mem* arrMemObjects);
+
     //Access
     cl_device_id getDevice() const {return m_clDeviceID;}
     cl_context getContext() const {return m_clContext;}
     cl_command_queue getCommandQ() const {return m_clCommandQueue;}
+
 
 private:
 	/*!

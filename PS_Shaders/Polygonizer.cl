@@ -792,7 +792,7 @@ __kernel void ComputeAllFields(__global float4* arrInHeader4,
 	if((idX >= inGridParam->ctGridPoints[0])||(idY >= inGridParam->ctGridPoints[1])||(idZ >= inGridParam->ctGridPoints[2]))
 		return;
 	U32 idxVertex = idZ * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + idY * inGridParam->ctGridPoints[0] + idX;
-	if(idxVertex > inGridParam->ctTotalPoints)
+	if(idxVertex >= inGridParam->ctTotalPoints)
 		return;
 	//printf("IDXVertex = %d\n", idxVertex);
 	
@@ -816,7 +816,7 @@ __kernel void ComputeEdgeTable(__global float4* arrInFields,
 	if((idX >= inGridParam->ctGridPoints[0])||(idY >= inGridParam->ctGridPoints[1])||(idZ >= inGridParam->ctGridPoints[2]))
 		return;
 	U32 idxVertex = idZ * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + idY * inGridParam->ctGridPoints[0] + idX;
-	if(idxVertex > inGridParam->ctTotalPoints)
+	if(idxVertex >= inGridParam->ctTotalPoints)
 		return;
 
 	bool bHot = isgreaterequal(arrInFields[idxVertex].w, ISO_VALUE); 
@@ -889,7 +889,7 @@ __kernel void ComputeVertexAttribs(__global float4* arrInHeader4,
 	if((idX >= inGridParam->ctGridPoints[0])||(idY >= inGridParam->ctGridPoints[1])||(idZ >= inGridParam->ctGridPoints[2]))
 		return;
 	U32 idxVertex = idZ * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + idY * inGridParam->ctGridPoints[0] + idX;
-	if(idxVertex > inGridParam->ctTotalPoints)
+	if(idxVertex >= inGridParam->ctTotalPoints)
 		return;
 	
 	//IF This vertex has no hot edges then return
@@ -930,6 +930,7 @@ __kernel void ComputeVertexAttribs(__global float4* arrInHeader4,
 		ComputeFieldAndColor(v, &color, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
 
 		//Save 
+		v.w = 1;
 		arrOutMeshVertex[idxStore] = v;
 		arrOutMeshColor[idxStore] = color;
 		arrOutMeshNormal[idxStore * 3] = n.x;
@@ -961,6 +962,7 @@ __kernel void ComputeVertexAttribs(__global float4* arrInHeader4,
 		ComputeFieldAndColor(v, &color, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
 
 		//Save 
+		v.w = 1;
 		arrOutMeshVertex[idxStore] = v;
 		arrOutMeshColor[idxStore] = color;
 		arrOutMeshNormal[idxStore * 3] = n.x;
@@ -992,6 +994,7 @@ __kernel void ComputeVertexAttribs(__global float4* arrInHeader4,
 		ComputeFieldAndColor(v, &color, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
 
 		//Save 
+		v.w = 1;
 		arrOutMeshVertex[idxStore] = v;
 		arrOutMeshColor[idxStore] = color;
 		arrOutMeshNormal[idxStore * 3] = n.x;
@@ -1000,6 +1003,115 @@ __kernel void ComputeVertexAttribs(__global float4* arrInHeader4,
 		idxStore++;
 	}
 } 
+
+//Compute Cell Configs
+__kernel void ComputeCellConfigs(__global float4* arrInFields,
+								 __read_only image2d_t texInVertexCountTable,
+								 __constant struct GridParam* inGridParam,
+								 __constant struct CellParam* inCellParam,
+								 __global U32* arrOutCellElementsCount,
+								 __global U8* arrOutCellConfig)
+{
+	int idX = get_global_id(0);
+	int idY = get_global_id(1);
+	int idZ = get_global_id(2);
+	if((idX >= inCellParam->ctNeededCells[0])||(idY >= inCellParam->ctNeededCells[1])||(idZ >= inCellParam->ctNeededCells[2]))
+		return;
+	uint idxCell = idZ * (inCellParam->ctNeededCells[0] * inCellParam->ctNeededCells[1]) + idY * inCellParam->ctNeededCells[0] + idX;
+	if(idxCell >= inCellParam->ctTotalCells)
+		return;
+
+	U32 dx = inGridParam->ctGridPoints[0];	
+	U32 dxdy = inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1];
+	
+	//Compute Configuration index
+    U32 idxCorners[8];
+    idxCorners[0] = idZ * dxdy + idY * dx + idX;
+    idxCorners[1] = (idZ+1) * dxdy + idY * dx + idX;
+    idxCorners[2] = idZ * dxdy + (idY+1) * dx + idX;
+    idxCorners[3] = (idZ+1) * dxdy + (idY+1) * dx + idX;
+    idxCorners[4] = idZ * dxdy + idY * dx + idX + 1;
+    idxCorners[5] = (idZ+1) * dxdy + idY * dx + idX + 1;
+    idxCorners[6] = idZ * dxdy + (idY+1) * dx + idX + 1;
+    idxCorners[7] = (idZ+1) * dxdy + (idY+1) * dx + idX + 1;
+    
+    int idxConfig = 0;    
+    for(int i=0; i<8; i++)
+	{
+    	if(idxCorners[i] < inGridParam->ctTotalPoints)
+    	{
+    	   if(isgreaterequal(arrInFields[idxCorners[i]].w, ISO_VALUE))
+    		   idxConfig += (1 << i);
+    	}
+	}
+	
+    //read number of vertices that output from this cell
+	arrOutCellElementsCount[idxCell] = read_imageui(texInVertexCountTable, tableSampler, (int2)(idxConfig,0)).x;
+	arrOutCellConfig[idxCell] = idxConfig;
+}
+
+//Compute Elements Kernel
+__kernel void ComputeElements(__global U32* arrInHighEdgesOffset,
+		   	   	   	   	   	  __global U8* arrInHighEdgesFlags,
+		   	   	   	   	   	  __global U8* arrInCellConfig,
+							  __global U32* arrInCellElementCount,
+							  __global U32* arrInCellElementOffset,
+							  __read_only image2d_t texInTriangleTable,
+							  __constant struct GridParam* inGridParam,
+							  __constant struct CellParam* inCellParam,							  
+							  __global U32* arrOutElements)
+{
+	int idX = get_global_id(0);
+	int idY = get_global_id(1);
+	int idZ = get_global_id(2);
+	if((idX >= inCellParam->ctNeededCells[0])||(idY >= inCellParam->ctNeededCells[1])||(idZ >= inCellParam->ctNeededCells[2]))
+		return;
+	uint idxCell = idZ * (inCellParam->ctNeededCells[0] * inCellParam->ctNeededCells[1]) + idY * inCellParam->ctNeededCells[0] + idX;
+	if(idxCell >= inCellParam->ctTotalCells)
+		return;
+	int ctElements = arrInCellElementCount[idxCell];
+	if(ctElements == 0)
+		return;
+	
+	U32 dx = inGridParam->ctGridPoints[0];	
+	U32 dxdy = inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1];
+
+	//Compute Configuration index
+    U32 idxCorners[8];
+    idxCorners[0] = idZ * dxdy + idY * dx + idX;
+    idxCorners[1] = (idZ+1) * dxdy + idY * dx + idX;
+    idxCorners[2] = idZ * dxdy + (idY+1) * dx + idX;
+    idxCorners[3] = (idZ+1) * dxdy + (idY+1) * dx + idX;
+    idxCorners[4] = idZ * dxdy + idY * dx + idX + 1;
+    idxCorners[5] = (idZ+1) * dxdy + idY * dx + idX + 1;
+    idxCorners[6] = idZ * dxdy + (idY+1) * dx + idX + 1;
+    idxCorners[7] = (idZ+1) * dxdy + (idY+1) * dx + idX + 1;
+	
+	U32 idxEdge;
+	int idxEdgeStart, idxEdgeAxis;
+	U32 idxStore = arrInCellElementOffset[idxCell];
+	
+	//Break loop if the idxEdge is 255
+	for(int i=0; i<ctElements; i++)
+	{
+		idxEdge = read_imageui(texInTriangleTable, tableSampler, (int2)(i, arrInCellConfig[idxCell])).x;
+		if(idxEdge == 255)
+			break;
+		idxEdgeStart = inCellParam->corner1[idxEdge];
+		//idxEdgeEnd   = inCellParam->corner2[idxEdge];
+		idxEdgeAxis  = inCellParam->edgeaxis[idxEdge];	
+
+		U8 flag = arrInHighEdgesFlags[idxCorners[idxEdgeStart]];		
+		U8 incr[3];
+		//XYZ: 421
+		incr[0] = 0;
+		incr[1] = (flag & 0x04) >> 2;
+		incr[2] = incr[1] + ((flag & 0x02) >> 1);			
+		
+		//XYZ = 012
+		arrOutElements[idxStore + i] = arrInHighEdgesOffset[idxCorners[idxEdgeStart]] + incr[idxEdgeAxis]; 
+	}
+}
 
 
 

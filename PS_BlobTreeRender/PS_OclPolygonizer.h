@@ -88,8 +88,8 @@ private:
 	int computeAllFields(float cellsize);
 	int computeEdgeTable();
 	int computeVertexAttribs(U32 ctVertices);
-	//int computeCellConfigs();
-	//int computeElements();
+	int computeCellConfigs();
+	int computeElements(U32 ctElements);
 
 private:
     struct CellParam{
@@ -124,6 +124,9 @@ private:
 	//Kernels for the multipass polygonizer
 	ComputeKernel* m_lpKernelComputeAllFields;
 	ComputeKernel* m_lpKernelComputeEdgeTable;
+	ComputeKernel* m_lpKernelComputeVertexAttribs;
+	ComputeKernel* m_lpKernelComputeCellConfigs;
+	ComputeKernel* m_lpKernelComputeElements;
 
 
 	//Reusable vars
@@ -137,11 +140,20 @@ private:
 	cl_mem m_inMemCellParam;
 	cl_mem m_inMemGridParam;
 
-	cl_mem m_inoutHighEdgesCount;
-	cl_mem m_inoutHighEdgesFlags;
-	cl_mem m_inoutAllFields;
-	bool m_bModelLoaded;
+	//Vertex
+	cl_mem m_inoutMemAllFields;
+	cl_mem m_inoutMemHighEdgesCount;
+	cl_mem m_inoutMemHighEdgesFlags;
+	cl_mem m_inMemHighEdgesOffset;
 
+	//Cell
+	cl_mem m_inoutMemCellConfig;
+	cl_mem m_inoutMemCellElementsCount;
+	cl_mem m_inMemCellElementsOffset;
+
+
+	//Model
+	bool m_bModelLoaded;
 
 	//Inputs:
 	//BlobNode Matrix

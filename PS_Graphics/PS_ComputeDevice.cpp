@@ -761,6 +761,32 @@ size_t ComputeDevice::getKernelWorkgroupSize(ComputeKernel* lpKernel)
 	return szWorkGroup;
 }
 
+bool ComputeDevice::enqueueNDRangeKernel(ComputeKernel* lpKernel, int dim, size_t* arrGlobalIndex, size_t* arrLocalIndex)
+{
+	cl_int err = clEnqueueNDRangeKernel(m_clCommandQueue, lpKernel->getKernel(),
+								 	    dim, NULL, arrGlobalIndex, arrLocalIndex,
+								 	    0, NULL, NULL);
+
+	if (err) {
+		LogErrorArg2("Failed to execute %s kernel! Ocl Error: %s",
+					 lpKernel->getTitle().c_str(),
+					 ComputeDevice::oclErrorString(err));
+		return false;
+	}
+	else
+		return true;
+}
+
+bool ComputeDevice::acquireGLObject(cl_uint count, const cl_mem* arrMemObjects)
+{
+	clEnqueueAcquireGLObjects(m_clCommandQueue, count, arrMemObjects, 0, 0, 0);
+}
+
+bool ComputeDevice::releaseGLObject(cl_uint count, const cl_mem* arrMemObjects)
+{
+	clEnqueueReleaseGLObjects(m_clCommandQueue, count, arrMemObjects, 0, 0, 0);
+}
+
 const char* ComputeDevice::oclErrorString(cl_int error)
 {
     static const char* errorString[] = {
