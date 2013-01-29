@@ -27,7 +27,7 @@ using namespace PS::FUNCTIONALMATH;
 #define OFFSET_OP_TYPE			0
 #define OFFSET_OP_CHILDREN 		1
 #define OFFSET_OP_LINK_FLAGS 	2
-#define OFFSET_OP_PARENT_LINK	3
+#define OFFSET_OP_NEXT			3
 
 //Primitive
 #define OFFSET_PRIM_TYPE		0
@@ -40,6 +40,10 @@ using namespace PS::FUNCTIONALMATH;
 #define OFFSET_COUNT_OPS 		9
 #define OFFSET_COUNT_MTXNODES	10
 #define OFFSET_COUNT_INSTANCE 	11
+
+//Defines an empty index to jump out of branch
+#define NULL_BLOB 0xFFFF
+
 
 namespace PS{
 namespace HPC{

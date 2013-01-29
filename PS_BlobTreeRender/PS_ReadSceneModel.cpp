@@ -248,6 +248,7 @@ int ModelReader::readNode(CSketchConfig* lpScript, int id, int* lpOutIsOp)
 		m_lpBlobOps->type[idxNode]   = GetScriptOpType(strOpType.ptr());
 		m_lpBlobOps->opFlags[idxNode]  = 0;
 
+
 		switch(m_lpBlobOps->type[idxNode])
 		{
 		case(opRicciBlend):
@@ -350,18 +351,35 @@ int ModelReader::readNode(CSketchConfig* lpScript, int id, int* lpOutIsOp)
 					return false;
 				}
 
-				int isChildOp;
+				int isLCOp = 0;
+				int isRCOp = 0;
+				int idxLC;
+				int idxRC;
 
 				//Read Left Child
-				m_lpBlobOps->opLeftChild[idxNode] = readNode(lpScript, ids[0], &isChildOp);
-				if(isChildOp)
+				idxLC = readNode(lpScript, ids[0], &isLCOp);
+				m_lpBlobOps->opLeftChild[idxNode] = idxLC;
+				if(isLCOp)
 					m_lpBlobOps->opFlags[idxNode] |= ofLeftChildIsOp;
 
 				if(isBinaryNode)
 				{
-					m_lpBlobOps->opRightChild[idxNode] = readNode(lpScript, ids[1], &isChildOp);
-					if(isChildOp)
+					idxRC = readNode(lpScript, ids[1], &isRCOp);
+					m_lpBlobOps->opRightChild[idxNode] = idxRC;
+					if(isRCOp)
+					{
 						m_lpBlobOps->opFlags[idxNode] |= ofRightChildIsOp;
+
+						//Is Right Op
+						m_lpBlobOps->opFlags[idxRC] |= ofIsRightOp;
+					}
+
+					//Set Break Flag for both child ops
+					if(isLCOp && isRCOp)
+					{
+						m_lpBlobOps->opFlags[idxLC] |= ofBreak;
+						m_lpBlobOps->opFlags[idxRC] |= ofBreak;
+					}
 
 				}
 			}
@@ -458,7 +476,7 @@ int ModelReader::readNode(CSketchConfig* lpScript, int id, int* lpOutIsOp)
 
 			m_lpBlobPrims->resX[idxNode] = r;
 
-					}
+		}
 		break;
 		case(primCylinder):
 		{
@@ -477,7 +495,7 @@ int ModelReader::readNode(CSketchConfig* lpScript, int id, int* lpOutIsOp)
 
 			m_lpBlobPrims->resX[idxNode] = r;
 			m_lpBlobPrims->resY[idxNode] = h;
-					}
+		}
 		break;
 		case(primCube):
 		{
@@ -489,7 +507,7 @@ int ModelReader::readNode(CSketchConfig* lpScript, int id, int* lpOutIsOp)
 			m_lpBlobPrims->posZ[idxNode] = p.z;
 
 			m_lpBlobPrims->resX[idxNode] = s;
-					}
+		}
 		break;
 		case(primTriangle):
 		{
@@ -507,17 +525,17 @@ int ModelReader::readNode(CSketchConfig* lpScript, int id, int* lpOutIsOp)
 			m_lpBlobPrims->resX[idxNode] = c.x;
 			m_lpBlobPrims->resY[idxNode] = c.y;
 			m_lpBlobPrims->resZ[idxNode] = c.z;
-					}
+		}
 		break;
 		case(primNULL):
-					{
+		{
 			m_lpBlobPrims->posX[idxNode] = 0.0f;
 			m_lpBlobPrims->posY[idxNode] = 0.0f;
 			m_lpBlobPrims->posZ[idxNode] = 0.0f;
-					}
+		}
 		break;
 		case(primInstance):
-			{
+		{
 			//x: idxArray
 			//y: idxScript
 			//z: isOperator
@@ -536,7 +554,7 @@ int ModelReader::readNode(CSketchConfig* lpScript, int id, int* lpOutIsOp)
 			//Origin NodeType
 			m_lpBlobPrims->dirX[idxNode] = idxOriginNodeType;
 			m_ctInstancedNodes++;
-			}
+		}
 		break;
 		default:
 		{

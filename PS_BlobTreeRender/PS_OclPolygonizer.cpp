@@ -104,7 +104,9 @@ namespace HPC{
 		m_arrHeader[8] = static_cast<float>(tempPrims.count);
 		m_arrHeader[9] = static_cast<float>(tempOps.count);
 		m_arrHeader[10] = static_cast<float>(m_mtxNode.count);
-		m_arrHeader[11] = DEFAULT_CELL_SIZE;
+
+		//Root Op
+		m_arrHeader[11] = NULL_BLOB;
 
 		//Count
 		m_ctPrims = tempPrims.count;
@@ -154,8 +156,9 @@ namespace HPC{
 
 				U32 opLeftRightChild = (tempOps.opLeftChild[i] << 16) | tempOps.opRightChild[i];
 				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_CHILDREN] = static_cast<float>(opLeftRightChild);
+
 				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS] = static_cast<float>(tempOps.opFlags[i]);
-				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_PARENT_LINK] = 0;
+				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_NEXT] = NULL_BLOB;
 
 				m_arrOps[i * DATASIZE_OPERATOR + 4] = static_cast<float>(tempOps.resX[i]);
 				m_arrOps[i * DATASIZE_OPERATOR + 5] = static_cast<float>(tempOps.resY[i]);
@@ -163,72 +166,99 @@ namespace HPC{
 				m_arrOps[i * DATASIZE_OPERATOR + 7] = static_cast<float>(tempOps.resW[i]);
 			}
 
-			//Update Parent/Link and Link Properties
+			//Set OP next and Link Properties
 			SIMPLESTACK<MAX_TREE_NODES> stkOps;
+			SIMPLESTACK<MAX_TREE_NODES> stkLastBreak;
+
 			stkOps.push(0);
+			stkLastBreak.push(NULL_BLOB);
+
+			//Process All Ops
 			while(!stkOps.empty())
 			{
 				U16 idxOp = stkOps.top();
-				stkOps.pop();
-
 				U32 opFlags = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS]);
-				bool isRange =(bool)((opFlags & ofChildIndexIsRange) >> 2);
-				bool isLCOp = (bool)((opFlags & ofLeftChildIsOp) >> 1);
-				bool isRCOp = (bool)(opFlags & ofRightChildIsOp);
+				bool isBreak = (bool)((opFlags & ofBreak) >> 5);
+				bool isLCOp  = (bool)((opFlags & ofLeftChildIsOp) >> 1);
+				bool isRCOp  = (bool) (opFlags & ofRightChildIsOp);
 
 				U32 idxKids = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_CHILDREN]);
 				U16 idxLC   = idxKids >> 16;
 				U16 idxRC   = idxKids & 0xFFFF;
 
-				if(isRange)
+				//Process a break when we got two primitive kids
+				if(isLCOp == false && isRCOp == false && stkLastBreak.empty() == false)
 				{
-					printf("READER: Range is not supported in GPU yet!");
-					return false;
-				}
+					//Remove key op from stack
+					stkOps.pop();
+					U16 idxBreak = stkLastBreak.top();
+					stkLastBreak.pop();
 
+					//Set Root Op
+					if(idxBreak == NULL_BLOB)
+						m_arrHeader[11] = idxOp;
+					else
+						m_arrOps[idxBreak * DATASIZE_OPERATOR + OFFSET_OP_NEXT] = idxOp;
 
-				U32 linkLC = (idxOp << 16) | idxRC;
-				//LINK FLAGS: LC = 1, isRCOP
-				U16 linkFlagLC = (isRCOp == 1)?3:2;
+					//Pop while not at a break node
+					while(!isBreak && !stkOps.empty())
+					{
+						idxOp = stkOps.top();
+						stkOps.pop();
 
-				U32 linkRC = (idxOp << 16) | idxLC;
-				//LINK FLAGS: LC = 0, isRCOP
-				U16 linkFlagRC = (isLCOp == 1)?1:0;
+						opFlags = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS]);
+						isBreak = (bool)((opFlags & ofBreak) >> 5);
+						//bool isRop   = (bool)((opFlags & ofIsRightOp) >> 4);
+						//bool isUnary = (bool)((opFlags & ofIsUnaryOp) >> 3);
+						//bool isRange = (bool)((opFlags & ofChildIndexIsRange) >> 2);
+						isLCOp  = (bool)((opFlags & ofLeftChildIsOp) >> 1);
+						isRCOp  = (bool) (opFlags & ofRightChildIsOp);
 
-				//LC
-				if(isLCOp)
-				{
-					U32 flags = static_cast<U32>(m_arrOps[idxLC * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS]);
-					flags |= (linkFlagLC << 16);
-					m_arrOps[idxLC * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS] = (float)flags;
-					m_arrOps[idxLC * DATASIZE_OPERATOR + OFFSET_OP_PARENT_LINK] = static_cast<float>(linkLC);
+						idxKids = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_CHILDREN]);
+						idxLC   = idxKids >> 16;
+						idxRC   = idxKids & 0xFFFF;
 
-					stkOps.push(idxLC);
+						if(isBreak)
+							stkLastBreak.push(idxOp);
+						if(isLCOp)
+							m_arrOps[idxLC * DATASIZE_OPERATOR + OFFSET_OP_NEXT] = idxOp;
+						if(isRCOp)
+							m_arrOps[idxRC * DATASIZE_OPERATOR + OFFSET_OP_NEXT] = idxOp;
+					}
 				}
 				else
 				{
-					m_arrPrims[idxLC * DATASIZE_PRIMITIVE + OFFSET_PRIM_LINK_FLAGS] = (float)(linkFlagLC << 16);
-					m_arrPrims[idxLC * DATASIZE_PRIMITIVE + OFFSET_PRIM_PARENT_LINK] = static_cast<float>(linkLC);
-				}
+					if(isLCOp)
+						stkOps.push(idxLC);
 
-
-				//RC
-				if(isRCOp)
-				{
-					U32 flags = static_cast<U32>(m_arrOps[idxRC * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS]);
-					flags |= (linkFlagRC << 16);
-					m_arrOps[idxRC * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS] = (float)flags;
-					m_arrOps[idxRC * DATASIZE_OPERATOR + OFFSET_OP_PARENT_LINK] = static_cast<float>(linkRC);
-					stkOps.push(idxRC);
+					if(isRCOp)
+						stkOps.push(idxRC);
 				}
-				else
-				{
-					m_arrPrims[idxRC * DATASIZE_PRIMITIVE + OFFSET_PRIM_LINK_FLAGS] = (float)(linkFlagRC << 16);
-					m_arrPrims[idxRC * DATASIZE_PRIMITIVE + OFFSET_PRIM_PARENT_LINK] = static_cast<float>(linkRC);
-				}
-
 			}
 		}
+
+
+		//Check next links and connections
+		if(m_arrOps[OFFSET_OP_NEXT] != NULL_BLOB)
+		{
+			LogError("Root operator next pointer not set.");
+			return false;
+		}
+
+		int ctErrors = 0;
+		for(int i=1; i< m_ctOps; i++)
+		{
+			U16 next = m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_NEXT];
+			if(next < 0 || next >= m_ctOps)
+			{
+				ctErrors ++;
+				LogErrorArg1("Next pointer not set properly at operator #%d", i);
+			}
+		}
+
+		if(ctErrors > 0)
+			return false;
+
 
 		//const int corner1[12]    = {LBN,LTN,LBN,LBF,RBN,RTN,RBN,RBF,LBN,LBF,LTN,LTF};
 		//const int corner2[12]    = {LBF,LTF,LTN,LTF,RBF,RTF,RTN,RTF,RBN,RBF,RTN,RTF};
@@ -251,22 +281,22 @@ namespace HPC{
 
 		//Header
 		if(!m_lpGPU->enqueueWriteBuffer(m_inMemHeader, sizeof(float) * DATASIZE_HEADER, m_arrHeader))
-			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
+			return false;
 
 		//Ops
 		if(!m_lpGPU->enqueueWriteBuffer(m_inMemOps, sizeof(float) * DATASIZE_OPERATOR * ctOpsToCopy, m_arrOps))
-			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
+			return false;
 
 		//Prims
 		if(!m_lpGPU->enqueueWriteBuffer(m_inMemPrims, sizeof(float) * DATASIZE_PRIMITIVE * ctPrimsToCopy, m_arrPrims))
-			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
+			return false;
 
 		//Matrix
 		if(!m_lpGPU->enqueueWriteBuffer(m_inMemMtx, sizeof(float) * PRIM_MATRIX_STRIDE * m_mtxNode.count, m_mtxNode.matrix))
-			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
+			return false;
 		m_bModelLoaded = true;
 
-		return SUCCESS;
+		return true;
 	}
 
 

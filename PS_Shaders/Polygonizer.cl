@@ -36,7 +36,7 @@
 #define OFFSET_OP_TYPE			0
 #define OFFSET_OP_FLAGS			1
 #define OFFSET_OP_LCRC			2
-#define OFFSET_OP_PARENTLINK	3
+#define OFFSET_OP_NEXT			3
 
 //OFFSETS in PRIMITIVES
 #define OFFSET4_PRIM_TYPE		0
@@ -68,6 +68,9 @@
 #define MAX_VERTICES_COUNT_PER_CELL		15
 #define MAX_TRIANGLES_COUNT_PER_CELL	5
 
+
+//Defines an empty index to jump out of branch
+#define NULL_BLOB 0xFFFF
 
 //MPU GRID
 #define GRID_DIM_8
@@ -123,33 +126,12 @@ enum OperatorType {opUnion, opIntersect, opDif, opSmoothDif, opBlend, opRicciBle
 				   opGradientBlend, opFastQuadricPointSet, opCache, opWarpTwist, 
 				   opWarpTaper, opWarpBend, opWarpShear};
 				   
-enum OPFLAGS {ofRightChildIsOp = 1, ofLeftChildIsOp = 2, ofChildIndexIsRange = 4, ofIsUnaryOp = 8};
+enum OPFLAGS {ofRightChildIsOp = 1, ofLeftChildIsOp = 2, ofChildIndexIsRange = 4, ofIsUnaryOp = 8, ofIsRightOp = 16, ofBreak = 32};
 
 //Sampler
 const sampler_t tableSampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_NEAREST;
 
-
-//Directions
-const int LBN =	0;  /* left bottom near corner  */
-const int LBF =	1;  /* left bottom far corner   */
-const int LTN =	2;  /* left top near corner     */
-const int LTF =	3;  /* left top far corner      */
-const int RBN =	4;  /* right bottom near corner */
-const int RBF =	5;  /* right bottom far corner  */
-const int RTN =	6;  /* right top near corner    */
-const int RTF =	7;  /* right top far corner     */
-
-//Axis
-const int AAX = 0;
-const int AAY = 1;
-const int AAZ = 2;
-
-//edge: LB, LT, LN, LF, RB, RT, RN, RF, BN, BF, TN, TF
-//Corner and EdgeAxis
-//const int corner1[12]    = {LBN,LTN,LBN,LBF,RBN,RTN,RBN,RBF,LBN,LBF,LTN,LTF};
-//const int corner2[12]    = {LBF,LTF,LTN,LTF,RBF,RTF,RTN,RTF,RBN,RBF,RTN,RTF};
-//const int edgeaxis[12]   = {AAZ,AAZ,AAY,AAY,AAZ,AAZ,AAY,AAY,AAX,AAX,AAX,AAX};
-
+//CellParam
 typedef struct CellParam{
 	U8 corner1[12];
 	U8 corner2[12];
@@ -159,6 +141,7 @@ typedef struct CellParam{
 	float cellsize;
 }CellParam;
 
+//GridParam
 typedef struct GridParam{
 	U32 ctGridPoints[3];
 	U32 ctTotalPoints;
@@ -167,7 +150,7 @@ typedef struct GridParam{
 
 
 typedef struct SimpleStack{
-	U16 values[MAX_TREE_NODES];
+	U16 values[MAX_TREE_DEPTH];
 	U16 count;
 }SimpleStack;
 
@@ -387,7 +370,106 @@ float ComputePrimitiveField(U16 idxPrimitive,
 }
 
 /*!
- * Compute field due to a primitive.
+ * Compute field due to a branch in the tree.
+ * At Ops: 1. Evaluate Left Prim and Right Prim
+ * 		   2. Use Left Field or Right Field if the child is op
+ * 		   3. Jump to next op or return
+ * 	    
+ */
+float ComputeBranchField(U16 idxBranchOp,
+						 U16* nextOp,		
+						 bool* rop, 
+						 float4 v,
+						 float lf,
+						 float rf,
+						 __global float4* arrHeader4,
+						 __global float4* arrOps4,
+						 __global float4* arrPrims4, 
+						 __global float4* arrMtxNodes4)
+{	
+	float field = 0.0f;
+	while(idxBranchOp != NULL_BLOB)
+	{
+		//Next Node
+		*nextOp = (U16)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].w;
+		
+		
+		U16 opType = (U16)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].x;
+		U32 opLR = (U32)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].y;
+		U16 opLeftChild = (U16)(opLR >> 16) & 0xFFFF;
+		U16 opRightChild = (U16)(opLR & 0xFFFF);
+	
+		U32 flags = (U32)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].z;
+		float4 params = arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_RES];
+		
+		
+		//enum OPFLAGS {ofRightChildIsOp = 1, ofLeftChildIsOp = 2, ofChildIndexIsRange = 4, ofIsUnaryOp = 8, ofIsRightOp = 16, ofBreak = 32};
+		bool isBreak = (flags & ofBreak) >> 5;
+		*rop 	= (flags & ofIsRightOp) >> 4;
+		bool bUnary = (flags & ofIsUnaryOp) >> 3;
+		bool bRange = (flags & ofChildIndexIsRange) >> 2;
+		bool bLeftChildOp = (flags & ofLeftChildIsOp) >> 1;
+		bool bRightChildOp = (flags & ofRightChildIsOp);
+		field = 0.0f;
+
+		//Range
+		if(bRange)
+		{
+			for(U16 i=opLeftChild; i <= opRightChild; i++)									
+				field += ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);				
+		}
+		else
+		{
+			if(!bLeftChildOp)
+				lf = ComputePrimitiveField(opLeftChild, v, arrOps4, arrPrims4, arrMtxNodes4);
+			
+			if(!bUnary && !bRightChildOp)
+				rf = ComputePrimitiveField(opRightChild, v, arrOps4, arrPrims4, arrMtxNodes4);
+		
+
+			//Compute All Operators			
+			switch(opType) {
+				case(opUnion): {
+					field = max(lf, rf);
+					break;
+				}
+					
+				case(opBlend): {
+					field = lf + rf;
+					break;
+				}					
+
+				case(opRicciBlend): {
+					field = pow(pow(lf, params.x) + pow(rf, params.x), params.y);
+					break;
+				}					
+
+				case(opIntersect): {
+					field = min(lf, rf);
+					break;
+				}					
+			}
+		}	
+		
+		//If we processed a right op
+		if(rop)
+			rf = field;
+		else
+			lf = field;
+		
+		//If we processed a break op
+		if(isBreak)
+			break;
+
+		//idxBranchOp
+		idxBranchOp = *nextOp;
+	}
+	
+	return field;
+}
+
+/*!
+ * Stackless Non-Recursive BlobTree Traversal
  */
 float ComputeField(float4 v,			
 				   __global float4* arrHeader4,
@@ -396,61 +478,40 @@ float ComputeField(float4 v,
 		   		   __global float4* arrMtxNodes4)
 {
 	//Count : Prims, Ops, Mtx ; CellSize
-	U32 ctPrims = (U32)arrHeader4[OFFSET4_HEADER_PARAMS].x;
+	//U32 ctPrims = (U32)arrHeader4[OFFSET4_HEADER_PARAMS].x;
 	U32 ctOps   = (U32)arrHeader4[OFFSET4_HEADER_PARAMS].y;
-	U16 idxOp = 0;
-	
+
 	//Should be in homogenous coordinates
 	v.w = 1.0f;
-	
+
 	if(ctOps > 0)
 	{
-		SimpleStack stkOps;
-		stkOps.count = 0;
-		StackPush(&stkOps, idxOp);
+		float lf = 0.0f;
+		float rf = 0.0f;
+		float field;
+		bool rop;
 		
-		//Final Field
-		float field = 0.0f;
-		
-		//Pop operators from stack and process
-		while(!IsStackEmpty(&stkOps))
+		U16 idxBranchOp = arrHeader4[OFFSET4_HEADER_PARAMS].w;
+		U16 idxNextOp = NULL_BLOB;
+		while(idxBranchOp != NULL_BLOB)
 		{
-			idxOp = StackTop(&stkOps);
-			StackPop(&stkOps);
+			//enum OPFLAGS {ofRightChildIsOp = 1, ofLeftChildIsOp = 2, ofChildIndexIsRange = 4, ofIsUnaryOp = 8, ofIsRightOp = 16};
+			//U32 flags = (U32)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].z;							
+			field = ComputeBranchField(idxBranchOp, &idxNextOp, &rop, v, lf, rf, arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);
+			if(rop)
+				rf = field;
+			else
+				lf = field;
 			
-			U16 opType = (U16)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].x;
-			U16 opLeftChild = (U16)(((U32)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].y) >> 16);
-			U16 opRightChild = (U16)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].y;
-			
-			U32 flags = (U32)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].z;
-			float4 params = arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_RES];
-			
-			//Left and Right is Op
-			//bool bLeftChildOp = (flags & ofLeftChildIsOp) >> 1;
-			//bool bRightChildOp = (flags & ofRightChildIsOp);
-			//bReady = !((bLeftChildOp && (arrOpsFieldComputed[idxLC] == 0))||
-			//(bRightChildOp && (arrOpsFieldComputed[idxRC] == 0)));
-			
-			//Compute Primitive Fields
-			float fieldLeft = ComputePrimitiveField(opLeftChild, v, arrOps4, arrPrims4, arrMtxNodes4);
-			float fieldRight = ComputePrimitiveField(opRightChild, v, arrOps4, arrPrims4, arrMtxNodes4);
-			
-			//Compute All Operators			
-			switch(opType){
-			case(opBlend):{
-				field = fieldLeft + fieldRight;
-				break;
-			}
-			}			
+			idxBranchOp = idxNextOp;
 		}
 		
-		//Return final field
 		return field;
 	}
 	else
 		return ComputePrimitiveField(0, v, arrOps4, arrPrims4, arrMtxNodes4);
 }
-
+		
 /*!
  * Compute Field-Value and Color
  */
@@ -510,14 +571,6 @@ float ComputeFieldAndColor(float4 v,
 				float rcf = 2.0f * (0.5f + fieldRight) - 1.0f;
 				(*lpOutColor) = lcf * arrPrims4[opLeftChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR] + 
 								rcf * arrPrims4[opRightChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
-				/*
-				Float_ lcf  = two * (half + leftChildField) - one;
-				Float_ rcf  = two * (half + rightChildField) - one;
-
-				outColorX = lcf * leftChildColorX + rcf * rightChildColorX;
-				outColorY = lcf * leftChildColorY + rcf * rightChildColorY;
-				outColorZ = lcf * leftChildColorZ + rcf * rightChildColorZ;
-				*/
 				break;
 			}
 			}			
@@ -557,225 +610,6 @@ float3 ComputeNormal(float4 v,
 	n = normalize(n);
 	//printf("Prenormalized N= [%.2f, %.2f, %.2f, %.2f] \n", n.x, n.y, n.z, n.w); 
 	return n;
-}
-
-
-/*!
- *  Compute the cell configuration by evaluating the field at 8 vertices of the cube.
- */
-__kernel void ComputeConfig(__global float4* arrInHeader4,
-			 __global float4* arrInOps4,										 
-			 __global float4* arrInPrims4,											 
-	 		 __global float4* arrInMtxNodes4,
-			 __read_only image2d_t texInVertexCountTable,
-			 __constant struct CellParam* inCellParams,
-			 __global uchar* arrOutCellConfig,
-			 __global uchar* arrOutVertexCount)		
-{
-	//Get XY plane index
-	int idX = get_global_id(0);
-	int idY = get_global_id(1);
-	int idZ = get_global_id(2);
-	if((idX >= inCellParams->ctNeededCells[0])||(idY >= inCellParams->ctNeededCells[1])||(idZ >= inCellParams->ctNeededCells[2]))
-		return;
-	uint idxCell = idZ * (inCellParams->ctNeededCells[0] * inCellParams->ctNeededCells[1]) + idY * inCellParams->ctNeededCells[0] + idX;
-	if(idxCell > inCellParams->ctTotalCells)
-		return;
-	
-	float cellsize = inCellParams->cellsize;
-	//printf("Cellsize: %.2f\n", cellsize);
-
-	//Count : Prims, Ops, Mtx ; CellSize
-	U32 ctPrims = (U32)arrInHeader4[OFFSET4_HEADER_PARAMS].x;
-	U32 ctOps   = (U32)arrInHeader4[OFFSET4_HEADER_PARAMS].y;
-	float4 lower = arrInHeader4[OFFSET4_HEADER_LOWER] + cellsize * (float4)(idX, idY, idZ, 0.0f);
-
-	float arrFields[8];
-	float4 arrVertices[8];
-	arrVertices[0] = lower;
-	arrVertices[1] = lower + cellsize * (float4)(0, 0, 1, 0);
-	arrVertices[2] = lower + cellsize * (float4)(0, 1, 0, 0);
-  	arrVertices[3] = lower + cellsize * (float4)(0, 1, 1, 0);
-	arrVertices[4] = lower + cellsize * (float4)(1, 0, 0, 0);
-	arrVertices[5] = lower + cellsize * (float4)(1, 0, 1, 0);
-  	arrVertices[6] = lower + cellsize * (float4)(1, 1, 0, 0);
-	arrVertices[7] = lower + cellsize * (float4)(1, 1, 1, 0);
-	
-    //Compute Configuration index
-    int idxConfig = 0;
-	for(int i=0; i<8; i++)
-	{
-		//arrFields[i] = ComputePrimitiveField(0, arrVertices[i], arrInOps4, arrInPrims4, arrInMtxNode4);
-		arrFields[i] = ComputeField(arrVertices[i], arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
-		if(isgreaterequal(arrFields[i], ISO_VALUE))
-			idxConfig += (1 << i);
-	}
-	
-    //read number of vertices that output from this cell
-    U8 ctVertices = read_imageui(texInVertexCountTable, tableSampler, (int2)(idxConfig,0)).x;
-
-	//Cell-based output											
-	arrOutCellConfig[idxCell] = idxConfig;
-	arrOutVertexCount[idxCell] = ctVertices;
-}
-
-
-/*
- * Extract mesh by computing its vertices
- */
-__kernel void ComputeMesh(__global float4* arrInHeader4,
-						  __global float4* arrInOps4,										 
-						  __global float4* arrInPrims4,											 
-						  __global float4* arrInMtxNode4,					      
-						  __read_only image2d_t texInTriangleTable,
-						  __constant struct CellParam* inCellParams,
-						  __global U8* arrInCellConfig,						
-						  __global U32* arrInVertexBufferOffset,
-						  
-						  __global U32* arrInTetMeshBufferOffset,
-						  __global float* arrOutTetMeshVertices,
-						  __global U32* arrOutTetMeshIndices,
-						  
-						  __global float4* arrOutMeshVertex,
-						  __global float4* arrOutMeshColor,
-						  __global float* arrOutMeshNormal)						  
-{
-	//Get XY plane index
-	int idX = get_global_id(0);
-	int idY = get_global_id(1);
-	int idZ = get_global_id(2);
-	if((idX >= inCellParams->ctNeededCells[0])||(idY >= inCellParams->ctNeededCells[1])||(idZ >= inCellParams->ctNeededCells[2]))
-		return;
-	uint idxCell = idZ * (inCellParams->ctNeededCells[0] * inCellParams->ctNeededCells[1]) + idY * inCellParams->ctNeededCells[0] + idX;
-	if(idxCell > inCellParams->ctTotalCells)
-		return;
-	
-	//We need complete insiders too
-	if(arrInCellConfig[idxCell] == 0)
-		return;
-
-	float cellsize = inCellParams->cellsize;
-	float4 lower = arrInHeader4[OFFSET4_HEADER_LOWER] + cellsize * (float4)(idX, idY, idZ, 0.0f);
-	float arrFields[8];
-	float4 arrVertices[8];
-	arrVertices[0] = lower;
-	arrVertices[1] = lower + cellsize * (float4)(0, 0, 1, 0);
-	arrVertices[2] = lower + cellsize * (float4)(0, 1, 0, 0);
-  	arrVertices[3] = lower + cellsize * (float4)(0, 1, 1, 0);
-	arrVertices[4] = lower + cellsize * (float4)(1, 0, 0, 0);
-	arrVertices[5] = lower + cellsize * (float4)(1, 0, 1, 0);
-  	arrVertices[6] = lower + cellsize * (float4)(1, 1, 0, 0);
-	arrVertices[7] = lower + cellsize * (float4)(1, 1, 1, 0);
-	
-
-    //Compute Configuration index
-	for(int i=0; i<8; i++)
-	{
-		arrFields[i] = ComputeField(arrVertices[i], arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNode4);
-	}
-
-	//Tetrahedralize
-	//(x,y,z) * number of cubes * 8 cube corners
-	//cl_mem inoutMemTetMeshVertices = m_lpGPU->createMemBuffer(sizeof(float) * 3 * ctCrossedOrInside * 8, ComputeDevice::memReadWrite);
-
-	//(a,b,c,d) * number of cubes * 6 Tetrahedra per cube
-	//cl_mem inoutMemTetMeshIndices = m_lpGPU->createMemBuffer(sizeof(U32) * 4 * ctCrossedOrInside * 6, ComputeDevice::memReadWrite);
-	U32 idxTet = arrInTetMeshBufferOffset[idxCell];	
-	U32 offsetVertex = idxTet * 8 * 3;
-	for(int i=0; i<8; i++)
-	{
-		arrOutTetMeshVertices[offsetVertex + i*3 + 0] = arrVertices[i].x; 
-		arrOutTetMeshVertices[offsetVertex + i*3 + 1] = arrVertices[i].y;
-		arrOutTetMeshVertices[offsetVertex + i*3 + 2] = arrVertices[i].z;
-	}
-	
-	//6 Tets per each cube
-	U32 offsetTetVertex = idxTet*8;
-	U32 offsetTet = idxTet * 6 * 4;
-	arrOutTetMeshIndices[offsetTet + 0] = offsetTetVertex + LBN;
-	arrOutTetMeshIndices[offsetTet + 1] = offsetTetVertex + LTN;
-	arrOutTetMeshIndices[offsetTet + 2] = offsetTetVertex + RBN;
-	arrOutTetMeshIndices[offsetTet + 3] = offsetTetVertex + LBF;
-	
-	arrOutTetMeshIndices[offsetTet + 4] = offsetTetVertex + RTN;
-	arrOutTetMeshIndices[offsetTet + 5] = offsetTetVertex + LTN;
-	arrOutTetMeshIndices[offsetTet + 6] = offsetTetVertex + LBF;
-	arrOutTetMeshIndices[offsetTet + 7] = offsetTetVertex + RBN;
-
-	arrOutTetMeshIndices[offsetTet + 8] = offsetTetVertex + RTN;
-	arrOutTetMeshIndices[offsetTet + 9] = offsetTetVertex + LTN;
-	arrOutTetMeshIndices[offsetTet + 10] = offsetTetVertex + LTF;
-	arrOutTetMeshIndices[offsetTet + 11] = offsetTetVertex + LBF;
-
-	arrOutTetMeshIndices[offsetTet + 12] = offsetTetVertex + RTN;
-	arrOutTetMeshIndices[offsetTet + 13] = offsetTetVertex + RBN;
-	arrOutTetMeshIndices[offsetTet + 14] = offsetTetVertex + LBF;
-	arrOutTetMeshIndices[offsetTet + 15] = offsetTetVertex + RBF;
-
-	arrOutTetMeshIndices[offsetTet + 16] = offsetTetVertex + RTN;
-	arrOutTetMeshIndices[offsetTet + 17] = offsetTetVertex + LBF;
-	arrOutTetMeshIndices[offsetTet + 18] = offsetTetVertex + LTF;
-	arrOutTetMeshIndices[offsetTet + 19] = offsetTetVertex + RBF;
-
-	arrOutTetMeshIndices[offsetTet + 20] = offsetTetVertex + RTN;
-	arrOutTetMeshIndices[offsetTet + 21] = offsetTetVertex + LTF;
-	arrOutTetMeshIndices[offsetTet + 22] = offsetTetVertex + RTF;
-	arrOutTetMeshIndices[offsetTet + 23] = offsetTetVertex + RBF;
-
-	
-
-	//Variables
-	U32 idxEdge;
-	float4 e1;
-	float4 e2;
-	float4 v;
-	float3 n;
-	float scale;
-	U32 idxMeshAttrib;
-	int idxEdgeStart, idxEdgeEnd, idxEdgeAxis;
-	int idxConfig = arrInCellConfig[idxCell];
-	int voffset = arrInVertexBufferOffset[idxCell];
-
-	//Break loop if the idxEdge is 255
-	for(int i=0; i<16; i++)
-	{
-		idxEdge = read_imageui(texInTriangleTable, tableSampler, (int2)(i, idxConfig)).x;
-		if(idxEdge == 255)
-			break;
-		idxEdgeStart = inCellParams->corner1[idxEdge];
-		idxEdgeEnd   = inCellParams->corner2[idxEdge];
-		idxEdgeAxis  = inCellParams->edgeaxis[idxEdge];	
-
-		e1 = lower + cellsize * (float4)((int)((idxEdgeStart & 0x04) >> 2), (int)((idxEdgeStart & 0x02) >> 1), (int)(idxEdgeStart & 0x01), 0.0f);
-		e2 = e1;
-		if(idxEdgeAxis == 0)
-			e2.x += cellsize;
-		else if(idxEdgeAxis == 1)
-			e2.y += cellsize;
-		else
-			e2.z += cellsize;
-		scale = (ISO_VALUE - arrFields[idxEdgeStart])/(arrFields[idxEdgeEnd] - arrFields[idxEdgeStart]);
-		
-		//Use Linear Interpolation for now. Upgrade to Newton-Raphson (Gradient Marching)
-		v = e1 + scale * (e2 - e1);
-
-		//Compute Normal
-		n = ComputeNormal(v, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNode4);
-
-		//Compute Field and Color
-		float4 color;
-		ComputeFieldAndColor(v,	&color, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNode4);
-
-		//MeshAttrib index
-		idxMeshAttrib = voffset + i;
-		 
-		arrOutMeshVertex[idxMeshAttrib] = v;
-		arrOutMeshColor[idxMeshAttrib] = color;
-		arrOutMeshNormal[idxMeshAttrib * 3] = n.x;
-		arrOutMeshNormal[idxMeshAttrib * 3 + 1] = n.y;
-		arrOutMeshNormal[idxMeshAttrib * 3 + 2] = n.z;
-	//	printf("n = [%.2f, %.2f, %.2f] \n", n.x, n.y, n.z);  
-	}
 }
 
 

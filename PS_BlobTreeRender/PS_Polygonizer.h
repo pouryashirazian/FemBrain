@@ -143,7 +143,7 @@ struct PS_BEGIN_ALIGNED(PS_SIMD_FLEN) SOABlobPrims
 
 //Aligned SOA structure for operators
 //SS= 5636
-enum OPFLAGS {ofRightChildIsOp = 1, ofLeftChildIsOp = 2, ofChildIndexIsRange = 4, ofIsUnaryOp = 8};
+enum OPFLAGS {ofRightChildIsOp = 1, ofLeftChildIsOp = 2, ofChildIndexIsRange = 4, ofIsUnaryOp = 8,  ofIsRightOp = 16, ofBreak = 32};
 struct PS_BEGIN_ALIGNED(PS_SIMD_FLEN) SOABlobOps
 {
 	U8 type[PS_SIMD_PADSIZE(MAX_TREE_NODES)];
