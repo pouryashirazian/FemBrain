@@ -1,4 +1,4 @@
-/* Please Write the OpenCL Kernel(s) code here or load it from a text file *///OpenCL BlobTree Polygonizer: Pourya Shirazian
+//OpenCL BlobTree Polygonizer: Pourya Shirazian
 
 //DATASIZES
 #define DATASIZE_HEADER		12
@@ -129,7 +129,7 @@ enum OperatorType {opUnion, opIntersect, opDif, opSmoothDif, opBlend, opRicciBle
 enum OPFLAGS {ofRightChildIsOp = 1, ofLeftChildIsOp = 2, ofChildIndexIsRange = 4, ofIsUnaryOp = 8, ofIsRightOp = 16, ofBreak = 32};
 
 //Sampler
-const sampler_t tableSampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_NEAREST;
+__constant sampler_t tableSampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_NEAREST;
 
 //CellParam
 typedef struct CellParam{
@@ -524,7 +524,9 @@ float ComputeBranchFieldAndColor(U16 idxBranchOp,
 								 float4 v,
 								 float4* lpOutColor,
 								 float lf,
+								 float4 lcolor,
 								 float rf,
+								 float4 rcolor,
 								 __global float4* arrHeader4,
 								 __global float4* arrOps4,
 								 __global float4* arrPrims4, 
@@ -567,11 +569,15 @@ float ComputeBranchFieldAndColor(U16 idxBranchOp,
 		}
 		else
 		{
-			if(!bLeftChildOp)
+			if(!bLeftChildOp) {
 				lf = ComputePrimitiveField(opLeftChild, v, arrOps4, arrPrims4, arrMtxNodes4);
+				lcolor = arrPrims4[opLeftChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
+			}
 			
-			if(!bUnary && !bRightChildOp)
+			if(!bUnary && !bRightChildOp) {
 				rf = ComputePrimitiveField(opRightChild, v, arrOps4, arrPrims4, arrMtxNodes4);
+				rcolor = arrPrims4[opRightChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
+			}
 		
 			//Normalized fields from (0 - 0.5) to (0 - 1)
 			float lfn = 2.0f * (0.5f + lf) - 1.0f;
@@ -581,35 +587,31 @@ float ComputeBranchFieldAndColor(U16 idxBranchOp,
 			switch(opType) {
 				case(opUnion): {
 					if(isgreaterequal(lfn, rfn))
-						(*lpOutColor) += lfn * arrPrims4[opLeftChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
+						(*lpOutColor) += lfn * lcolor;
 					else
-						(*lpOutColor) += rfn * arrPrims4[opRightChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
+						(*lpOutColor) += rfn * rcolor;
 
 					field = max(lf, rf);
 					break;
 				}
 					
 				case(opBlend): {
-					(*lpOutColor) += lfn * arrPrims4[opLeftChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR] + 
-									rfn * arrPrims4[opRightChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
-
+					(*lpOutColor) += lfn * lcolor + rfn * rcolor; 									
 					field = lf + rf;
 					break;
 				}					
 
 				case(opRicciBlend): {
-					(*lpOutColor) += lfn * arrPrims4[opLeftChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR] + 
-									rfn * arrPrims4[opRightChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
-
+					(*lpOutColor) += lfn * lcolor + rfn * rcolor;
 					field = pow(pow(lf, params.x) + pow(rf, params.x), params.y);
 					break;
 				}					
 
 				case(opIntersect): {
 					if(islessequal(lfn, rfn))
-						(*lpOutColor) += lfn * arrPrims4[opLeftChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
+						(*lpOutColor) += lfn * lcolor;
 					else
-						(*lpOutColor) += rfn * arrPrims4[opRightChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
+						(*lpOutColor) += rfn * rcolor;
 
 					field = min(lf, rf);
 					break;
@@ -618,10 +620,15 @@ float ComputeBranchFieldAndColor(U16 idxBranchOp,
 		}	
 		
 		//If we processed a right op
-		if((*lpIsRightOp) == true)
+		if((*lpIsRightOp) == true) {
+			rcolor = (*lpOutColor);
 			rf = field;
-		else
+		}
+		else 
+		{
+			lcolor = (*lpOutColor);
 			lf = field;
+		}
 		
 		//If we processed a break op
 		if(isBreak)
@@ -656,6 +663,8 @@ float ComputeFieldAndColor(float4 v,
 	{
 		float lf = 0.0f;
 		float rf = 0.0f;
+		float4 lcolor = (float4)(0,0,0,0);
+		float4 rcolor = (float4)(0,0,0,0);
 		float field;
 		bool isRightOp;
 		
@@ -665,11 +674,16 @@ float ComputeFieldAndColor(float4 v,
 		{
 			//enum OPFLAGS {ofRightChildIsOp = 1, ofLeftChildIsOp = 2, ofChildIndexIsRange = 4, ofIsUnaryOp = 8, ofIsRightOp = 16};
 			//U32 flags = (U32)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].z;							
-			field = ComputeBranchFieldAndColor(idxBranchOp, &idxNextOp, &isRightOp, v, lpOutColor, lf, rf, arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);
-			if(isRightOp)
+			field = ComputeBranchFieldAndColor(idxBranchOp, &idxNextOp, &isRightOp, v, lpOutColor, 
+											   lf, lcolor, rf, rcolor, arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);
+			if(isRightOp) {
 				rf = field;
-			else
+				rcolor = *lpOutColor;
+			}
+			else {				
 				lf = field;
+				lcolor = *lpOutColor;
+			}
 			
 			idxBranchOp = idxNextOp;
 		}

@@ -61,6 +61,11 @@ DAnsiStr ModelReader::GetScriptOpName(U8 opCode)
 		strName = "FASTQUADRICPOINTSET";
 		break;
 	}
+	case(opUnion): {
+		strName = "UNION";
+		break;
+	}
+
 	case(opBlend): {
 		strName = "BLEND";
 		break;

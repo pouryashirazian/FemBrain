@@ -215,7 +215,7 @@ namespace HPC{
 	}
 
 	bool GPUPoly::setTraversalRoute() {
-		//printBlobTree("blobtree.txt");
+		printBlobTree("blobtree.txt");
 
 		//Set OP next and Link Properties
 		SIMPLESTACK<MAX_TREE_NODES> stkOps;
@@ -384,7 +384,7 @@ namespace HPC{
 
 					//Visit Node
 					DAnsiStr strName = ModelReader::GetScriptOpName(opType);
-					ofs << "OP#" << n.index << ":" << strName.substr(0, 3) << "\t";
+					ofs << "OP#" << n.index << ":" << strName.substr(0, 5) << "\t";
 
 					if(isRange)
 					{
@@ -402,7 +402,7 @@ namespace HPC{
 				{
 					U16 primType = static_cast<U16>(m_arrPrims[n.index * DATASIZE_PRIMITIVE + OFFSET_PRIM_TYPE]);
 					DAnsiStr strName = ModelReader::GetScriptPrimName(primType);
-					ofs << "PR#" << n.index << ":" << strName.substr(0, 3) << "\t";
+					ofs << "PR#" << n.index << ":" << strName.substr(0, 5) << "\t";
 				}
 			}
 		}
@@ -410,7 +410,7 @@ namespace HPC{
 		{
 			U16 primType = static_cast<U16>(m_arrPrims[OFFSET_PRIM_TYPE]);
 			DAnsiStr strName = ModelReader::GetScriptPrimName(primType);
-			ofs << "PR#0:" << strName.substr(0, 3) << "\t";
+			ofs << "PR#0:" << strName.substr(0, 5) << "\t";
 		}
 		/*
 		//Iterate over depths
@@ -551,8 +551,8 @@ namespace HPC{
 		//Build Kernel
 		LogInfo("3.Setup Kernel Functions.");
 		//m_lpKernelComputeConfig = lpProgram->addKernel("ComputeConfigIndexVertexCount");
-		m_lpKernelComputeConfig = lpProgram->addKernel("ComputeConfig");
-		m_lpKernelComputeMesh = lpProgram->addKernel("ComputeMesh");
+		//m_lpKernelComputeConfig = lpProgram->addKernel("ComputeConfig");
+		//m_lpKernelComputeMesh = lpProgram->addKernel("ComputeMesh");
 
 		m_lpKernelComputeAllFields = lpProgram->addKernel("ComputeAllFields");
 		m_lpGPU->getKernelWorkgroupSize(m_lpKernelComputeAllFields);
