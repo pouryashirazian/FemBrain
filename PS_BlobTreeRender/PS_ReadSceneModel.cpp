@@ -52,6 +52,61 @@ U8 ModelReader::GetScriptOpType(const char* chrOpName)
 		return opUnion;
 }
 
+DAnsiStr ModelReader::GetScriptOpName(U8 opCode)
+{
+	DAnsiStr strName = "UNKNOWN";
+	switch(opCode)
+	{
+	case(opFastQuadricPointSet): {
+		strName = "FASTQUADRICPOINTSET";
+		break;
+	}
+	case(opBlend): {
+		strName = "BLEND";
+		break;
+	}
+	case(opRicciBlend): {
+		strName = "RICCI BLEND";
+		break;
+	}
+	case(opIntersect): {
+		strName = "INTERSECTION";
+		break;
+	}
+	case(opDif): {
+		strName = "DIFFERENCE";
+		break;
+	}
+	case(opSmoothDif): {
+		strName = "SMOOTH DIFFERENCE";
+		break;
+	}
+
+	case(opCache): {
+		strName = "CACHE";
+		break;
+	}
+	case(opWarpTwist): {
+		strName = "TWIST";
+		break;
+	}
+	case(opWarpTaper): {
+		strName = "TAPER";
+		break;
+	}
+	case(opWarpBend): {
+		strName = "BEND";
+		break;
+	}
+	case(opWarpShear): {
+		strName = "SHEAR";
+		break;
+	}
+	}
+
+	return strName;
+}
+
 U8 ModelReader::GetScriptPrimType(const char* chrPrimName)
 {
 	if(strcmp(chrPrimName, "QUADRICPOINT") == 0)
@@ -76,6 +131,57 @@ U8 ModelReader::GetScriptPrimType(const char* chrPrimName)
 		return primNULL;
 	else
 		return primNULL;
+}
+
+DAnsiStr ModelReader::GetScriptPrimName(U8 primCode)
+{
+	DAnsiStr strName = "UNKNOWN";
+	switch(primCode)
+	{
+	case(primQuadricPoint): {
+		strName = "QUADRICPOINT";
+		break;
+	}
+	case(primPoint): {
+		strName = "POINT";
+		break;
+	}
+	case(primLine): {
+		strName = "LINE";
+		break;
+	}
+	case(primCylinder): {
+		strName = "CYLINDER";
+		break;
+	}
+	case(primDisc): {
+		strName = "DISC";
+		break;
+	}
+	case(primRing): {
+		strName = "RING";
+		break;
+	}
+
+	case(primCube): {
+		strName = "CUBE";
+		break;
+	}
+	case(primTriangle): {
+		strName = "TRIANGLE";
+		break;
+	}
+	case(primInstance): {
+		strName = "INSTANCE";
+		break;
+	}
+	case(primNULL): {
+		strName = "NULL";
+		break;
+	}
+	}
+
+	return strName;
 }
 
 ModelReader::ModelReader(SOABlobPrims* lpPrims,

@@ -265,6 +265,7 @@ struct SIMPLESTACK
 
 	void pop() {count--;}
 	bool empty() { return (count == 0);}
+	void clear() { count = 0;}
 	U32 top() {return id[count - 1];}
 
 	U32 id[_size];
@@ -287,6 +288,7 @@ struct GENERIC_PAIR_STACK
 	bool empty() { return (count == 0);}
 	T topFirst() {return arrFirstVals[count - 1];}
 	T topSecond() {return arrSecondVals[count - 1];}
+	void clear() { count =0;}
 
 	//Members
 	T arrFirstVals[_size];

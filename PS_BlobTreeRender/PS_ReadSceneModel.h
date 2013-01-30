@@ -50,14 +50,26 @@ public:
 	int read(const char* lpFilePath);
 
 	/*!
-	 * Returns BlobTree opcode for the specified operator
+	 * Returns BlobTree opcode for the specified operator name
 	 */
 	static U8 GetScriptOpType(const char* chrOpName);
 
 	/*!
-	 * Returns BlobTree primcode for the specified primitive
+	 * Returns BlobTree operator name for the specified opcode
+	 */
+	static DAnsiStr GetScriptOpName(U8 opCode);
+
+
+	/*!
+	 * Returns BlobTree primitive code for the specified primitive name
 	 */
 	static U8 GetScriptPrimType(const char* chrPrimName);
+
+	/*!
+	 * Returns BlobTree primitive name for the specified primitive
+	 */
+	static DAnsiStr GetScriptPrimName(U8 primCode);
+
 protected:
 	int readNode(PS::CSketchConfig* lpScript, int id, int* lpOutIsOp = NULL);
 

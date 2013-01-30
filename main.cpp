@@ -974,7 +974,7 @@ int main(int argc, char* argv[])
 
 	DAnsiStr strFPModel = ExtractFilePath(GetExePath());
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/sphere.txt";
-	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/peanut.scene";
+	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/testDisc3.scene";
 	g_lpBlobRender = new GPUPoly();
 	g_lpBlobRender->readModel(strFPModel.cptr());
 	g_lpBlobRender->runMultiPass(g_appSettings.cellsize);

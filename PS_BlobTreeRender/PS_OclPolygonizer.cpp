@@ -165,99 +165,14 @@ namespace HPC{
 				m_arrOps[i * DATASIZE_OPERATOR + 6] = static_cast<float>(tempOps.resZ[i]);
 				m_arrOps[i * DATASIZE_OPERATOR + 7] = static_cast<float>(tempOps.resW[i]);
 			}
-
-			//Set OP next and Link Properties
-			SIMPLESTACK<MAX_TREE_NODES> stkOps;
-			SIMPLESTACK<MAX_TREE_NODES> stkLastBreak;
-
-			stkOps.push(0);
-			stkLastBreak.push(NULL_BLOB);
-
-			//Process All Ops
-			while(!stkOps.empty())
-			{
-				U16 idxOp = stkOps.top();
-				U32 opFlags = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS]);
-				bool isBreak = (bool)((opFlags & ofBreak) >> 5);
-				bool isLCOp  = (bool)((opFlags & ofLeftChildIsOp) >> 1);
-				bool isRCOp  = (bool) (opFlags & ofRightChildIsOp);
-
-				U32 idxKids = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_CHILDREN]);
-				U16 idxLC   = idxKids >> 16;
-				U16 idxRC   = idxKids & 0xFFFF;
-
-				//Process a break when we got two primitive kids
-				if(isLCOp == false && isRCOp == false && stkLastBreak.empty() == false)
-				{
-					//Remove key op from stack
-					stkOps.pop();
-					U16 idxBreak = stkLastBreak.top();
-					stkLastBreak.pop();
-
-					//Set Root Op
-					if(idxBreak == NULL_BLOB)
-						m_arrHeader[11] = idxOp;
-					else
-						m_arrOps[idxBreak * DATASIZE_OPERATOR + OFFSET_OP_NEXT] = idxOp;
-
-					//Pop while not at a break node
-					while(!isBreak && !stkOps.empty())
-					{
-						idxOp = stkOps.top();
-						stkOps.pop();
-
-						opFlags = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS]);
-						isBreak = (bool)((opFlags & ofBreak) >> 5);
-						//bool isRop   = (bool)((opFlags & ofIsRightOp) >> 4);
-						//bool isUnary = (bool)((opFlags & ofIsUnaryOp) >> 3);
-						//bool isRange = (bool)((opFlags & ofChildIndexIsRange) >> 2);
-						isLCOp  = (bool)((opFlags & ofLeftChildIsOp) >> 1);
-						isRCOp  = (bool) (opFlags & ofRightChildIsOp);
-
-						idxKids = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_CHILDREN]);
-						idxLC   = idxKids >> 16;
-						idxRC   = idxKids & 0xFFFF;
-
-						if(isBreak)
-							stkLastBreak.push(idxOp);
-						if(isLCOp)
-							m_arrOps[idxLC * DATASIZE_OPERATOR + OFFSET_OP_NEXT] = idxOp;
-						if(isRCOp)
-							m_arrOps[idxRC * DATASIZE_OPERATOR + OFFSET_OP_NEXT] = idxOp;
-					}
-				}
-				else
-				{
-					if(isLCOp)
-						stkOps.push(idxLC);
-
-					if(isRCOp)
-						stkOps.push(idxRC);
-				}
-			}
 		}
 
-
-		//Check next links and connections
-		if(m_arrOps[OFFSET_OP_NEXT] != NULL_BLOB)
+		//Set Traversal Route
+		if(!setTraversalRoute())
 		{
-			LogError("Root operator next pointer not set.");
+			LogError("Failed to find a tree traversal route in this BlobTree!");
 			return false;
 		}
-
-		int ctErrors = 0;
-		for(int i=1; i< m_ctOps; i++)
-		{
-			U16 next = m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_NEXT];
-			if(next < 0 || next >= m_ctOps)
-			{
-				ctErrors ++;
-				LogErrorArg1("Next pointer not set properly at operator #%d", i);
-			}
-		}
-
-		if(ctErrors > 0)
-			return false;
 
 
 		//const int corner1[12]    = {LBN,LTN,LBN,LBF,RBN,RTN,RBN,RBF,LBN,LBF,LTN,LTF};
@@ -299,6 +214,241 @@ namespace HPC{
 		return true;
 	}
 
+	bool GPUPoly::setTraversalRoute() {
+		//printBlobTree("blobtree.txt");
+
+		//Set OP next and Link Properties
+		SIMPLESTACK<MAX_TREE_NODES> stkOps;
+		SIMPLESTACK<MAX_TREE_NODES> stkLastBreak;
+
+		stkOps.push(0);
+		stkLastBreak.push(NULL_BLOB);
+
+		//Process All Ops
+		while(!stkOps.empty())
+		{
+			U16 idxOp = stkOps.top();
+			U32 opFlags = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS]);
+			bool isBreak = (bool)((opFlags & ofBreak) >> 5);
+			bool isLCOp  = (bool)((opFlags & ofLeftChildIsOp) >> 1);
+			bool isRCOp  = (bool) (opFlags & ofRightChildIsOp);
+
+			U32 idxKids = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_CHILDREN]);
+			U16 idxLC   = idxKids >> 16;
+			U16 idxRC   = idxKids & 0xFFFF;
+
+			//Process a break when we got two primitive kids
+			if(isLCOp == false && isRCOp == false && stkLastBreak.empty() == false)
+			{
+				//Remove key op from stack
+				stkOps.pop();
+				U16 idxBreak = stkLastBreak.top();
+				stkLastBreak.pop();
+
+				//Set Root Op
+				if(idxBreak == NULL_BLOB)
+					m_arrHeader[11] = idxOp;
+				else
+					m_arrOps[idxBreak * DATASIZE_OPERATOR + OFFSET_OP_NEXT] = idxOp;
+
+				if(isBreak)
+					stkLastBreak.push(idxOp);
+
+				//Pop while not at a break node
+				while(!isBreak && !stkOps.empty())
+				{
+					idxOp = stkOps.top();
+					stkOps.pop();
+
+					opFlags = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS]);
+					isBreak = (bool)((opFlags & ofBreak) >> 5);
+					//bool isRop   = (bool)((opFlags & ofIsRightOp) >> 4);
+					//bool isUnary = (bool)((opFlags & ofIsUnaryOp) >> 3);
+					//bool isRange = (bool)((opFlags & ofChildIndexIsRange) >> 2);
+					isLCOp  = (bool)((opFlags & ofLeftChildIsOp) >> 1);
+					isRCOp  = (bool) (opFlags & ofRightChildIsOp);
+
+					idxKids = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_CHILDREN]);
+					idxLC   = idxKids >> 16;
+					idxRC   = idxKids & 0xFFFF;
+
+					if(isBreak)
+						stkLastBreak.push(idxOp);
+					if(isLCOp)
+						m_arrOps[idxLC * DATASIZE_OPERATOR + OFFSET_OP_NEXT] = idxOp;
+					if(isRCOp)
+						m_arrOps[idxRC * DATASIZE_OPERATOR + OFFSET_OP_NEXT] = idxOp;
+				}
+			}
+			else
+			{
+				if(isLCOp)
+					stkOps.push(idxLC);
+
+				if(isRCOp)
+					stkOps.push(idxRC);
+			}
+		}
+
+		//Test Route
+		//Check next links and connections
+		if(m_arrOps[OFFSET_OP_NEXT] != NULL_BLOB)
+		{
+			LogError("Root operator next pointer not set.");
+			return false;
+		}
+
+		int ctErrors = 0;
+		for(U32 i=1; i< m_ctOps; i++)
+		{
+			U16 next = m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_NEXT];
+			if(next < 0 || next >= m_ctOps)
+			{
+				ctErrors ++;
+				LogErrorArg1("Next pointer not set properly at operator #%d", i);
+			}
+		}
+
+		return (ctErrors == 0);
+	}
+
+	void GPUPoly::printBlobTree(const char* chrFilePath) const
+	{
+		ofstream ofs;
+		ofs.open(chrFilePath, ios::out);
+
+		//Compute Tree Depth
+		U32 maxDepth = 0;
+
+		//Compute MAXDEPTH
+		if(m_ctOps > 0)
+		{
+			GENERIC_PAIR_STACK<U32, MAX_TREE_NODES> stkDepth;
+			stkDepth.push(0, 0);
+			while(!stkDepth.empty())
+			{
+				U32 idxOp = stkDepth.topFirst();
+				U32 depth = stkDepth.topSecond();
+				maxDepth = MATHMAX(maxDepth, depth);
+				stkDepth.pop();
+
+				U32 opFlags = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS]);
+				bool isLCOp  = (bool)((opFlags & ofLeftChildIsOp) >> 1);
+				bool isRCOp  = (bool) (opFlags & ofRightChildIsOp);
+
+				U32 idxKids = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_CHILDREN]);
+				U16 idxLC   = idxKids >> 16;
+				U16 idxRC   = idxKids & 0xFFFF;
+
+				if(isLCOp)
+					stkDepth.push(idxLC, depth + 1);
+				if(isRCOp)
+					stkDepth.push(idxRC, depth + 1);
+			}
+
+			//Last Op has prims
+			maxDepth ++;
+		}
+
+
+		if(m_ctOps > 0)
+		{
+			list<NODE> lstNodes;
+			lstNodes.push_back(NODE(0, 0, 1));
+			U32 currentDepth = -1;
+			while(!lstNodes.empty())
+			{
+				NODE n = lstNodes.front();
+				lstNodes.pop_front();
+
+				if(n.depth != currentDepth)
+				{
+					ofs << endl;
+					currentDepth = n.depth;
+					for(int i=0; i<(maxDepth - currentDepth); i++)
+						ofs << "\t\t\t";
+				}
+
+				if(n.isOp)
+				{
+					U32 opFlags = static_cast<U32>(m_arrOps[n.index * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS]);
+					U16 opType  = static_cast<U16>(m_arrOps[n.index * DATASIZE_OPERATOR + OFFSET_OP_TYPE]);
+					bool isUnary = (bool)((opFlags & ofIsUnaryOp) >> 3);
+					bool isRange = (bool)((opFlags & ofIsUnaryOp) >> 2);
+					bool isLCOp  = (bool)((opFlags & ofLeftChildIsOp) >> 1);
+					bool isRCOp  = (bool) (opFlags & ofRightChildIsOp);
+
+					U32 idxKids = static_cast<U32>(m_arrOps[n.index * DATASIZE_OPERATOR + OFFSET_OP_CHILDREN]);
+					U16 idxLC   = idxKids >> 16;
+					U16 idxRC   = idxKids & 0xFFFF;
+
+					//Visit Node
+					DAnsiStr strName = ModelReader::GetScriptOpName(opType);
+					ofs << "OP#" << n.index << ":" << strName.substr(0, 3) << "\t";
+
+					if(isRange)
+					{
+						for(int i = idxLC; i <= idxRC; i++)
+							lstNodes.push_back(NODE(i, n.depth + 1, isLCOp));
+					}
+					else
+					{
+						lstNodes.push_back(NODE(idxLC, n.depth + 1, isLCOp));
+						if(!isUnary)
+							lstNodes.push_back(NODE(idxRC, n.depth + 1, isRCOp));
+					}
+				}
+				else
+				{
+					U16 primType = static_cast<U16>(m_arrPrims[n.index * DATASIZE_PRIMITIVE + OFFSET_PRIM_TYPE]);
+					DAnsiStr strName = ModelReader::GetScriptPrimName(primType);
+					ofs << "PR#" << n.index << ":" << strName.substr(0, 3) << "\t";
+				}
+			}
+		}
+		else
+		{
+			U16 primType = static_cast<U16>(m_arrPrims[OFFSET_PRIM_TYPE]);
+			DAnsiStr strName = ModelReader::GetScriptPrimName(primType);
+			ofs << "PR#0:" << strName.substr(0, 3) << "\t";
+		}
+		/*
+		//Iterate over depths
+		for(int i=0; i<=maxDepth; i++)
+		{
+			//Tabs
+			for(int j=0; j<(maxDepth - i); j++)
+				ofs << "\t\t\t";
+
+			for(int j=0; j<arrNodes.size(); j++)
+			{
+				NODE n = arrNodes[j];
+				if(n.depth == i)
+				{
+					if(n.isOp) {
+						U32 opFlags = static_cast<U32>(m_arrOps[n.index * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS]);
+						bool isLCOp  = (bool)((opFlags & ofLeftChildIsOp) >> 1);
+						bool isRCOp  = (bool) (opFlags & ofRightChildIsOp);
+						U16 opType = static_cast<U16>(m_arrOps[n.index * DATASIZE_OPERATOR + OFFSET_OP_TYPE]);
+
+
+						DAnsiStr strName = ModelReader::GetScriptOpName(opType);
+						ofs << "OP#" << n.index << ":" << strName.substr(0, 3) << "\t";
+					}
+					else {
+						U16 primType = static_cast<U16>(m_arrPrims[n.index * DATASIZE_PRIMITIVE + OFFSET_PRIM_TYPE]);
+						DAnsiStr strName = ModelReader::GetScriptPrimName(primType);
+						ofs << "PR#" << n.index << ":" << strName.substr(0, 3) << "\t";
+					}
+				}
+			}
+
+			ofs << endl;
+		}
+		*/
+
+		ofs.close();
+	}
 
 	void GPUPoly::drawBBox()
 	{

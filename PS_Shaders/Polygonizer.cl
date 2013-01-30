@@ -377,8 +377,8 @@ float ComputePrimitiveField(U16 idxPrimitive,
  * 	    
  */
 float ComputeBranchField(U16 idxBranchOp,
-						 U16* nextOp,		
-						 bool* rop, 
+						 U16* lpNextOp,		
+						 bool* lpIsRightOp, 
 						 float4 v,
 						 float lf,
 						 float rf,
@@ -391,7 +391,7 @@ float ComputeBranchField(U16 idxBranchOp,
 	while(idxBranchOp != NULL_BLOB)
 	{
 		//Next Node
-		*nextOp = (U16)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].w;
+		*lpNextOp = (U16)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].w;
 		
 		
 		U16 opType = (U16)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].x;
@@ -405,10 +405,10 @@ float ComputeBranchField(U16 idxBranchOp,
 		
 		//enum OPFLAGS {ofRightChildIsOp = 1, ofLeftChildIsOp = 2, ofChildIndexIsRange = 4, ofIsUnaryOp = 8, ofIsRightOp = 16, ofBreak = 32};
 		bool isBreak = (flags & ofBreak) >> 5;
-		*rop 	= (flags & ofIsRightOp) >> 4;
-		bool bUnary = (flags & ofIsUnaryOp) >> 3;
-		bool bRange = (flags & ofChildIndexIsRange) >> 2;
-		bool bLeftChildOp = (flags & ofLeftChildIsOp) >> 1;
+		*lpIsRightOp = (flags & ofIsRightOp) >> 4;
+		bool bUnary  = (flags & ofIsUnaryOp) >> 3;
+		bool bRange  = (flags & ofChildIndexIsRange) >> 2;
+		bool bLeftChildOp  = (flags & ofLeftChildIsOp) >> 1;
 		bool bRightChildOp = (flags & ofRightChildIsOp);
 		field = 0.0f;
 
@@ -452,7 +452,7 @@ float ComputeBranchField(U16 idxBranchOp,
 		}	
 		
 		//If we processed a right op
-		if(rop)
+		if((*lpIsRightOp) == true)
 			rf = field;
 		else
 			lf = field;
@@ -462,7 +462,7 @@ float ComputeBranchField(U16 idxBranchOp,
 			break;
 
 		//idxBranchOp
-		idxBranchOp = *nextOp;
+		idxBranchOp = *lpNextOp;
 	}
 	
 	return field;
@@ -489,16 +489,15 @@ float ComputeField(float4 v,
 		float lf = 0.0f;
 		float rf = 0.0f;
 		float field;
-		bool rop;
+		bool isRightOp;
 		
 		U16 idxBranchOp = arrHeader4[OFFSET4_HEADER_PARAMS].w;
 		U16 idxNextOp = NULL_BLOB;
 		while(idxBranchOp != NULL_BLOB)
 		{
-			//enum OPFLAGS {ofRightChildIsOp = 1, ofLeftChildIsOp = 2, ofChildIndexIsRange = 4, ofIsUnaryOp = 8, ofIsRightOp = 16};
-			//U32 flags = (U32)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].z;							
-			field = ComputeBranchField(idxBranchOp, &idxNextOp, &rop, v, lf, rf, arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);
-			if(rop)
+			//Compute Right Branch
+			field = ComputeBranchField(idxBranchOp, &idxNextOp, &isRightOp, v, lf, rf, arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);			
+			if(isRightOp)
 				rf = field;
 			else
 				lf = field;
@@ -511,7 +510,130 @@ float ComputeField(float4 v,
 	else
 		return ComputePrimitiveField(0, v, arrOps4, arrPrims4, arrMtxNodes4);
 }
+
+/*!
+ * Compute field and color due to a branch in the tree.
+ * At Ops: 1. Evaluate Left Prim and Right Prim
+ * 		   2. Use Left Field or Right Field if the child is op
+ * 		   3. Jump to next op or return
+ * 	    
+ */
+float ComputeBranchFieldAndColor(U16 idxBranchOp,
+								 U16* lpNextOp,		
+								 bool* lpIsRightOp, 
+								 float4 v,
+								 float4* lpOutColor,
+								 float lf,
+								 float rf,
+								 __global float4* arrHeader4,
+								 __global float4* arrOps4,
+								 __global float4* arrPrims4, 
+								 __global float4* arrMtxNodes4)
+{	
+	float field = 0.0f;
+	while(idxBranchOp != NULL_BLOB)
+	{
+		//Next Node
+		*lpNextOp = (U16)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].w;
 		
+		
+		U16 opType = (U16)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].x;
+		U32 opLR = (U32)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].y;
+		U16 opLeftChild = (U16)(opLR >> 16) & 0xFFFF;
+		U16 opRightChild = (U16)(opLR & 0xFFFF);
+	
+		U32 flags = (U32)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].z;
+		float4 params = arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_RES];
+		
+		
+		//enum OPFLAGS {ofRightChildIsOp = 1, ofLeftChildIsOp = 2, ofChildIndexIsRange = 4, ofIsUnaryOp = 8, ofIsRightOp = 16, ofBreak = 32};
+		bool isBreak = (flags & ofBreak) >> 5;
+		*lpIsRightOp = (flags & ofIsRightOp) >> 4;
+		bool bUnary = (flags & ofIsUnaryOp) >> 3;
+		bool bRange = (flags & ofChildIndexIsRange) >> 2;
+		bool bLeftChildOp = (flags & ofLeftChildIsOp) >> 1;
+		bool bRightChildOp = (flags & ofRightChildIsOp);
+		field = 0.0f;
+
+		//Range
+		if(bRange)
+		{
+			for(U16 i=opLeftChild; i <= opRightChild; i++)	
+			{				
+				float primF = ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);
+				(*lpOutColor) += (2.0f * (0.5f + primF) - 1.0f) * arrPrims4[i * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
+				field += primF;
+			}
+		}
+		else
+		{
+			if(!bLeftChildOp)
+				lf = ComputePrimitiveField(opLeftChild, v, arrOps4, arrPrims4, arrMtxNodes4);
+			
+			if(!bUnary && !bRightChildOp)
+				rf = ComputePrimitiveField(opRightChild, v, arrOps4, arrPrims4, arrMtxNodes4);
+		
+			//Normalized fields from (0 - 0.5) to (0 - 1)
+			float lfn = 2.0f * (0.5f + lf) - 1.0f;
+			float rfn = 2.0f * (0.5f + rf) - 1.0f;
+
+			//Compute All Operators			
+			switch(opType) {
+				case(opUnion): {
+					if(isgreaterequal(lfn, rfn))
+						(*lpOutColor) += lfn * arrPrims4[opLeftChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
+					else
+						(*lpOutColor) += rfn * arrPrims4[opRightChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
+
+					field = max(lf, rf);
+					break;
+				}
+					
+				case(opBlend): {
+					(*lpOutColor) += lfn * arrPrims4[opLeftChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR] + 
+									rfn * arrPrims4[opRightChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
+
+					field = lf + rf;
+					break;
+				}					
+
+				case(opRicciBlend): {
+					(*lpOutColor) += lfn * arrPrims4[opLeftChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR] + 
+									rfn * arrPrims4[opRightChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
+
+					field = pow(pow(lf, params.x) + pow(rf, params.x), params.y);
+					break;
+				}					
+
+				case(opIntersect): {
+					if(islessequal(lfn, rfn))
+						(*lpOutColor) += lfn * arrPrims4[opLeftChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
+					else
+						(*lpOutColor) += rfn * arrPrims4[opRightChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
+
+					field = min(lf, rf);
+					break;
+				}					
+			}
+		}	
+		
+		//If we processed a right op
+		if((*lpIsRightOp) == true)
+			rf = field;
+		else
+			lf = field;
+		
+		//If we processed a break op
+		if(isBreak)
+			break;
+
+		//idxBranchOp
+		idxBranchOp = *lpNextOp;
+	} //END WHILE
+	
+	return field;
+}
+
 /*!
  * Compute Field-Value and Color
  */
@@ -523,60 +645,35 @@ float ComputeFieldAndColor(float4 v,
 						   __global float4* arrMtxNodes4)
 {
 	//Count : Prims, Ops, Mtx ; CellSize
-	U32 ctPrims = (U32)arrHeader4[OFFSET4_HEADER_PARAMS].x;
+	//U32 ctPrims = (U32)arrHeader4[OFFSET4_HEADER_PARAMS].x;
 	U32 ctOps   = (U32)arrHeader4[OFFSET4_HEADER_PARAMS].y;
-	U16 idxOp = 0;
-	
+	(*lpOutColor) = (float4)(0,0,0,0);
+
 	//Should be in homogenous coordinates
 	v.w = 1.0f;
-	
+
 	if(ctOps > 0)
 	{
-		SimpleStack stkOps;
-		stkOps.count = 0;
-		StackPush(&stkOps, idxOp);
+		float lf = 0.0f;
+		float rf = 0.0f;
+		float field;
+		bool isRightOp;
 		
-		//Final Field
-		float field = 0.0f;
-		
-		//Pop operators from stack and process
-		while(!IsStackEmpty(&stkOps))
+		U16 idxBranchOp = arrHeader4[OFFSET4_HEADER_PARAMS].w;
+		U16 idxNextOp = NULL_BLOB;
+		while(idxBranchOp != NULL_BLOB)
 		{
-			idxOp = StackTop(&stkOps);
-			StackPop(&stkOps);
+			//enum OPFLAGS {ofRightChildIsOp = 1, ofLeftChildIsOp = 2, ofChildIndexIsRange = 4, ofIsUnaryOp = 8, ofIsRightOp = 16};
+			//U32 flags = (U32)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].z;							
+			field = ComputeBranchFieldAndColor(idxBranchOp, &idxNextOp, &isRightOp, v, lpOutColor, lf, rf, arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);
+			if(isRightOp)
+				rf = field;
+			else
+				lf = field;
 			
-			U16 opType = (U16)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].x;
-			U16 opLeftChild = (U16)(((U32)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].y) >> 16);
-			U16 opRightChild = (U16)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].y;
-			
-			U32 flags = (U32)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].z;
-			float4 params = arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_RES];
-			
-			//Left and Right is Op
-			//bool bLeftChildOp = (flags & ofLeftChildIsOp) >> 1;
-			//bool bRightChildOp = (flags & ofRightChildIsOp);
-			//bReady = !((bLeftChildOp && (arrOpsFieldComputed[idxLC] == 0))||
-			//(bRightChildOp && (arrOpsFieldComputed[idxRC] == 0)));
-			
-			//Compute Primitive Fields
-			float fieldLeft = ComputePrimitiveField(opLeftChild, v, arrOps4, arrPrims4, arrMtxNodes4);
-			float fieldRight = ComputePrimitiveField(opRightChild, v, arrOps4, arrPrims4, arrMtxNodes4);
-			
-			//Compute All Operators			
-			switch(opType){
-			case(opBlend):{
-				field = fieldLeft + fieldRight;
-
-				float lcf = 2.0f * (0.5f + fieldLeft) - 1.0f;
-				float rcf = 2.0f * (0.5f + fieldRight) - 1.0f;
-				(*lpOutColor) = lcf * arrPrims4[opLeftChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR] + 
-								rcf * arrPrims4[opRightChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
-				break;
-			}
-			}			
+			idxBranchOp = idxNextOp;
 		}
 		
-		//Return final field
 		return field;
 	}
 	else

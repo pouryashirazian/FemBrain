@@ -82,6 +82,20 @@ public:
 	void drawBBox();
 
 private:
+	struct NODE {
+		U32 index;
+		U32 depth;
+		U8 isOp;
+
+		NODE() :
+				index(0), depth(0), isOp(1) {
+		}
+		NODE(U32 index_, U32 depth_, U8 isOp_) {
+			index = index_;
+			depth = depth_;
+			isOp = isOp_;
+		}
+	};
 	/*!
 	 * Init shaders and opencl kernels
 	 */
@@ -94,6 +108,10 @@ private:
 	int computeVertexAttribs(U32 ctVertices);
 	int computeCellConfigs();
 	int computeElements(U32 ctElements);
+
+	//Set traversal route
+	bool setTraversalRoute();
+	void printBlobTree(const char* chrFilePath) const;
 
 private:
     struct CellParam{
