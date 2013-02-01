@@ -907,7 +907,7 @@ int main(int argc, char* argv[])
 
 	//Setup the event logger
 	PS::TheEventLogger::Instance().setWriteFlags(PS_LOG_WRITE_EVENTTYPE | PS_LOG_WRITE_TIMESTAMP | PS_LOG_WRITE_SOURCE | PS_LOG_WRITE_TO_SCREEN);
-	LogInfo("Starting FemMain Application");
+	LogInfo("Starting FemBrain");
 	
 	//Initialize app
 	glutInit(&argc, argv);
@@ -976,7 +976,7 @@ int main(int argc, char* argv[])
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/sphere.txt";
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/testDisc3.scene";
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/CylinderWithHoles.scene";
-	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/testColor.scene";
+	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/test1level.scene";
 
 	g_lpBlobRender = new GPUPoly();
 	g_lpBlobRender->readModel(strFPModel.cptr());

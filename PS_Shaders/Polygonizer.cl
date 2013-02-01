@@ -102,6 +102,8 @@
 #define CELLID_HASHSIZE (size_t)(1<<(3*CELLID_SHIFT_Y))
 #define CELLID_FROM_IDX(i,j,k) ((((k) & CELLID_BITMASK) << CELLID_SHIFT_Z) | (((j) & CELLID_BITMASK) << CELLID_SHIFT_Y) | ((i) & CELLID_BITMASK))
 #define EDGETABLE_DEPTH 8
+#define NORMALIZE_FIELD(x) (2.0f * (0.5f + (x)) - 1.0f)
+
 
 //Return codes
 #define RET_PARAM_ERROR -1
@@ -185,6 +187,187 @@ float ComputeWyvillField(float dd)
 	return t*t*t;
 }
 
+/*
+float ComputeTriangleSquareDist(vec3f vertices[3], vec3f p,
+								vec3f& outClosestPoint, vec3f& outBaryCoords) {
+	vec3f dif = vertices[0] - p;
+	vec3f edge0 = vertices[1] - vertices[0];
+	vec3f edge1 = vertices[2] - vertices[0];
+	float a00 = edge0.length2();
+	float a01 = edge0.dot(edge1);
+	float a11 = edge1.length2();
+
+	float b0 = dif.dot(edge0);
+	float b1 = dif.dot(edge1);
+	float c = dif.length2();
+	float det = Absolutef(a00 * a11 - a01 * a01);
+	float s = a01 * b1 - a11 * b0;
+	float t = a01 * b0 - a00 * b1;
+	float sqrDistance;
+
+	//Conditions
+	if (s + t <= det) {
+		if (s < (float) 0) {
+			if (t < (float) 0) // region 4
+					{
+				if (b0 < (float) 0) {
+					t = (float) 0;
+					if (-b0 >= a00) {
+						s = (float) 1;
+						sqrDistance = a00 + ((float) 2) * b0 + c;
+					} else {
+						s = -b0 / a00;
+						sqrDistance = b0 * s + c;
+					}
+				} else {
+					s = (float) 0;
+					if (b1 >= (float) 0) {
+						t = (float) 0;
+						sqrDistance = c;
+					} else if (-b1 >= a11) {
+						t = (float) 1;
+						sqrDistance = a11 + ((float) 2) * b1 + c;
+					} else {
+						t = -b1 / a11;
+						sqrDistance = b1 * t + c;
+					}
+				}
+			} else // region 3
+			{
+				s = (float) 0;
+				if (b1 >= (float) 0) {
+					t = (float) 0;
+					sqrDistance = c;
+				} else if (-b1 >= a11) {
+					t = (float) 1;
+					sqrDistance = a11 + ((float) 2) * b1 + c;
+				} else {
+					t = -b1 / a11;
+					sqrDistance = b1 * t + c;
+				}
+			}
+		} else if (t < (float) 0) // region 5
+				{
+			t = (float) 0;
+			if (b0 >= (float) 0) {
+				s = (float) 0;
+				sqrDistance = c;
+			} else if (-b0 >= a00) {
+				s = (float) 1;
+				sqrDistance = a00 + ((float) 2) * b0 + c;
+			} else {
+				s = -b0 / a00;
+				sqrDistance = b0 * s + c;
+			}
+		} else // region 0
+		{
+			// minimum at interior point
+			float invDet = ((float) 1) / det;
+			s *= invDet;
+			t *= invDet;
+			sqrDistance = s * (a00 * s + a01 * t + ((float) 2) * b0)
+					+ t * (a01 * s + a11 * t + ((float) 2) * b1) + c;
+		}
+	} else {
+		float tmp0, tmp1, numer, denom;
+
+		if (s < (float) 0) // region 2
+				{
+			tmp0 = a01 + b0;
+			tmp1 = a11 + b1;
+			if (tmp1 > tmp0) {
+				numer = tmp1 - tmp0;
+				denom = a00 - ((float) 2) * a01 + a11;
+				if (numer >= denom) {
+					s = (float) 1;
+					t = (float) 0;
+					sqrDistance = a00 + ((float) 2) * b0 + c;
+				} else {
+					s = numer / denom;
+					t = (float) 1 - s;
+					sqrDistance = s * (a00 * s + a01 * t + ((float) 2) * b0)
+							+ t * (a01 * s + a11 * t + ((float) 2) * b1) + c;
+				}
+			} else {
+				s = (float) 0;
+				if (tmp1 <= (float) 0) {
+					t = (float) 1;
+					sqrDistance = a11 + ((float) 2) * b1 + c;
+				} else if (b1 >= (float) 0) {
+					t = (float) 0;
+					sqrDistance = c;
+				} else {
+					t = -b1 / a11;
+					sqrDistance = b1 * t + c;
+				}
+			}
+		} else if (t < (float) 0) // region 6
+				{
+			tmp0 = a01 + b1;
+			tmp1 = a00 + b0;
+			if (tmp1 > tmp0) {
+				numer = tmp1 - tmp0;
+				denom = a00 - ((float) 2) * a01 + a11;
+				if (numer >= denom) {
+					t = (float) 1;
+					s = (float) 0;
+					sqrDistance = a11 + ((float) 2) * b1 + c;
+				} else {
+					t = numer / denom;
+					s = (float) 1 - t;
+					sqrDistance = s * (a00 * s + a01 * t + ((float) 2) * b0)
+							+ t * (a01 * s + a11 * t + ((float) 2) * b1) + c;
+				}
+			} else {
+				t = (float) 0;
+				if (tmp1 <= (float) 0) {
+					s = (float) 1;
+					sqrDistance = a00 + ((float) 2) * b0 + c;
+				} else if (b0 >= (float) 0) {
+					s = (float) 0;
+					sqrDistance = c;
+				} else {
+					s = -b0 / a00;
+					sqrDistance = b0 * s + c;
+				}
+			}
+		} else // region 1
+		{
+			numer = a11 + b1 - a01 - b0;
+			if (numer <= (float) 0) {
+				s = (float) 0;
+				t = (float) 1;
+				sqrDistance = a11 + ((float) 2) * b1 + c;
+			} else {
+				denom = a00 - ((float) 2) * a01 + a11;
+				if (numer >= denom) {
+					s = (float) 1;
+					t = (float) 0;
+					sqrDistance = a00 + ((float) 2) * b0 + c;
+				} else {
+					s = numer / denom;
+					t = (float) 1 - s;
+					sqrDistance = s * (a00 * s + a01 * t + ((float) 2) * b0)
+							+ t * (a01 * s + a11 * t + ((float) 2) * b1) + c;
+				}
+			}
+		}
+	}
+
+	// Account for numerical round-off error.
+	if (sqrDistance < (float) 0) {
+		sqrDistance = (float) 0;
+	}
+
+	//mClosestPoint0 = *mPoint;
+	outClosestPoint = vertices[0] + s * edge0 + t * edge1;
+	outBaryCoords.y = s;
+	outBaryCoords.z = t;
+	outBaryCoords.x = (float) 1 - s - t;
+	return sqrDistance;
+}
+*/
+
 /*!
  * Compute field due to a primitive.
  */
@@ -247,7 +430,16 @@ float ComputePrimitiveField(U16 idxPrimitive,
 	break;	
 	case(primTriangle):
 	{
-		dist2  = 10.0f;
+		dist2 = 10.0f;
+		/*
+        float4 vertices[3];
+        vertices[0] = arrPrims4[idxPrimitive * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_POS];
+        vertices[1] = arrPrims4[idxPrimitive * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_DIR];
+        vertices[2] = arrPrims4[idxPrimitive * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_RES];
+        float4 outClosest;
+        float4 outBaryCoords;
+        dist2 = ComputeTriangleSquareDist(vertices, vt, &outClosest, &outBaryCoords);
+        */
 	}
 	break;	
 
@@ -260,6 +452,7 @@ float ComputePrimitiveField(U16 idxPrimitive,
 		float delta;
 			
 		//Along X
+		dist2 = 0.0f;
 		float4 axis = (float4)(1.0f, 0.0f, 0.0f, 0.0f);		
 		projected = dot(dif, axis);
 		if(isless(projected, -1.0f * side))
@@ -415,8 +608,30 @@ float ComputeBranchField(U16 idxBranchOp,
 		//Range
 		if(bRange)
 		{
-			for(U16 i=opLeftChild; i <= opRightChild; i++)									
-				field += ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);				
+			switch(opType) {
+				case(opUnion): {
+						for(U16 i=opLeftChild; i <= opRightChild; i++)									
+							field = max(field, ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4));
+						break;
+				}
+				case(opIntersect): {
+					for(U16 i=opLeftChild; i <= opRightChild; i++)									
+						field = min(field, ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4));
+						break;
+				}
+	
+				case(opBlend): {
+					for(U16 i=opLeftChild; i <= opRightChild; i++)									
+						field += ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);
+					break;				
+				}
+				case(opRicciBlend): {
+					for(U16 i=opLeftChild; i <= opRightChild; i++)									
+						field = pow(pow(field, params.x) + pow(ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4), params.x), params.y); 
+					break;				
+				}
+			}
+			
 		}
 		else
 		{
@@ -433,21 +648,28 @@ float ComputeBranchField(U16 idxBranchOp,
 					field = max(lf, rf);
 					break;
 				}
-					
+				case(opIntersect): {
+					field = min(lf, rf);
+					break;
+				}										
 				case(opBlend): {
 					field = lf + rf;
 					break;
 				}					
-
 				case(opRicciBlend): {
 					field = pow(pow(lf, params.x) + pow(rf, params.x), params.y);
 					break;
-				}					
-
-				case(opIntersect): {
-					field = min(lf, rf);
+				}		
+		
+				case(opDif): {
+					field = min(lf, 1.0f - rf); 
 					break;
-				}					
+				}
+				
+				case(opSmoothDif): {
+					field = lf * (1.0f - rf);
+					break;
+				}
 			}
 		}	
 		
@@ -559,12 +781,60 @@ float ComputeBranchFieldAndColor(U16 idxBranchOp,
 
 		//Range
 		if(bRange)
-		{
-			for(U16 i=opLeftChild; i <= opRightChild; i++)	
-			{				
-				float primF = ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);
-				(*lpOutColor) += (2.0f * (0.5f + primF) - 1.0f) * arrPrims4[i * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
-				field += primF;
+		{				
+			float primF;
+			
+			switch(opType) {
+				case(opUnion): {				
+						U16 idxMaxField = 0;
+						field = ComputePrimitiveField(opLeftChild, v, arrOps4, arrPrims4, arrMtxNodes4);						
+						for(U16 i=opLeftChild+1; i <= opRightChild; i++)
+						{
+							primF = ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);
+							if(isgreaterequal(primF, field))
+							{
+								field = primF;
+								idxMaxField = i;
+							}
+						}					
+						(*lpOutColor) = NORMALIZE_FIELD(field) * arrPrims4[idxMaxField * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
+						break;
+				}
+				case(opIntersect): {
+					U16 idxMinField = 0;
+					field = ComputePrimitiveField(opLeftChild, v, arrOps4, arrPrims4, arrMtxNodes4);
+					for(U16 i=opLeftChild+1; i <= opRightChild; i++)
+					{
+						primF = ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);
+						if(islessequal(primF, field))
+						{
+							field = primF;
+							idxMinField = i;
+						}
+					}					
+					(*lpOutColor) = NORMALIZE_FIELD(field) * arrPrims4[idxMinField * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
+					break;
+				}
+	
+				case(opBlend): {								
+					for(U16 i=opLeftChild; i <= opRightChild; i++)	
+					{				
+						primF = ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);
+						(*lpOutColor) += NORMALIZE_FIELD(primF) * arrPrims4[i * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
+						field += primF;
+					}
+					break;				
+				}
+				case(opRicciBlend): {
+					for(U16 i=opLeftChild; i <= opRightChild; i++)	
+					{				
+						primF = ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);
+						(*lpOutColor) += NORMALIZE_FIELD(primF) * arrPrims4[i * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
+						field = pow(pow(field, params.x) + pow(primF, params.x), params.y);
+					}
+					break;				
+				}
+				
 			}
 		}
 		else
@@ -580,42 +850,60 @@ float ComputeBranchFieldAndColor(U16 idxBranchOp,
 			}
 		
 			//Normalized fields from (0 - 0.5) to (0 - 1)
-			float lfn = 2.0f * (0.5f + lf) - 1.0f;
-			float rfn = 2.0f * (0.5f + rf) - 1.0f;
+			float lfn = NORMALIZE_FIELD(lf);
+			float rfn = NORMALIZE_FIELD(rf);
 
 			//Compute All Operators			
 			switch(opType) {
 				case(opUnion): {
 					if(isgreaterequal(lfn, rfn))
-						(*lpOutColor) += lfn * lcolor;
+						(*lpOutColor) = lfn * lcolor;
 					else
-						(*lpOutColor) += rfn * rcolor;
+						(*lpOutColor) = rfn * rcolor;
 
 					field = max(lf, rf);
 					break;
 				}
+				case(opIntersect): {
+					if(islessequal(lfn, rfn))
+						(*lpOutColor) = lcolor;
+					else
+						(*lpOutColor) = rcolor;
+
+					field = min(lf, rf);
+					break;
+				}					
 					
 				case(opBlend): {
-					(*lpOutColor) += lfn * lcolor + rfn * rcolor; 									
+					(*lpOutColor) = lfn * lcolor + rfn * rcolor; 									
 					field = lf + rf;
 					break;
 				}					
 
 				case(opRicciBlend): {
-					(*lpOutColor) += lfn * lcolor + rfn * rcolor;
+					(*lpOutColor) = lfn * lcolor + rfn * rcolor;
 					field = pow(pow(lf, params.x) + pow(rf, params.x), params.y);
 					break;
-				}					
-
-				case(opIntersect): {
-					if(islessequal(lfn, rfn))
-						(*lpOutColor) += lfn * lcolor;
+				}
+				
+				case(opDif): { 
+					if(islessequal(lf, 1.0f - rf))
+						(*lpOutColor) = lcolor;
 					else
-						(*lpOutColor) += rfn * rcolor;
-
-					field = min(lf, rf);
+						(*lpOutColor) = rcolor;
+					field = min(lf, 1.0f - rf);
 					break;
-				}					
+				}
+				
+				case(opSmoothDif): {
+					if(islessequal(lf, 1.0f - rf))
+						(*lpOutColor) = lcolor;
+					else
+						(*lpOutColor) = rcolor;
+					field = min(lf, 1.0f - rf);
+					break;
+				}
+
 			}
 		}	
 		
