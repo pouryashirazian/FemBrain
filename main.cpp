@@ -976,7 +976,7 @@ int main(int argc, char* argv[])
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/sphere.txt";
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/testDisc3.scene";
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/CylinderWithHoles.scene";
-	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/test1level.scene";
+	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/peanut.scene";
 
 	g_lpBlobRender = new GPUPoly();
 	g_lpBlobRender->readModel(strFPModel.cptr());

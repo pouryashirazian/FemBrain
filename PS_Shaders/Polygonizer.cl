@@ -2,7 +2,7 @@
 
 //DATASIZES
 #define DATASIZE_HEADER		12
-#define DATASIZE_OPERATOR	8
+#define DATASIZE_OPERATOR	16
 #define DATASIZE_PRIMITIVE	20
 #define PRIM_MATRIX_STRIDE  12
 #define BOX_MATRIX_STRIDE   16
@@ -27,16 +27,22 @@
 #define OFFSET_HEADER_COUNT_PRIMS 	8
 #define OFFSET_HEADER_COUNT_OPS 	9
 #define OFFSET_HEADER_COUNT_MTX		10
-#define OFFSET_HEADER_COUNT_INST 	11
+#define OFFSET_HEADER_START 		11
 
 //OFFSETS in OPERATORS
 #define OFFSET4_OP_TYPE			0
 #define OFFSET4_OP_RES			1
+#define OFFSET4_AABB_LO			2
+#define OFFSET4_AABB_HI			3
 
 #define OFFSET_OP_TYPE			0
-#define OFFSET_OP_FLAGS			1
-#define OFFSET_OP_LCRC			2
+#define OFFSET_OP_LC			1
+#define OFFSET_OP_RC			2
 #define OFFSET_OP_NEXT			3
+#define OFFSET_OP_RES			4
+#define OFFSET_OP_FLAGS			7
+#define OFFSET_OP_AABB_LO		8
+#define OFFSET_OP_AABB_HI		12
 
 //OFFSETS in PRIMITIVES
 #define OFFSET4_PRIM_TYPE		0
@@ -45,18 +51,16 @@
 #define OFFSET4_PRIM_RES		3
 #define OFFSET4_PRIM_COLOR		4
 
-//Primitive
 #define OFFSET_PRIM_TYPE		0
-#define OFFSET_PRIM_LINK_FLAGS 	1
-#define OFFSET_PRIM_IDX_MATRIX 	2
-#define OFFSET_PRIM_PARENT_LINK 3
+#define OFFSET_PRIM_IDX_MATRIX 	1
+#define OFFSET_PRIM_PARENT 		2
+#define OFFSET_PRIM_SIBLING 	3
+#define OFFSET_PRIM_POS		 	4
+#define OFFSET_PRIM_DIR	 		8
+#define OFFSET_PRIM_RES		 	12
+#define OFFSET_PRIM_COLOR	 	16
 
-
-//BlobTree
-#define MAX_TREE_DEPTH	 64
-#define MAX_TREE_NODES   1024
-#define MAX_MTX_NODES MAX_TREE_NODES * 2
-
+//Constants
 #define ISO_VALUE 0.5f
 #define NORMAL_DELTA 0.0001f
 
@@ -65,6 +69,7 @@
 #define AXISY {0.0f, 1.0f, 0.0f, 0.0f}
 #define AXISZ {0.0f, 0.0f, 1.0f, 0.0f}
 
+#define MAX_TREE_DEPTH 64
 #define MAX_VERTICES_COUNT_PER_CELL		15
 #define MAX_TRIANGLES_COUNT_PER_CELL	5
 
@@ -119,6 +124,8 @@ typedef			 char		I8;
 typedef			 short		I16;
 typedef			 int		I32;
 
+//CellCorners
+enum CellCorners {LBN, LBF, LTN, LTF, RBN, RBF, RTN, RTF};
 
 //Types
 enum PrimitiveType {primPoint, primLine, primCylinder, primDisc, primRing, primCube, 
@@ -152,12 +159,12 @@ typedef struct GridParam{
 
 
 typedef struct SimpleStack{
-	U16 values[MAX_TREE_DEPTH];
-	U16 count;
+	U32 values[MAX_TREE_DEPTH];
+	U32 count;
 }SimpleStack;
 
 //Stack Operations
-void StackPush(struct SimpleStack* lpStkOperators, U16 val)
+void StackPush(struct SimpleStack* lpStkOperators, U32 val)
 {
 	lpStkOperators->values[lpStkOperators->count] = val;
 	lpStkOperators->count++;			
@@ -173,7 +180,7 @@ bool IsStackEmpty(struct SimpleStack* lpStkOperators)
 	return (lpStkOperators->count == 0);
 }
 
-U16 StackTop(struct SimpleStack* lpStkOperators)
+U32 StackTop(struct SimpleStack* lpStkOperators)
 {
 	return lpStkOperators->values[lpStkOperators->count - 1];
 }
@@ -186,6 +193,23 @@ float ComputeWyvillField(float dd)
 	float t = (1.0f - dd);
 	return t*t*t;
 }
+
+
+//Check weather a given vertex is outside the specified op
+bool IsOutsideOp(float4 v, U32 idxOp, __global float4* arrOps4)
+{
+	float4 aabbLo = arrOps4[idxOp * DATASIZE_OPERATOR + OFFSET4_AABB_LO];
+	float4 aabbHi = arrOps4[idxOp * DATASIZE_OPERATOR + OFFSET4_AABB_HI];
+	return !(isgreaterequal(v.x, aabbLo.x) && isgreaterequal(aabbHi.x, v.x) &&
+			isgreaterequal(v.y, aabbLo.y) && isgreaterequal(aabbHi.y, v.y) &&
+			isgreaterequal(v.z, aabbLo.z) && isgreaterequal(aabbHi.z, v.z));
+}
+
+//Global Functions
+float ComputeRangeField(float4 v, U32 idxOp, 
+					    __global float4* arrOps4,
+						__global float4* arrPrims4, 
+						__global float4* arrMtxNodes4);
 
 /*
 float ComputeTriangleSquareDist(vec3f vertices[3], vec3f p,
@@ -371,7 +395,7 @@ float ComputeTriangleSquareDist(vec3f vertices[3], vec3f p,
 /*!
  * Compute field due to a primitive.
  */
-float ComputePrimitiveField(U16 idxPrimitive,
+float ComputePrimitiveField(U32 idxPrimitive,
 							float4 v,			
 							__global float4* arrOps4,
 							__global float4* arrPrims4, 
@@ -391,8 +415,38 @@ float ComputePrimitiveField(U16 idxPrimitive,
 		//printf("idxPrim: %d, idxMatrix: %d, MTX row0: [%.2f, %.2f, %.2f, %.2f]\n", idxPrimitive, idxMatrix, row0.x, row0.y, row0.z, row0.w);
 		vt = (float4)(dot(row0, v), dot(row1, v), dot(row2, v), 0.0f);
 	}
+	
+	//Handle Instanced Node First
+	if(primType == primInstance)
+	{
+		//resX: idxArray, resY: idxScript, resZ: isOriginOp, dirX: originNodeType
+		U32 idxOrigin = (U32)arrPrims4[idxPrimitive * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_RES].x;
+		bool isOriginOp = (((int)arrPrims4[idxPrimitive * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_RES].z) == 1);
+		U32 originType = (U32)arrPrims4[idxPrimitive * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_DIR].x;
+
+		return 0.0f;
+		/*
+		if(isOriginOp) {
+			if(IsOutsideOp(vt, idxOrigin, arrOps4))
+				return 0.0f;
+			else 
+			{
+				//Instanced nodes can only be range for now.
+				U32 flags = (U32)arrOps4[idxOrigin * DATASIZE_OPERATOR_F4 + OFFSET4_OP_RES].w;
+				bool bRange  = (flags & ofChildIndexIsRange) >> 2;
+				if(bRange)
+					return ComputeRangeField(vt, idxOrigin, arrOps4, arrPrims4, arrMtxNodes4);
+				else 
+					return 0.0f;
+			}
+		}
+		else
+			return ComputePrimitiveField(idxOrigin, vt, arrOps4, arrPrims4, arrMtxNodes4);
+		 */
+	}
 		
 
+	//All Other primitives
 	float dist2;
 
 	//Compute distance to the skeletal primitive
@@ -549,18 +603,54 @@ float ComputePrimitiveField(U16 idxPrimitive,
 	}
 	break;
 	
-	case(primInstance):
-	{
-		int idxOrigin = (int)arrPrims4[idxPrimitive * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_RES].x;
-		int isOriginOp = (int)arrPrims4[idxPrimitive * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_RES].z;
-		//return ComputeOperatorField(idxOrigin, vt, arrOps4, arrPrims4, arrMtxNodes4);		
-	}
-	break;
 		
 	}
 
  	return ComputeWyvillField(dist2); 
 }
+
+float ComputeRangeField(float4 v, U32 idxOp, 						
+					    __global float4* arrOps4,
+						__global float4* arrPrims4, 
+						__global float4* arrMtxNodes4)
+{
+	//Homogenous coords needed
+	v.w = 1.0f;
+	U32 opType  = (U32)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].x;
+	U32 idxFrom = (U32)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].y;
+	U32 idxTo   = (U32)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].z;
+	float4 params = arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_RES];
+
+	
+	float field = 0.0f;
+	switch(opType) {
+		case(opUnion): {
+			for(U32 i=idxFrom; i <= idxTo; i++)									
+				field = max(field, ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4));
+			break;
+		}
+		case(opIntersect): {
+			for(U32 i=idxFrom; i <= idxTo; i++)									
+				field = min(field, ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4));
+			break;
+		}
+	
+		case(opBlend): {
+			for(U32 i=idxFrom; i <= idxTo; i++)									
+				field += ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);
+			break;				
+		}
+		case(opRicciBlend): {
+			for(U32 i=idxFrom; i <= idxTo; i++)									
+				field = pow(pow(field, params.x) + pow(ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4), params.x), params.y); 
+			break;				
+		}
+	}
+	
+	return field;
+}
+
+
 
 /*!
  * Compute field due to a branch in the tree.
@@ -569,8 +659,8 @@ float ComputePrimitiveField(U16 idxPrimitive,
  * 		   3. Jump to next op or return
  * 	    
  */
-float ComputeBranchField(U16 idxBranchOp,
-						 U16* lpNextOp,		
+float ComputeBranchField(U32 idxBranchOp,
+						 U32* lpNextOp,		
 						 bool* lpIsRightOp, 
 						 float4 v,
 						 float lf,
@@ -582,19 +672,16 @@ float ComputeBranchField(U16 idxBranchOp,
 {	
 	float field = 0.0f;
 	while(idxBranchOp != NULL_BLOB)
-	{
+	{		
+		U32 opType = (U32)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].x;
+		U32 opLeftChild = (U32)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].y;
+		U32 opRightChild = (U32)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].z;
+
 		//Next Node
-		*lpNextOp = (U16)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].w;
-		
-		
-		U16 opType = (U16)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].x;
-		U32 opLR = (U32)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].y;
-		U16 opLeftChild = (U16)(opLR >> 16) & 0xFFFF;
-		U16 opRightChild = (U16)(opLR & 0xFFFF);
+		*lpNextOp = (U32)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].w;
 	
-		U32 flags = (U32)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].z;
 		float4 params = arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_RES];
-		
+		U32 flags = (U32)params.w;
 		
 		//enum OPFLAGS {ofRightChildIsOp = 1, ofLeftChildIsOp = 2, ofChildIndexIsRange = 4, ofIsUnaryOp = 8, ofIsRightOp = 16, ofBreak = 32};
 		bool isBreak = (flags & ofBreak) >> 5;
@@ -607,32 +694,7 @@ float ComputeBranchField(U16 idxBranchOp,
 
 		//Range
 		if(bRange)
-		{
-			switch(opType) {
-				case(opUnion): {
-						for(U16 i=opLeftChild; i <= opRightChild; i++)									
-							field = max(field, ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4));
-						break;
-				}
-				case(opIntersect): {
-					for(U16 i=opLeftChild; i <= opRightChild; i++)									
-						field = min(field, ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4));
-						break;
-				}
-	
-				case(opBlend): {
-					for(U16 i=opLeftChild; i <= opRightChild; i++)									
-						field += ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);
-					break;				
-				}
-				case(opRicciBlend): {
-					for(U16 i=opLeftChild; i <= opRightChild; i++)									
-						field = pow(pow(field, params.x) + pow(ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4), params.x), params.y); 
-					break;				
-				}
-			}
-			
-		}
+			field = ComputeRangeField(v, idxBranchOp, arrOps4, arrPrims4, arrMtxNodes4);					
 		else
 		{
 			if(!bLeftChildOp)
@@ -713,8 +775,8 @@ float ComputeField(float4 v,
 		float field;
 		bool isRightOp;
 		
-		U16 idxBranchOp = arrHeader4[OFFSET4_HEADER_PARAMS].w;
-		U16 idxNextOp = NULL_BLOB;
+		U32 idxBranchOp = arrHeader4[OFFSET4_HEADER_PARAMS].w;
+		U32 idxNextOp = NULL_BLOB;
 		while(idxBranchOp != NULL_BLOB)
 		{
 			//Compute Right Branch
@@ -740,8 +802,8 @@ float ComputeField(float4 v,
  * 		   3. Jump to next op or return
  * 	    
  */
-float ComputeBranchFieldAndColor(U16 idxBranchOp,
-								 U16* lpNextOp,		
+float ComputeBranchFieldAndColor(U32 idxBranchOp,
+								 U32* lpNextOp,		
 								 bool* lpIsRightOp, 
 								 float4 v,
 								 float4* lpOutColor,
@@ -756,19 +818,17 @@ float ComputeBranchFieldAndColor(U16 idxBranchOp,
 {	
 	float field = 0.0f;
 	while(idxBranchOp != NULL_BLOB)
-	{
+	{			
+		U32 opType = (U32)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].x;
+		U32 opLeftChild = (U32)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].y;
+		U32 opRightChild = (U32)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].z;
+
 		//Next Node
-		*lpNextOp = (U16)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].w;
-		
-		
-		U16 opType = (U16)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].x;
-		U32 opLR = (U32)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].y;
-		U16 opLeftChild = (U16)(opLR >> 16) & 0xFFFF;
-		U16 opRightChild = (U16)(opLR & 0xFFFF);
-	
-		U32 flags = (U32)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].z;
+		*lpNextOp = (U32)arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].w;
+
+		//Params
 		float4 params = arrOps4[idxBranchOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_RES];
-		
+		U32 flags = params.w;		
 		
 		//enum OPFLAGS {ofRightChildIsOp = 1, ofLeftChildIsOp = 2, ofChildIndexIsRange = 4, ofIsUnaryOp = 8, ofIsRightOp = 16, ofBreak = 32};
 		bool isBreak = (flags & ofBreak) >> 5;
@@ -786,9 +846,9 @@ float ComputeBranchFieldAndColor(U16 idxBranchOp,
 			
 			switch(opType) {
 				case(opUnion): {				
-						U16 idxMaxField = 0;
+						U32 idxMaxField = 0;
 						field = ComputePrimitiveField(opLeftChild, v, arrOps4, arrPrims4, arrMtxNodes4);						
-						for(U16 i=opLeftChild+1; i <= opRightChild; i++)
+						for(U32 i=opLeftChild+1; i <= opRightChild; i++)
 						{
 							primF = ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);
 							if(isgreaterequal(primF, field))
@@ -801,9 +861,9 @@ float ComputeBranchFieldAndColor(U16 idxBranchOp,
 						break;
 				}
 				case(opIntersect): {
-					U16 idxMinField = 0;
+					U32 idxMinField = 0;
 					field = ComputePrimitiveField(opLeftChild, v, arrOps4, arrPrims4, arrMtxNodes4);
-					for(U16 i=opLeftChild+1; i <= opRightChild; i++)
+					for(U32 i=opLeftChild+1; i <= opRightChild; i++)
 					{
 						primF = ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);
 						if(islessequal(primF, field))
@@ -817,7 +877,7 @@ float ComputeBranchFieldAndColor(U16 idxBranchOp,
 				}
 	
 				case(opBlend): {								
-					for(U16 i=opLeftChild; i <= opRightChild; i++)	
+					for(U32 i=opLeftChild; i <= opRightChild; i++)	
 					{				
 						primF = ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);
 						(*lpOutColor) += NORMALIZE_FIELD(primF) * arrPrims4[i * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
@@ -826,7 +886,7 @@ float ComputeBranchFieldAndColor(U16 idxBranchOp,
 					break;				
 				}
 				case(opRicciBlend): {
-					for(U16 i=opLeftChild; i <= opRightChild; i++)	
+					for(U32 i=opLeftChild; i <= opRightChild; i++)	
 					{				
 						primF = ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);
 						(*lpOutColor) += NORMALIZE_FIELD(primF) * arrPrims4[i * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
@@ -956,8 +1016,8 @@ float ComputeFieldAndColor(float4 v,
 		float field;
 		bool isRightOp;
 		
-		U16 idxBranchOp = arrHeader4[OFFSET4_HEADER_PARAMS].w;
-		U16 idxNextOp = NULL_BLOB;
+		U32 idxBranchOp = arrHeader4[OFFSET4_HEADER_PARAMS].w;
+		U32 idxNextOp = NULL_BLOB;
 		while(idxBranchOp != NULL_BLOB)
 		{
 			//enum OPFLAGS {ofRightChildIsOp = 1, ofLeftChildIsOp = 2, ofChildIndexIsRange = 4, ofIsUnaryOp = 8, ofIsRightOp = 16};
@@ -1237,6 +1297,110 @@ __kernel void ComputeVertexAttribs(__global float4* arrInHeader4,
 	}
 } 
 
+//In the cell config is non-zero then it will be exploded to 6 tets
+__kernel void TetCountCells(__global U8* arrInCellConfig,
+						    __constant struct CellParam* inCellParam,
+						    __global U32* arrOutTetMeshCount) {
+	int idX = get_global_id(0);
+	int idY = get_global_id(1);
+	int idZ = get_global_id(2);
+	if((idX >= inCellParam->ctNeededCells[0])||(idY >= inCellParam->ctNeededCells[1])||(idZ >= inCellParam->ctNeededCells[2]))
+		return;
+	U32 idxCell = idZ * (inCellParam->ctNeededCells[0] * inCellParam->ctNeededCells[1]) + idY * inCellParam->ctNeededCells[0] + idX;
+	if(idxCell >= inCellParam->ctTotalCells)
+		return;
+	
+	//In the cell is inside or crossing the surface then count it
+	arrOutTetMeshCount[idxCell] = (arrInCellConfig[idxCell] != 0);
+}
+
+//Compute mesh vertices
+__kernel void TetVertices(__global float4* arrInHeader4,
+						  __constant struct GridParam* inGridParam,
+						  __global float* arrOutTetMeshVertices)
+{
+	int idX = get_global_id(0);
+	int idY = get_global_id(1);
+	int idZ = get_global_id(2);
+	if((idX >= inGridParam->ctGridPoints[0])||(idY >= inGridParam->ctGridPoints[1])||(idZ >= inGridParam->ctGridPoints[2]))
+		return;
+	U32 idxVertex = idZ * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + idY * inGridParam->ctGridPoints[0] + idX;
+	if(idxVertex >= inGridParam->ctTotalPoints)
+		return;
+	
+	float cellsize = inGridParam->cellsize;		
+	float4 v = arrInHeader4[OFFSET4_HEADER_LOWER] + cellsize * (float4)(idX, idY, idZ, 0.0f);
+	arrOutTetMeshVertices[idxVertex* 3] = v.x;
+	arrOutTetMeshVertices[idxVertex* 3 + 1] = v.y;
+	arrOutTetMeshVertices[idxVertex* 3 + 2] = v.z;
+}
+
+//Explode each crossing or inside cell into 6 tetrahedra
+__kernel void TetElements(__global U8* arrInCellConfig,
+					      __global U32* arrInCellTetOffset,
+						  __constant struct GridParam* inGridParam,
+						  __constant struct CellParam* inCellParam,
+						  __global U32* arrOutTetMeshIndices) 
+{
+	int idX = get_global_id(0);
+	int idY = get_global_id(1);
+	int idZ = get_global_id(2);
+	if((idX >= inCellParam->ctNeededCells[0])||(idY >= inCellParam->ctNeededCells[1])||(idZ >= inCellParam->ctNeededCells[2]))
+		return;
+	U32 idxCell = idZ * (inCellParam->ctNeededCells[0] * inCellParam->ctNeededCells[1]) + idY * inCellParam->ctNeededCells[0] + idX;
+	if(idxCell >= inCellParam->ctTotalCells)
+		return;
+	if(arrInCellConfig[idxCell] == 0)
+		return;
+
+	U32 dx = inGridParam->ctGridPoints[0];	
+	U32 dxdy = inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1];
+	
+	//Compute Configuration index
+    U32 idxCorners[8];
+    idxCorners[0] = idZ * dxdy + idY * dx + idX;
+    idxCorners[1] = (idZ+1) * dxdy + idY * dx + idX;
+    idxCorners[2] = idZ * dxdy + (idY+1) * dx + idX;
+    idxCorners[3] = (idZ+1) * dxdy + (idY+1) * dx + idX;
+    idxCorners[4] = idZ * dxdy + idY * dx + idX + 1;
+    idxCorners[5] = (idZ+1) * dxdy + idY * dx + idX + 1;
+    idxCorners[6] = idZ * dxdy + (idY+1) * dx + idX + 1;
+    idxCorners[7] = (idZ+1) * dxdy + (idY+1) * dx + idX + 1;
+
+    U32 offsetTet = arrInCellTetOffset[idxCell] * 24;
+    
+	arrOutTetMeshIndices[offsetTet + 0] = idxCorners[LBN];
+	arrOutTetMeshIndices[offsetTet + 1] = idxCorners[LTN];
+	arrOutTetMeshIndices[offsetTet + 2] = idxCorners[RBN];
+	arrOutTetMeshIndices[offsetTet + 3] = idxCorners[LBF];
+	
+	arrOutTetMeshIndices[offsetTet + 4] = idxCorners[RTN];
+	arrOutTetMeshIndices[offsetTet + 5] = idxCorners[LTN];
+	arrOutTetMeshIndices[offsetTet + 6] = idxCorners[LBF];
+	arrOutTetMeshIndices[offsetTet + 7] = idxCorners[RBN];
+
+	arrOutTetMeshIndices[offsetTet + 8] = idxCorners[RTN];
+	arrOutTetMeshIndices[offsetTet + 9] = idxCorners[LTN];
+	arrOutTetMeshIndices[offsetTet + 10] = idxCorners[LTF];
+	arrOutTetMeshIndices[offsetTet + 11] = idxCorners[LBF];
+
+	arrOutTetMeshIndices[offsetTet + 12] = idxCorners[RTN];
+	arrOutTetMeshIndices[offsetTet + 13] = idxCorners[RBN];
+	arrOutTetMeshIndices[offsetTet + 14] = idxCorners[LBF];
+	arrOutTetMeshIndices[offsetTet + 15] = idxCorners[RBF];
+
+	arrOutTetMeshIndices[offsetTet + 16] = idxCorners[RTN];
+	arrOutTetMeshIndices[offsetTet + 17] = idxCorners[LBF];
+	arrOutTetMeshIndices[offsetTet + 18] = idxCorners[LTF];
+	arrOutTetMeshIndices[offsetTet + 19] = idxCorners[RBF];
+
+	arrOutTetMeshIndices[offsetTet + 20] = idxCorners[RTN];
+	arrOutTetMeshIndices[offsetTet + 21] = idxCorners[LTF];
+	arrOutTetMeshIndices[offsetTet + 22] = idxCorners[RTF];
+	arrOutTetMeshIndices[offsetTet + 23] = idxCorners[RBF];
+}
+
+
 //Compute Cell Configs
 __kernel void ComputeCellConfigs(__global float4* arrInFields,
 								 __read_only image2d_t texInVertexCountTable,
@@ -1250,7 +1414,7 @@ __kernel void ComputeCellConfigs(__global float4* arrInFields,
 	int idZ = get_global_id(2);
 	if((idX >= inCellParam->ctNeededCells[0])||(idY >= inCellParam->ctNeededCells[1])||(idZ >= inCellParam->ctNeededCells[2]))
 		return;
-	uint idxCell = idZ * (inCellParam->ctNeededCells[0] * inCellParam->ctNeededCells[1]) + idY * inCellParam->ctNeededCells[0] + idX;
+	U32 idxCell = idZ * (inCellParam->ctNeededCells[0] * inCellParam->ctNeededCells[1]) + idY * inCellParam->ctNeededCells[0] + idX;
 	if(idxCell >= inCellParam->ctTotalCells)
 		return;
 

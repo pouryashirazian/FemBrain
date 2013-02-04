@@ -19,27 +19,66 @@ using namespace PS::HPC;
 using namespace PS::FUNCTIONALMATH;
 
 //DATASIZES
-#define DATASIZE_HEADER			12
-#define DATASIZE_OPERATOR		8
-#define DATASIZE_PRIMITIVE		20
+#define DATASIZE_HEADER		12
+#define DATASIZE_OPERATOR	16
+#define DATASIZE_PRIMITIVE	20
+#define PRIM_MATRIX_STRIDE  12
+#define BOX_MATRIX_STRIDE   16
 
-//Operator
+#define DATASIZE_OPERATOR_F4	DATASIZE_OPERATOR/4
+#define DATASIZE_PRIMITIVE_F4	DATASIZE_PRIMITIVE/4
+#define PRIM_MATRIX_STRIDE_F4 	PRIM_MATRIX_STRIDE/4
+#define BOX_MATRIX_STRIDE_F4 	BOX_MATRIX_STRIDE/4
+
+
+//OFFSETS in HEADER
+#define OFFSET4_HEADER_LOWER	0
+#define OFFSET4_HEADER_UPPER	1
+#define OFFSET4_HEADER_PARAMS	2
+
+#define OFFSET_HEADER_BBOX_LO_X 	0
+#define OFFSET_HEADER_BBOX_LO_Y 	1
+#define OFFSET_HEADER_BBOX_LO_Z 	2
+#define OFFSET_HEADER_BBOX_HI_X 	4
+#define OFFSET_HEADER_BBOX_HI_Y 	5
+#define OFFSET_HEADER_BBOX_HI_Z 	6
+#define OFFSET_HEADER_COUNT_PRIMS 	8
+#define OFFSET_HEADER_COUNT_OPS 	9
+#define OFFSET_HEADER_COUNT_MTX		10
+#define OFFSET_HEADER_START 		11
+
+//OFFSETS in OPERATORS
+#define OFFSET4_OP_TYPE			0
+#define OFFSET4_OP_RES			1
+#define OFFSET4_AABB_LO			2
+#define OFFSET4_AABB_HI			3
+
 #define OFFSET_OP_TYPE			0
-#define OFFSET_OP_CHILDREN 		1
-#define OFFSET_OP_LINK_FLAGS 	2
+#define OFFSET_OP_LC			1
+#define OFFSET_OP_RC			2
 #define OFFSET_OP_NEXT			3
+#define OFFSET_OP_RES_X			4
+#define OFFSET_OP_RES_Y			5
+#define OFFSET_OP_RES_Z			6
+#define OFFSET_OP_FLAGS			7
+#define OFFSET_OP_AABB_LO		8
+#define OFFSET_OP_AABB_HI		12
 
-//Primitive
+//OFFSETS in PRIMITIVES
+#define OFFSET4_PRIM_TYPE		0
+#define OFFSET4_PRIM_POS		1
+#define OFFSET4_PRIM_DIR		2
+#define OFFSET4_PRIM_RES		3
+#define OFFSET4_PRIM_COLOR		4
+
 #define OFFSET_PRIM_TYPE		0
 #define OFFSET_PRIM_IDX_MATRIX 	1
-#define OFFSET_PRIM_LINK_FLAGS 	2
-#define OFFSET_PRIM_PARENT_LINK 3
-
-//HEADER
-#define OFFSET_COUNT_PRIMS 		8
-#define OFFSET_COUNT_OPS 		9
-#define OFFSET_COUNT_MTXNODES	10
-#define OFFSET_COUNT_INSTANCE 	11
+#define OFFSET_PRIM_PARENT 		2
+#define OFFSET_PRIM_SIBLING 	3
+#define OFFSET_PRIM_POS		 	4
+#define OFFSET_PRIM_DIR	 		8
+#define OFFSET_PRIM_RES		 	12
+#define OFFSET_PRIM_COLOR	 	16
 
 //Defines an empty index to jump out of branch
 #define NULL_BLOB 0xFFFF
@@ -70,6 +109,7 @@ public:
 
 
 	void testScan();
+
 	/*!
 	 * Run the algorithm in tandem
 	 */
@@ -108,6 +148,9 @@ private:
 	int computeVertexAttribs(U32 ctVertices);
 	int computeCellConfigs();
 	int computeElements(U32 ctElements);
+
+	//FEM Passes
+	int tetrahedralize();
 
 	//Set traversal route
 	bool setTraversalRoute();

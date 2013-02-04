@@ -118,8 +118,8 @@ namespace HPC{
 			//Update Parent/Link and Link Properties
 			m_arrPrims[i * DATASIZE_PRIMITIVE + OFFSET_PRIM_TYPE] = static_cast<float>(tempPrims.type[i]);
 			m_arrPrims[i * DATASIZE_PRIMITIVE + OFFSET_PRIM_IDX_MATRIX] = static_cast<float>(tempPrims.idxMatrix[i]);
-			m_arrPrims[i * DATASIZE_PRIMITIVE + OFFSET_PRIM_LINK_FLAGS] = 0;
-			m_arrPrims[i * DATASIZE_PRIMITIVE + OFFSET_PRIM_PARENT_LINK] = 0;
+			m_arrPrims[i * DATASIZE_PRIMITIVE + OFFSET_PRIM_PARENT] = 0;
+			m_arrPrims[i * DATASIZE_PRIMITIVE + OFFSET_PRIM_SIBLING] = 0;
 
 			//Pos
 			m_arrPrims[i * DATASIZE_PRIMITIVE + 4] = tempPrims.posX[i];
@@ -153,17 +153,24 @@ namespace HPC{
 			{
 				//Update Parent/Link and Link Properties
 				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_TYPE] = static_cast<float>(tempOps.type[i]);
-
-				U32 opLeftRightChild = (tempOps.opLeftChild[i] << 16) | tempOps.opRightChild[i];
-				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_CHILDREN] = static_cast<float>(opLeftRightChild);
-
-				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS] = static_cast<float>(tempOps.opFlags[i]);
+				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_LC] 	 = static_cast<float>(tempOps.opLeftChild[i]);
+				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_RC]   = static_cast<float>(tempOps.opRightChild[i]);
 				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_NEXT] = NULL_BLOB;
 
-				m_arrOps[i * DATASIZE_OPERATOR + 4] = static_cast<float>(tempOps.resX[i]);
-				m_arrOps[i * DATASIZE_OPERATOR + 5] = static_cast<float>(tempOps.resY[i]);
-				m_arrOps[i * DATASIZE_OPERATOR + 6] = static_cast<float>(tempOps.resZ[i]);
-				m_arrOps[i * DATASIZE_OPERATOR + 7] = static_cast<float>(tempOps.resW[i]);
+				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_RES_X] = static_cast<float>(tempOps.resX[i]);
+				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_RES_Y] = static_cast<float>(tempOps.resY[i]);
+				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_RES_Z] = static_cast<float>(tempOps.resZ[i]);
+				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_FLAGS] = static_cast<float>(tempOps.opFlags[i]);
+
+				//AABB
+				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_AABB_LO] = static_cast<float>(tempOps.bboxLoX[i]);
+				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_AABB_LO + 1] = static_cast<float>(tempOps.bboxLoY[i]);
+				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_AABB_LO + 2] = static_cast<float>(tempOps.bboxLoZ[i]);
+				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_AABB_LO + 3] = 1.0f;
+				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_AABB_HI] = static_cast<float>(tempOps.bboxHiX[i]);
+				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_AABB_HI + 1] = static_cast<float>(tempOps.bboxHiY[i]);
+				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_AABB_HI + 2] = static_cast<float>(tempOps.bboxHiZ[i]);
+				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_AABB_HI + 3] = 1.0f;
 			}
 		}
 
@@ -228,14 +235,13 @@ namespace HPC{
 		while(!stkOps.empty())
 		{
 			U16 idxOp = stkOps.top();
-			U32 opFlags = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS]);
+			U32 opFlags = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_FLAGS]);
 			bool isBreak = (bool)((opFlags & ofBreak) >> 5);
 			bool isLCOp  = (bool)((opFlags & ofLeftChildIsOp) >> 1);
 			bool isRCOp  = (bool) (opFlags & ofRightChildIsOp);
 
-			U32 idxKids = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_CHILDREN]);
-			U16 idxLC   = idxKids >> 16;
-			U16 idxRC   = idxKids & 0xFFFF;
+			U32 idxLC = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_LC]);
+			U32 idxRC = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_RC]);
 
 			//Process a break when we got two primitive kids
 			if(isLCOp == false && isRCOp == false && stkLastBreak.empty() == false)
@@ -247,7 +253,7 @@ namespace HPC{
 
 				//Set Root Op
 				if(idxBreak == NULL_BLOB)
-					m_arrHeader[11] = idxOp;
+					m_arrHeader[OFFSET_HEADER_START] = idxOp;
 				else
 					m_arrOps[idxBreak * DATASIZE_OPERATOR + OFFSET_OP_NEXT] = idxOp;
 
@@ -260,7 +266,7 @@ namespace HPC{
 					idxOp = stkOps.top();
 					stkOps.pop();
 
-					opFlags = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS]);
+					opFlags = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_FLAGS]);
 					isBreak = (bool)((opFlags & ofBreak) >> 5);
 					//bool isRop   = (bool)((opFlags & ofIsRightOp) >> 4);
 					//bool isUnary = (bool)((opFlags & ofIsUnaryOp) >> 3);
@@ -268,9 +274,11 @@ namespace HPC{
 					isLCOp  = (bool)((opFlags & ofLeftChildIsOp) >> 1);
 					isRCOp  = (bool) (opFlags & ofRightChildIsOp);
 
-					idxKids = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_CHILDREN]);
-					idxLC   = idxKids >> 16;
-					idxRC   = idxKids & 0xFFFF;
+					//LC
+					idxLC = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_LC]);
+
+					//RC
+					idxRC = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_RC]);
 
 					if(isBreak)
 						stkLastBreak.push(idxOp);
@@ -332,13 +340,12 @@ namespace HPC{
 				maxDepth = MATHMAX(maxDepth, depth);
 				stkDepth.pop();
 
-				U32 opFlags = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS]);
+				U32 opFlags = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_FLAGS]);
 				bool isLCOp  = (bool)((opFlags & ofLeftChildIsOp) >> 1);
 				bool isRCOp  = (bool) (opFlags & ofRightChildIsOp);
 
-				U32 idxKids = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_CHILDREN]);
-				U16 idxLC   = idxKids >> 16;
-				U16 idxRC   = idxKids & 0xFFFF;
+				U16 idxLC   = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_LC]);
+				U16 idxRC   = static_cast<U32>(m_arrOps[idxOp * DATASIZE_OPERATOR + OFFSET_OP_RC]);
 
 				if(isLCOp)
 					stkDepth.push(idxLC, depth + 1);
@@ -371,16 +378,15 @@ namespace HPC{
 
 				if(n.isOp)
 				{
-					U32 opFlags = static_cast<U32>(m_arrOps[n.index * DATASIZE_OPERATOR + OFFSET_OP_LINK_FLAGS]);
-					U16 opType  = static_cast<U16>(m_arrOps[n.index * DATASIZE_OPERATOR + OFFSET_OP_TYPE]);
+					U32 opType  = static_cast<U32>(m_arrOps[n.index * DATASIZE_OPERATOR + OFFSET_OP_TYPE]);
+					U32 opFlags = static_cast<U32>(m_arrOps[n.index * DATASIZE_OPERATOR + OFFSET_OP_FLAGS]);
 					bool isUnary = (bool)((opFlags & ofIsUnaryOp) >> 3);
 					bool isRange = (bool)((opFlags & ofIsUnaryOp) >> 2);
 					bool isLCOp  = (bool)((opFlags & ofLeftChildIsOp) >> 1);
 					bool isRCOp  = (bool) (opFlags & ofRightChildIsOp);
 
-					U32 idxKids = static_cast<U32>(m_arrOps[n.index * DATASIZE_OPERATOR + OFFSET_OP_CHILDREN]);
-					U16 idxLC   = idxKids >> 16;
-					U16 idxRC   = idxKids & 0xFFFF;
+					U16 idxLC   = static_cast<U32>(m_arrOps[n.index * DATASIZE_OPERATOR + OFFSET_OP_LC]);
+					U16 idxRC   = static_cast<U32>(m_arrOps[n.index * DATASIZE_OPERATOR + OFFSET_OP_RC]);
 
 					//Visit Node
 					DAnsiStr strName = ModelReader::GetScriptOpName(opType);
