@@ -56,9 +56,11 @@
 									<listOptionValue builtIn="false" value="GL"/>
 									<listOptionValue builtIn="false" value="rt"/>
 									<listOptionValue builtIn="false" value="tbb"/>
+									<listOptionValue builtIn="false" value="ssl"/>
+									<listOptionValue builtIn="false" value="crypto"/>
 								</option>
 								<option id="gnu.cpp.link.option.paths.1451060664" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
-									<listOptionValue builtIn="false" value="/usr/lib64/fglrx"/>
+									<listOptionValue builtIn="false" value="/usr/lib/fglrx"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/TBB/build/linux_intel64_gcc_cc4.6_libc2.15_kernel3.2.0_release"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/BOARD/lib"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/GLEW/lib"/>

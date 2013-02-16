@@ -543,7 +543,7 @@ namespace HPC{
 		
 		LogInfo("1.Setup compute device. Prefer AMD GPU.");
 		//Create a GPU Compute Device
-		m_lpGPU = new ComputeDevice(ComputeDevice::dtGPU, true, "AMD");
+		m_lpGPU = new ComputeDevice(ComputeDevice::dtGPU, true, false, "AMD");
 		m_lpGPU->printInfo();
 		
 
@@ -551,8 +551,9 @@ namespace HPC{
 		//PS::HPC::Scan* lpScanner = new PS::HPC::Scan(lpGPU);
 		//lpScanner->scanExclusiveLarge()
 		LogInfo("2.Compile OpenCL program.");
-		ComputeProgram* lpProgram = m_lpGPU->addProgramFromFile(strFP.cptr());
+		ComputeProgram* lpProgram = m_lpGPU->tryLoadBinaryThenCompile(strFP.cptr());
 		assert(lpProgram != NULL);
+
 
 		//Build Kernel
 		LogInfo("3.Setup Kernel Functions.");

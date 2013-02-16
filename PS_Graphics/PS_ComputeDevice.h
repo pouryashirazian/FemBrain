@@ -78,8 +78,8 @@ public:
     }
     virtual ~ComputeProgram();
 
-	bool saveBinary(const char* chrBinFilePath);
     ComputeKernel* addKernel(const char* chrKernelTitle);
+    cl_program getProgram() const {return m_clProgram;}
 private:
     cl_program m_clProgram;
     std::vector<ComputeKernel*> m_lstKernels;
@@ -93,23 +93,24 @@ private:
   */
 class ComputeDevice{
 public:
+
+	enum COMMANDEVENTYPE {cetQueued = CL_PROFILING_COMMAND_QUEUED,
+						  cetSubmit = CL_PROFILING_COMMAND_SUBMIT,
+						  cetStart = CL_PROFILING_COMMAND_START,
+						  cetEnd = CL_PROFILING_COMMAND_END};
+
     enum DEVICETYPE{dtCPU = CL_DEVICE_TYPE_CPU, dtGPU = CL_DEVICE_TYPE_GPU};
     enum MEMACCESSMODE{memReadWrite = CL_MEM_READ_WRITE, memReadOnly = CL_MEM_READ_ONLY, memWriteOnly = CL_MEM_WRITE_ONLY};
 
 	//Constructors
     ComputeDevice();
-    ComputeDevice(DEVICETYPE dev, bool bWithOpenGLInterOp = true, const char* lpPlatformProvide = "DEFAULT");
+    ComputeDevice(DEVICETYPE dev,
+    				bool bWithOpenGLInterOp = true,
+    				bool bEnableProfiling = false,
+    				const char* lpPlatformProvide = "DEFAULT");
   
 	//Destructor
 	virtual ~ComputeDevice();
-
-
-	bool isBinarySaved() const { return m_bSaveBinary;}
-	void setSaveBinary(bool bSave) 
-	{
-		m_bSaveBinary = bSave;
-	}
-
 
     bool isReady() const {return m_bReady;}
 
@@ -126,6 +127,16 @@ public:
      * @return pointer to the ComputeProgram object created.
      */
     ComputeProgram* addProgramFromFile(const char* chrFilePath);
+
+    /*!
+     * Add a new program from ptx binary file.
+     */
+    ComputeProgram* addProgramFromPtxBinary(const U8* binary, size_t length);
+
+    /*!
+     * First tries to load bin file is failed then loads compiles
+     */
+    ComputeProgram* tryLoadBinaryThenCompile(const char* chrFilePath);
 
     //Remove program
     void removeProgram(const ComputeProgram* lpProgram);
@@ -182,15 +193,30 @@ public:
     cl_command_queue getCommandQ() const {return m_clCommandQueue;}
 
 
+    //Profile TimeStamps
+    U64 profileTimeStamp(COMMANDEVENTYPE type) const;
+    U64 profileExecutionTime() const;
+    U64 profileSubmissionTime() const;
+
+
+    bool storeProgramBinary(ComputeProgram* lpProgram, const char* chrFilePath);
 private:
 	/*!
 	* @param dev Device type for running the compute kernels on
 	* @param bWithOpenGLInterOp using openGL inter-operability
+	* @param bEnableProfiling to profile and timestamp events
 	* @param lpStrPlatformProvider the string name of the platform to use
 	*/
-	bool initDevice(DEVICETYPE dev, bool bWithOpenGLInterOp, const char* lpStrPlatformProvider);
+	bool initDevice(DEVICETYPE dev,
+					  bool bWithOpenGLInterOp = true,
+					  bool bEnableProfiling = false,
+					  const char* lpStrPlatformProvider = "AMD");
 
 public:
+	static string ComputeCheckSum(const char* chrFilePath);
+	static bool SaveSourceCheckSum(const char* chrFilePath, const string& checksum);
+	static bool LoadSourceCheckSum(const char* chrFilePath, string& checksum);
+
     static cl_int oclPlatformID(cl_platform_id* clSelectedPlatformID, const char* lpStrProvider = "NVIDIA");
     //static void oclPrintDevInfo(int iLogMode, cl_device_id device);
 
@@ -252,7 +278,6 @@ private:
 
     std::vector<ComputeProgram*> m_lstPrograms;
 
-	bool m_bSaveBinary;
     bool m_bReady;
 };
 

@@ -3,6 +3,7 @@
 #include "../PS_Base/PS_Logger.h"
 #include <iostream>
 #include <fstream>
+#include <openssl/md5.h>
 
 using namespace PS;
 
@@ -75,48 +76,18 @@ ComputeKernel* ComputeProgram::addKernel(const char *chrKernelTitle)
 }
 
 
-bool ComputeProgram::saveBinary(const char* chrBinFilePath)
-{
-	//Get the binary
-	U64 szBinFile;
-	cl_int err = clGetProgramInfo(m_clProgram, CL_PROGRAM_BINARY_SIZES, sizeof(szBinFile), &szBinFile, NULL);
-	if(err != CL_SUCCESS)
-	{
-		LogErrorArg1("Unable to retrieve the size of the program binary. Ocl Error: %s", ComputeDevice::oclErrorString(err));
-		return false;
-	}
-	else
-	{
-		bool bres = false;
-		char* lpBinFile = new char[szBinFile + 64];
-		err = clGetProgramInfo(m_clProgram, CL_PROGRAM_BINARIES, szBinFile, lpBinFile, NULL);
-		if(err != CL_SUCCESS)		
-			LogErrorArg1("Unable to retrieve the program binary. Ocl Error: %s", ComputeDevice::oclErrorString(err));
-		else
-		{
-			ofstream binFile;
-			binFile.open (chrBinFilePath, ios::out | ios::binary);
-			binFile.write(lpBinFile, szBinFile);			
-			binFile.close();			
-			bres = true;
-		}
-
-		SAFE_DELETE(lpBinFile);
-		return bres;
-	}
-
-	return false;
-}
 /////////////////////////////////////////////////////////////////////////////////////
 ComputeDevice::ComputeDevice()
 {
 	m_bReady = false;
-	m_bSaveBinary = false;	
 }
 
-ComputeDevice::ComputeDevice(DEVICETYPE dev, bool bWithOpenGLInterOp, const char* lpPlatformProvide)
+ComputeDevice::ComputeDevice(DEVICETYPE dev,
+								 bool bWithOpenGLInterOp,
+								 bool bEnableProfiling,
+								 const char* lpPlatformProvide)
 {
-	assert(initDevice(dev, bWithOpenGLInterOp, lpPlatformProvide) == true);
+	assert(initDevice(dev, bWithOpenGLInterOp, bEnableProfiling, lpPlatformProvide) == true);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -139,9 +110,11 @@ ComputeDevice::~ComputeDevice()
 * OpenGL buffers. In case there are multiple platforms installed on this machine, one can be selected
 * by specifying it at lpStrPlatformProvider. 
 */
-bool ComputeDevice::initDevice(DEVICETYPE dev, bool bWithOpenGLInterOp, const char* lpStrPlatformProvider)
+bool ComputeDevice::initDevice(DEVICETYPE dev,
+								   bool bWithOpenGLInterOp,
+								   bool bEnableProfiling,
+								   const char* lpStrPlatformProvider)
 {
-	m_bSaveBinary = false;
 	m_bReady = false;
     m_deviceType = dev;
 
@@ -189,7 +162,10 @@ bool ComputeDevice::initDevice(DEVICETYPE dev, bool bWithOpenGLInterOp, const ch
     }
 
     // Create a command commands
-    m_clCommandQueue = clCreateCommandQueue(m_clContext, m_clDeviceID, 0, &err);
+    if(bEnableProfiling)
+    	m_clCommandQueue = clCreateCommandQueue(m_clContext, m_clDeviceID, CL_QUEUE_PROFILING_ENABLE, &err);
+    else
+    	m_clCommandQueue = clCreateCommandQueue(m_clContext, m_clDeviceID, 0, &err);
     if (!m_clCommandQueue) 
 	{
         LogError("Failed to create a command commands!");        
@@ -198,6 +174,33 @@ bool ComputeDevice::initDevice(DEVICETYPE dev, bool bWithOpenGLInterOp, const ch
 
     m_bReady = true;
 	return m_bReady;
+}
+
+U64 ComputeDevice::profileTimeStamp(COMMANDEVENTYPE type) const {
+	cl_event timing_event;
+	cl_ulong timestamp;
+	return clGetEventProfilingInfo(timing_event, type, sizeof(timestamp), &timestamp, NULL);
+}
+
+U64 ComputeDevice::profileExecutionTime() const {
+	cl_event timing_event;
+	cl_ulong starttime;
+	cl_ulong endtime;
+
+	cl_int errcode = clGetEventProfilingInfo(timing_event, cetStart, sizeof(starttime), &starttime, NULL);
+
+	clGetEventProfilingInfo(timing_event, cetEnd, sizeof(endtime), &endtime, NULL);
+	return (endtime - starttime);
+}
+
+U64 ComputeDevice::profileSubmissionTime() const {
+	cl_event timing_event;
+	cl_ulong queuedtime;
+	cl_ulong submissiontime;
+
+	cl_int errcode = clGetEventProfilingInfo(timing_event, cetQueued, sizeof(queuedtime), &queuedtime, NULL);
+	errcode = clGetEventProfilingInfo(timing_event, cetEnd, sizeof(submissiontime), &submissiontime, NULL);
+	return (submissiontime - queuedtime);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -380,24 +383,39 @@ cl_device_id ComputeDevice::oclGetMaxFlopsDev(cl_context cxGPUContext)
 
 void ComputeDevice::oclGetProgBinary( cl_program cpProgram, cl_device_id cdDevice, char** binary, size_t* length)
 {
+
     // Grab the number of devices associated with the program
     cl_uint num_devices;
-    clGetProgramInfo(cpProgram, CL_PROGRAM_NUM_DEVICES, sizeof(cl_uint), &num_devices, NULL);
+    cl_int err = clGetProgramInfo(cpProgram, CL_PROGRAM_NUM_DEVICES, sizeof(cl_uint), &num_devices, NULL);
+    if(err != CL_SUCCESS)
+    	LogErrorArg1("Unable to get number of devices. Error: %s", oclErrorString(err));
+
 
     // Grab the device ids
     cl_device_id* devices = (cl_device_id*) malloc(num_devices * sizeof(cl_device_id));
-    clGetProgramInfo(cpProgram, CL_PROGRAM_DEVICES, num_devices * sizeof(cl_device_id), devices, 0);
+    err = clGetProgramInfo(cpProgram, CL_PROGRAM_DEVICES, num_devices * sizeof(cl_device_id), devices, 0);
+    if(err != CL_SUCCESS)
+    	LogErrorArg1("Unable to get device ids. Error: %s", oclErrorString(err));
+
 
     // Grab the sizes of the binaries
     size_t* binary_sizes = (size_t*)malloc(num_devices * sizeof(size_t));
-    clGetProgramInfo(cpProgram, CL_PROGRAM_BINARY_SIZES, num_devices * sizeof(size_t), binary_sizes, NULL);
+    err = clGetProgramInfo(cpProgram, CL_PROGRAM_BINARY_SIZES, num_devices * sizeof(size_t), binary_sizes, NULL);
+    if(err != CL_SUCCESS)
+    	LogErrorArg1("Unable to get binery sizes. Error: %s", oclErrorString(err));
+
 
     // Now get the binaries
+    size_t szTotal = num_devices * sizeof(char *);
     char** ptx_code = (char**) malloc(num_devices * sizeof(char*));
     for( unsigned int i=0; i<num_devices; ++i) {
         ptx_code[i]= (char*)malloc(binary_sizes[i]);
+        szTotal += binary_sizes[i];
     }
-    clGetProgramInfo(cpProgram, CL_PROGRAM_BINARIES, 0, ptx_code, NULL);
+
+    err = clGetProgramInfo(cpProgram, CL_PROGRAM_BINARIES, szTotal, ptx_code, NULL);
+    if(err != CL_SUCCESS)
+    	LogErrorArg1("Unable to get program binary. Error: %s", oclErrorString(err));
 
     // Find the index of the device of interest
     unsigned int idx = 0;
@@ -412,11 +430,11 @@ void ComputeDevice::oclGetProgBinary( cl_program cpProgram, cl_device_id cdDevic
 
     // Cleanup
     free( devices );
-    free( binary_sizes );
+    //free( binary_sizes );
     for( unsigned int i=0; i<num_devices; ++i) {
         if( i != idx ) free(ptx_code[i]);
     }
-    free( ptx_code );
+    //free( ptx_code );
 }
 
 
@@ -684,13 +702,157 @@ ComputeProgram* ComputeDevice::addProgramFromFile(const char *chrFilePath)
     fp.close();
 	
 	//Save Binary
-	ComputeProgram* lpProgram = addProgram(strCode.c_str());
-	if(m_bSaveBinary)
-	{
-		std::string strBin = string(chrFilePath) + string(".ptx");
-		lpProgram->saveBinary(strBin.c_str());
+	return addProgram(strCode.c_str());
+}
+
+ComputeProgram* ComputeDevice::addProgramFromPtxBinary(const U8* binary, size_t length) {
+
+    cl_int binary_status;
+    cl_int err = 0;
+    cl_program program = clCreateProgramWithBinary(m_clContext, 1,
+    											   &m_clDeviceID,
+    											   &length, &binary,
+    											   &binary_status,
+                                                   &err);
+    if (!program || (binary_status != CL_SUCCESS)) {
+    	LogErrorArg1("Failed to create compute program from binary! Ocl Error: %s", oclErrorString(err));
+        return NULL;
+    }
+
+    // Build the program executable
+    err = clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
+    if (err != CL_SUCCESS)
+    {
+        size_t len;
+        char buffer[2048];
+        err = clGetProgramBuildInfo(program, m_clDeviceID, CL_PROGRAM_BUILD_LOG,
+                              sizeof(buffer), buffer, &len);
+        LogErrorArg1("Failed to build program executable! Ocl Reason: %s", oclErrorString(err));
+        LogErrorArg1("Build Error: %s", buffer);
+        return NULL;
+    }
+
+	//Add to the list of programs
+    ComputeProgram* lpCompute = new ComputeProgram(program);
+    m_lstPrograms.push_back(lpCompute);
+    return lpCompute;
+}
+
+ComputeProgram* ComputeDevice::tryLoadBinaryThenCompile(const char* chrFilePath) {
+
+	LogInfoArg1("Computing source file MD5 checksum for %s", chrFilePath);
+	string checkSumOrg = ComputeCheckSum(chrFilePath);
+
+	LogInfoArg1("Computed checksum is %s", checkSumOrg.c_str());
+	string checkSumLoaded;
+	ComputeProgram* lpProgram = NULL;
+	if(LoadSourceCheckSum(chrFilePath, checkSumLoaded)) {
+		if(checkSumOrg == checkSumLoaded) {
+
+			LogInfo("Checksums matched. Attempting to load ptx binfile.");
+    	    string strBinFile = string(chrFilePath) + ".ptx";
+    	    std::ifstream binFile;
+    	    binFile.open(strBinFile.c_str(), std::ios::binary);
+    	    if(binFile.is_open()) {
+    	    	 size_t size;
+    	    	 binFile.seekg(0, std::ios::end);
+    	    	 size = binFile.tellg();
+    	    	 binFile.seekg(0, std::ios::beg);
+
+    	    	 U8* buf = new U8[size];
+    	    	 binFile.read((char*)buf, size);
+    	    	 binFile.close();
+
+    	    	 lpProgram = addProgramFromPtxBinary(buf, size);
+    	    	 if(lpProgram)
+    	    		 LogInfoArg1("Kernels loaded from binfile at: %s", strBinFile.c_str());
+    	    	 else
+    	    		 LogErrorArg1("An error occured while trying to load ptx binfile from: %s", strBinFile.c_str());
+
+    	    	 SAFE_DELETE(buf);
+    	    }
+		}
 	}
+
+	if(!lpProgram) {
+		LogInfo("Compiling and storing bin file along with the computed md5 checksum for future loads.");
+		lpProgram = addProgramFromFile(chrFilePath);
+
+		//Saving Binary
+		if(lpProgram) {
+			string strBinFile = string(chrFilePath) + ".ptx";
+			storeProgramBinary(lpProgram, strBinFile.c_str());
+			SaveSourceCheckSum(chrFilePath, checkSumOrg);
+		}
+	}
+
 	return lpProgram;
+}
+
+
+bool ComputeDevice::storeProgramBinary(ComputeProgram* lpProgram, const char* chrFilePath) {
+	char* lpBinaryData;
+	size_t length;
+	oclGetProgBinary(lpProgram->getProgram(), m_clDeviceID, &lpBinaryData, &length);
+
+	ofstream binFile;
+	binFile.open (chrFilePath, ios::trunc | ios::out | ios::binary);
+	binFile.write(lpBinaryData, length);
+	binFile.close();
+
+	if(lpBinaryData)
+		free(lpBinaryData);
+	return (length > 0);
+}
+
+
+string ComputeDevice::ComputeCheckSum(const char* chrFilePath) {
+	unsigned char c[MD5_DIGEST_LENGTH];
+	MD5_CTX mdContext;
+
+	int bytes;
+	U8 data[1024];
+	FILE* inFile = fopen(chrFilePath, "rb");
+	if(inFile == NULL) {
+		LogError("Unable to load the text file!");
+		return string("error");
+	}
+
+	MD5_Init(&mdContext);
+	while ((bytes = fread(data, 1, 1024, inFile)) != 0) {
+		MD5_Update(&mdContext, data, bytes);
+	}
+	MD5_Final(c, &mdContext);
+	fclose(inFile);
+
+	string strOut;
+	char buffer[32];
+	for(int i = 0; i < MD5_DIGEST_LENGTH; i++) {
+		sprintf(buffer, "%02x", c[i]);
+		strOut += string(buffer);
+	}
+	return strOut;
+}
+
+bool ComputeDevice::LoadSourceCheckSum(const char* chrFilePath, string& checksum) {
+	string strCheckSumFP = string(chrFilePath) + string(".md5");
+	ifstream checksumFile(strCheckSumFP.c_str());
+	if(checksumFile.is_open()) {
+		checksumFile >> checksum;
+		checksumFile.close();
+		return true;
+	}
+
+	return false;
+}
+
+bool ComputeDevice::SaveSourceCheckSum(const char* chrFilePath, const string& checksum) {
+	string strCheckSumFP = string(chrFilePath) + string(".md5");
+	ofstream checksumFile;
+	checksumFile.open(strCheckSumFP.c_str());
+	checksumFile << checksum;
+	checksumFile.close();
+	return true;
 }
 
 //Compile code
