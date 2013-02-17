@@ -212,19 +212,19 @@ float ComputeRangeField(float4 v, U32 idxOp,
 						__global float4* arrMtxNodes4);
 
 /*
-float ComputeTriangleSquareDist(vec3f vertices[3], vec3f p,
-								vec3f& outClosestPoint, vec3f& outBaryCoords) {
-	vec3f dif = vertices[0] - p;
-	vec3f edge0 = vertices[1] - vertices[0];
-	vec3f edge1 = vertices[2] - vertices[0];
-	float a00 = edge0.length2();
-	float a01 = edge0.dot(edge1);
-	float a11 = edge1.length2();
+float ComputeTriangleSquareDist(float4 v, float4 vertices[3],
+								 float4* outClosestPoint, float4* outBaryCoords) {
+	float4 dif = vertices[0] - v;
+	float4 edge0 = vertices[1] - vertices[0];
+	float4 edge1 = vertices[2] - vertices[0];
+	float a00 = dot(edge0, edge0);
+	float a01 = dot(edge0, edge1);
+	float a11 = dot(edge1, edge1);
 
-	float b0 = dif.dot(edge0);
-	float b1 = dif.dot(edge1);
-	float c = dif.length2();
-	float det = Absolutef(a00 * a11 - a01 * a01);
+	float b0 = dot(dif, edge0);
+	float b1 = dot(dif, edge1);
+	float c = dot(dif, dif);
+	float det = fabs(a00 * a11 - a01 * a01);
 	float s = a01 * b1 - a11 * b0;
 	float t = a01 * b0 - a00 * b1;
 	float sqrDistance;
@@ -384,10 +384,10 @@ float ComputeTriangleSquareDist(vec3f vertices[3], vec3f p,
 	}
 
 	//mClosestPoint0 = *mPoint;
-	outClosestPoint = vertices[0] + s * edge0 + t * edge1;
-	outBaryCoords.y = s;
-	outBaryCoords.z = t;
-	outBaryCoords.x = (float) 1 - s - t;
+	*outClosestPoint = vertices[0] + s * edge0 + t * edge1;
+	(*outBaryCoords).y = s;
+	(*outBaryCoords).z = t;
+	(*outBaryCoords).x = (float) 1 - s - t;
 	return sqrDistance;
 }
 */
@@ -484,7 +484,6 @@ float ComputePrimitiveField(U32 idxPrimitive,
 	break;	
 	case(primTriangle):
 	{
-		dist2 = 10.0f;
 		/*
         float4 vertices[3];
         vertices[0] = arrPrims4[idxPrimitive * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_POS];
@@ -492,8 +491,9 @@ float ComputePrimitiveField(U32 idxPrimitive,
         vertices[2] = arrPrims4[idxPrimitive * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_RES];
         float4 outClosest;
         float4 outBaryCoords;
-        dist2 = ComputeTriangleSquareDist(vertices, vt, &outClosest, &outBaryCoords);
+        dist2 = ComputeTriangleSquareDist(vt, vertices, &outClosest, &outBaryCoords);
         */
+		dist2 = 10.0f;
 	}
 	break;	
 
@@ -627,24 +627,24 @@ float ComputeRangeField(float4 v, U32 idxOp,
 		case(opUnion): {
 			for(U32 i=idxFrom; i <= idxTo; i++)									
 				field = max(field, ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4));
-			break;
 		}
+		break;
 		case(opIntersect): {
 			for(U32 i=idxFrom; i <= idxTo; i++)									
 				field = min(field, ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4));
-			break;
 		}
+		break;
 	
 		case(opBlend): {
 			for(U32 i=idxFrom; i <= idxTo; i++)									
-				field += ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);
-			break;				
+				field += ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);				
 		}
+		break;
 		case(opRicciBlend): {
 			for(U32 i=idxFrom; i <= idxTo; i++)									
-				field = pow(pow(field, params.x) + pow(ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4), params.x), params.y); 
-			break;				
+				field = pow(pow(field, params.x) + pow(ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4), params.x), params.y); 				
 		}
+		break;
 	}
 	
 	return field;
@@ -858,8 +858,8 @@ float ComputeBranchFieldAndColor(U32 idxBranchOp,
 							}
 						}					
 						(*lpOutColor) = NORMALIZE_FIELD(field) * arrPrims4[idxMaxField * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
-						break;
 				}
+				break;
 				case(opIntersect): {
 					U32 idxMinField = 0;
 					field = ComputePrimitiveField(opLeftChild, v, arrOps4, arrPrims4, arrMtxNodes4);
@@ -873,8 +873,8 @@ float ComputeBranchFieldAndColor(U32 idxBranchOp,
 						}
 					}					
 					(*lpOutColor) = NORMALIZE_FIELD(field) * arrPrims4[idxMinField * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
-					break;
 				}
+				break;
 	
 				case(opBlend): {								
 					for(U32 i=opLeftChild; i <= opRightChild; i++)	
@@ -882,19 +882,18 @@ float ComputeBranchFieldAndColor(U32 idxBranchOp,
 						primF = ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);
 						(*lpOutColor) += NORMALIZE_FIELD(primF) * arrPrims4[i * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
 						field += primF;
-					}
-					break;				
+					}				
 				}
+				break;
 				case(opRicciBlend): {
 					for(U32 i=opLeftChild; i <= opRightChild; i++)	
 					{				
 						primF = ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);
 						(*lpOutColor) += NORMALIZE_FIELD(primF) * arrPrims4[i * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
 						field = pow(pow(field, params.x) + pow(primF, params.x), params.y);
-					}
-					break;				
+					}				
 				}
-				
+				break;				
 			}
 		}
 		else
@@ -922,8 +921,8 @@ float ComputeBranchFieldAndColor(U32 idxBranchOp,
 						(*lpOutColor) = rfn * rcolor;
 
 					field = max(lf, rf);
-					break;
 				}
+				break;
 				case(opIntersect): {
 					if(islessequal(lfn, rfn))
 						(*lpOutColor) = lcolor;
@@ -931,20 +930,20 @@ float ComputeBranchFieldAndColor(U32 idxBranchOp,
 						(*lpOutColor) = rcolor;
 
 					field = min(lf, rf);
-					break;
 				}					
+				break;
 					
 				case(opBlend): {
 					(*lpOutColor) = lfn * lcolor + rfn * rcolor; 									
 					field = lf + rf;
-					break;
 				}					
+				break;
 
 				case(opRicciBlend): {
 					(*lpOutColor) = lfn * lcolor + rfn * rcolor;
 					field = pow(pow(lf, params.x) + pow(rf, params.x), params.y);
-					break;
 				}
+				break;
 				
 				case(opDif): { 
 					if(islessequal(lf, 1.0f - rf))
@@ -952,8 +951,8 @@ float ComputeBranchFieldAndColor(U32 idxBranchOp,
 					else
 						(*lpOutColor) = rcolor;
 					field = min(lf, 1.0f - rf);
-					break;
 				}
+				break;
 				
 				case(opSmoothDif): {
 					if(islessequal(lf, 1.0f - rf))
@@ -961,8 +960,8 @@ float ComputeBranchFieldAndColor(U32 idxBranchOp,
 					else
 						(*lpOutColor) = rcolor;
 					field = min(lf, 1.0f - rf);
-					break;
 				}
+				break;
 
 			}
 		}	

@@ -26,15 +26,16 @@
 								<option id="gnu.cpp.compiler.option.optimization.level.218195916" name="Optimization Level" superClass="gnu.cpp.compiler.option.optimization.level" value="gnu.cpp.compiler.optimization.level.none" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.debugging.level.163294574" name="Debug Level" superClass="gnu.cpp.compiler.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.2115444334" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/OPENCL/common/inc"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
+									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/OPENCL/common/inc"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/GLUI/src/include"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/GLEW/include"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/TBB/include"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/LOKI/include"/>
+									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/BOARD/include"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/AA_VegaFem/include}&quot;"/>
 								</option>
-								<option id="gnu.cpp.compiler.option.other.other.1950008776" name="Other flags" superClass="gnu.cpp.compiler.option.other.other" value="-c -fmessage-length=0" valueType="string"/>
+								<option id="gnu.cpp.compiler.option.other.other.1950008776" name="Other flags" superClass="gnu.cpp.compiler.option.other.other" value="-c -fmessage-length=0 -march=corei7-avx -mtune=corei7-avx" valueType="string"/>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1828550290" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.c.compiler.base.2121171362" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.base">
@@ -102,10 +103,12 @@
 								<option id="gnu.cpp.compiler.option.optimization.level.1576437791" name="Optimization Level" superClass="gnu.cpp.compiler.option.optimization.level" value="gnu.cpp.compiler.optimization.level.most" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.debugging.level.1921516180" name="Debug Level" superClass="gnu.cpp.compiler.option.debugging.level" value="gnu.cpp.compiler.debugging.level.none" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.1065265090" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="/opt/AMDAPP/include"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
+									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/OPENCL/common/inc"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/GLUI/src/include"/>
-									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/LOKI/include"/>
+									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/GLEW/include"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/TBB/include"/>
+									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/LOKI/include"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/BOARD/include"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/AA_VegaFem/include}&quot;"/>
 								</option>
@@ -113,12 +116,7 @@
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1756364624" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.c.compiler.base.17447335" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.base">
-								<option id="gnu.c.compiler.option.include.paths.2133441098" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="/opt/AMDAPP/include"/>
-									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/GLEW/lib"/>
-									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/LOKI/include"/>
-									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/TBB/include"/>
-								</option>
+								<option id="gnu.c.compiler.option.include.paths.2133441098" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath"/>
 								<option defaultValue="gnu.c.optimization.level.most" id="gnu.c.compiler.option.optimization.level.1502695766" name="Optimization Level" superClass="gnu.c.compiler.option.optimization.level" valueType="enumerated"/>
 								<option id="gnu.c.compiler.option.debugging.level.455866354" name="Debug Level" superClass="gnu.c.compiler.option.debugging.level" value="gnu.c.debugging.level.none" valueType="enumerated"/>
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.873281944" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
@@ -126,18 +124,21 @@
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.base.813671169" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.base"/>
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.base.306214580" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.base">
 								<option id="gnu.cpp.link.option.libs.1132655833" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
+									<listOptionValue builtIn="false" value="OpenCL"/>
 									<listOptionValue builtIn="false" value="GLEW"/>
 									<listOptionValue builtIn="false" value="glut"/>
 									<listOptionValue builtIn="false" value="GLU"/>
 									<listOptionValue builtIn="false" value="GL"/>
 									<listOptionValue builtIn="false" value="rt"/>
 									<listOptionValue builtIn="false" value="tbb"/>
-									<listOptionValue builtIn="false" value="OpenCL"/>
+									<listOptionValue builtIn="false" value="ssl"/>
+									<listOptionValue builtIn="false" value="crypto"/>
 								</option>
 								<option id="gnu.cpp.link.option.paths.1705414817" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
-									<listOptionValue builtIn="false" value="/opt/AMDAPP/lib/x86"/>
-									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/TBB/build/linux_ia32_gcc_cc4.6_libc2.15_kernel3.2.0_release"/>
+									<listOptionValue builtIn="false" value="/usr/lib/fglrx"/>
+									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/TBB/build/linux_intel64_gcc_cc4.6_libc2.15_kernel3.2.0_release"/>
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/BOARD/lib"/>
+									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/GLEW/lib"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.1934111231" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>

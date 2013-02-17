@@ -240,15 +240,6 @@ public:
      */
     static cl_device_id oclGetMaxFlopsDev(cl_context cxGPUContext);
 
-
-    /*! Get the binary (PTX) of the program associated with the device
-     * @param cpProgram    OpenCL program
-     * @param cdDevice     device of interest
-     * @param binary       returned code
-     * @param length       length of returned code
-     */
-    static void oclGetProgBinary( cl_program cpProgram, cl_device_id cdDevice, char** binary, size_t* length);
-
     /*! Get and log the binary (PTX) from the OpenCL compiler for the requested program & device
      * @param cpProgram    OpenCL program
      * @param cdDevice     device of interest

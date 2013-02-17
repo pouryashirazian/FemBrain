@@ -381,62 +381,6 @@ cl_device_id ComputeDevice::oclGetMaxFlopsDev(cl_context cxGPUContext)
     return max_flops_device;
 }
 
-void ComputeDevice::oclGetProgBinary( cl_program cpProgram, cl_device_id cdDevice, char** binary, size_t* length)
-{
-
-    // Grab the number of devices associated with the program
-    cl_uint num_devices;
-    cl_int err = clGetProgramInfo(cpProgram, CL_PROGRAM_NUM_DEVICES, sizeof(cl_uint), &num_devices, NULL);
-    if(err != CL_SUCCESS)
-    	LogErrorArg1("Unable to get number of devices. Error: %s", oclErrorString(err));
-
-
-    // Grab the device ids
-    cl_device_id* devices = (cl_device_id*) malloc(num_devices * sizeof(cl_device_id));
-    err = clGetProgramInfo(cpProgram, CL_PROGRAM_DEVICES, num_devices * sizeof(cl_device_id), devices, 0);
-    if(err != CL_SUCCESS)
-    	LogErrorArg1("Unable to get device ids. Error: %s", oclErrorString(err));
-
-
-    // Grab the sizes of the binaries
-    size_t* binary_sizes = (size_t*)malloc(num_devices * sizeof(size_t));
-    err = clGetProgramInfo(cpProgram, CL_PROGRAM_BINARY_SIZES, num_devices * sizeof(size_t), binary_sizes, NULL);
-    if(err != CL_SUCCESS)
-    	LogErrorArg1("Unable to get binery sizes. Error: %s", oclErrorString(err));
-
-
-    // Now get the binaries
-    size_t szTotal = num_devices * sizeof(char *);
-    char** ptx_code = (char**) malloc(num_devices * sizeof(char*));
-    for( unsigned int i=0; i<num_devices; ++i) {
-        ptx_code[i]= (char*)malloc(binary_sizes[i]);
-        szTotal += binary_sizes[i];
-    }
-
-    err = clGetProgramInfo(cpProgram, CL_PROGRAM_BINARIES, szTotal, ptx_code, NULL);
-    if(err != CL_SUCCESS)
-    	LogErrorArg1("Unable to get program binary. Error: %s", oclErrorString(err));
-
-    // Find the index of the device of interest
-    unsigned int idx = 0;
-    while( idx<num_devices && devices[idx] != cdDevice ) ++idx;
-
-    // If it is associated prepare the result
-    if( idx < num_devices )
-    {
-        *binary = ptx_code[idx];
-        *length = binary_sizes[idx];
-    }
-
-    // Cleanup
-    free( devices );
-    //free( binary_sizes );
-    for( unsigned int i=0; i<num_devices; ++i) {
-        if( i != idx ) free(ptx_code[i]);
-    }
-    //free( ptx_code );
-}
-
 
 void ComputeDevice::oclLogPtx(cl_program cpProgram, cl_device_id cdDevice, const char* cPtxFileName)
 {
@@ -789,20 +733,81 @@ ComputeProgram* ComputeDevice::tryLoadBinaryThenCompile(const char* chrFilePath)
 	return lpProgram;
 }
 
+bool ComputeDevice::storeProgramBinary(ComputeProgram* lpProgram,
+											const char* chrFilePath) {
+	cl_uint numDevices = 0;
+	cl_int errNum;
 
-bool ComputeDevice::storeProgramBinary(ComputeProgram* lpProgram, const char* chrFilePath) {
-	char* lpBinaryData;
-	size_t length;
-	oclGetProgBinary(lpProgram->getProgram(), m_clDeviceID, &lpBinaryData, &length);
+	// 1 - Query for number of devices attached to program
+	errNum = clGetProgramInfo(lpProgram->getProgram(), CL_PROGRAM_NUM_DEVICES, sizeof(cl_uint),
+								&numDevices, NULL);
+	if (errNum != CL_SUCCESS) {
+		LogError("Error querying for number of devices.");
+		return false;
+	}
 
-	ofstream binFile;
-	binFile.open (chrFilePath, ios::trunc | ios::out | ios::binary);
-	binFile.write(lpBinaryData, length);
-	binFile.close();
+	// 2 - Get all of the Device IDs
+	cl_device_id *devices = new cl_device_id[numDevices];
+	errNum = clGetProgramInfo(lpProgram->getProgram(), CL_PROGRAM_DEVICES,
+								sizeof(cl_device_id) * numDevices, devices, NULL);
+	if (errNum != CL_SUCCESS) {
+		LogError("Error querying for devices.");
+		SAFE_DELETE_ARRAY(devices);
+		return false;
+	}
 
-	if(lpBinaryData)
-		free(lpBinaryData);
-	return (length > 0);
+	// 3 - Determine the size of each program binary
+	size_t *programBinarySizes = new size_t[numDevices];
+	errNum = clGetProgramInfo(lpProgram->getProgram(), CL_PROGRAM_BINARY_SIZES,
+								sizeof(size_t) * numDevices, programBinarySizes, NULL);
+	if (errNum != CL_SUCCESS) {
+		LogError("Error querying for program binary sizes.");
+		SAFE_DELETE_ARRAY(devices);
+		SAFE_DELETE_ARRAY(programBinarySizes);
+		return false;
+	}
+
+	unsigned char **programBinaries = new unsigned char*[numDevices];
+	for (cl_uint i = 0; i < numDevices; i++) {
+		programBinaries[i] = new unsigned char[programBinarySizes[i]];
+	}
+
+	// 4 - Get all of the program binaries
+	errNum = clGetProgramInfo(lpProgram->getProgram(), CL_PROGRAM_BINARIES,
+								sizeof(unsigned char*) * numDevices, programBinaries, NULL);
+	if (errNum != CL_SUCCESS) {
+		LogError("Error querying for program binaries.");
+
+		SAFE_DELETE_ARRAY(devices);
+		SAFE_DELETE_ARRAY(programBinarySizes);
+		for (cl_uint i = 0; i < numDevices; i++) {
+			SAFE_DELETE_ARRAY(programBinaries[i]);
+		}
+		SAFE_DELETE_ARRAY(programBinaries);
+		return false;
+	}
+
+	// 5 - Finally store the binaries for the device requested out to disk for future reading.
+	for (cl_uint i = 0; i < numDevices; i++) {
+		// Store the binary just for the device requested.  In a scenario where
+		// multiple devices were being used you would save all of the binaries out here.
+		if (devices[i] == m_clDeviceID) {
+			FILE *fp = fopen(chrFilePath, "wb");
+			fwrite(programBinaries[i], 1, programBinarySizes[i], fp);
+			fclose(fp);
+			break;
+		}
+	}
+
+	// Cleanup
+	SAFE_DELETE_ARRAY(devices);
+	SAFE_DELETE_ARRAY(programBinarySizes);
+	for (cl_uint i = 0; i < numDevices; i++) {
+		SAFE_DELETE_ARRAY(programBinaries[i]);
+	}
+	SAFE_DELETE_ARRAY(programBinaries);
+
+	return true;
 }
 
 
