@@ -89,6 +89,9 @@ namespace HPC{
 		if(mr.read(lpFilePath) != MODELREAD_SUCCESS)
 			return false;
 
+		//Model File Path
+		m_strModelFilePath = string(lpFilePath);
+
 		//Set Header
 		m_bboxLo = tempPrims.bboxLo;
 		m_bboxHi = tempPrims.bboxHi;
@@ -561,6 +564,8 @@ namespace HPC{
 		//m_lpKernelComputeConfig = lpProgram->addKernel("ComputeConfig");
 		//m_lpKernelComputeMesh = lpProgram->addKernel("ComputeMesh");
 
+
+		//Polygonizer
 		m_lpKernelComputeAllFields = lpProgram->addKernel("ComputeAllFields");
 		m_lpGPU->getKernelWorkgroupSize(m_lpKernelComputeAllFields);
 
@@ -576,6 +581,18 @@ namespace HPC{
 		m_lpKernelComputeElements = lpProgram->addKernel("ComputeElements");
 		m_lpGPU->getKernelWorkgroupSize(m_lpKernelComputeElements);
 
+		//Tetrahedralizer
+		m_lpKernelTetMeshCountCells = lpProgram->addKernel("TetMeshCells");
+		m_lpGPU->getKernelWorkgroupSize(m_lpKernelTetMeshCountCells);
+
+		m_lpKernelTetMeshVertices = lpProgram->addKernel("TetMeshVertices");
+		m_lpGPU->getKernelWorkgroupSize(m_lpKernelTetMeshVertices);
+
+		m_lpKernelTetMeshElements = lpProgram->addKernel("TetMeshElements");
+		m_lpGPU->getKernelWorkgroupSize(m_lpKernelTetMeshElements);
+
+		//Init some vars
+		m_ctTetMeshVertices = m_ctTetMeshElements = 0;
 
 		//Load Marching Cubes tables
 		cl_image_format imageFormat;
@@ -989,11 +1006,57 @@ namespace HPC{
 		//7. Compute Elements
 		computeElements(m_ctFaceElements);
 
+		/////////////////////////////////////////////////////////////////////
+		// Tetrahedralization
+		//8. Find all cells and vertices includes in the tetmesh
+		computeTetMeshCellsInsideOrCrossed();
 
-		//8. Draw Mesh
+		//SumScan to Compute Total Tetrahedra elements produced and elements offset
+		{
+			//Read-back Elements Count
+			U32* lpCellElementsOffset = new U32[m_cellParam.ctTotalCells];
+			m_lpGPU->enqueueReadBuffer(m_inoutMemCellElementsCount, sizeof(U32) * m_cellParam.ctTotalCells, lpCellElementsOffset);
+
+			//9. SumScan to read all elements, 6 Tetrahedra per each cell
+			m_ctTetMeshElements = m_lpOclSumScan->compute(lpCellElementsOffset, m_cellParam.ctTotalCells);
+			m_ctTetMeshElements *= 6;
+			//PrintArray(lpCellElementsOffset, 1000);
+
+			//Write Element Offsets
+			//m_inMemCellElementsOffset = m_lpGPU->createMemBuffer(sizeof(U32) * m_cellParam.ctTotalCells, ComputeDevice::memReadOnly);
+			m_lpGPU->enqueueWriteBuffer(m_inMemCellElementsOffset, sizeof(U32) * m_cellParam.ctTotalCells, lpCellElementsOffset);
+			SAFE_DELETE(lpCellElementsOffset);
+		}
+
+		//SumScan to Compute Total Vertices count and vertex list offsets
+		{
+			//Read-back EdgeTable Count
+			U32* lpVerticesIncluded = new U32[m_gridParam.ctTotalPoints];
+			m_lpGPU->enqueueReadBuffer(m_inoutMemHighEdgesCount, sizeof(U32) * m_gridParam.ctTotalPoints, lpVerticesIncluded);
+
+			//10. SumScan to compute included vertices
+			m_ctTetMeshVertices = m_lpOclSumScan->compute(lpVerticesIncluded, m_gridParam.ctTotalPoints);
+			//PrintArray(lpVerticesIncluded, 1000);
+
+			//Write Edge Offsets to device memory
+			//m_inMemHighEdgesOffset = m_lpGPU->createMemBuffer(sizeof(U32) * m_gridParam.ctTotalPoints, ComputeDevice::memReadOnly);
+			m_lpGPU->enqueueWriteBuffer(m_inMemHighEdgesOffset, sizeof(U32) * m_gridParam.ctTotalPoints, lpVerticesIncluded);
+			SAFE_DELETE(lpVerticesIncluded);
+		}
+
+		//11. Compute Tetmesh vertices
+		computeTetMeshVertices(m_ctTetMeshVertices);
+
+		//12.Compute Tetrahedra for all inside or crossed cells (6 tets per each cell)
+		computeTetMeshElements(m_ctTetMeshElements);
+
+		//13. Store tet mesh as vega format
+		string strVegaFP = m_strModelFilePath + string(".veg");
+		storeTetMeshInVegaFormat(strVegaFP.c_str());
+
+		//Draw Mesh
 		m_isValidIndex = true;
 		m_faceMode = ftTriangles;
-
 
 		/*
 		m_isValidIndex = false;
@@ -1014,9 +1077,14 @@ namespace HPC{
 		clReleaseMemObject(m_inoutMemCellElementsCount);
 		clReleaseMemObject(m_inMemCellElementsOffset);
 
+		//Release Temp vars for tetmesh
+		clReleaseMemObject(m_outMemTetMeshVertices);
+		clReleaseMemObject(m_outMemTetMeshElements);
+
 
 		return 1;
 	}
+
 
 	int GPUPoly::computeElements(U32 ctElements)
 	{
@@ -1321,6 +1389,164 @@ namespace HPC{
 	}
 
 
+	int GPUPoly::computeTetMeshCellsInsideOrCrossed() {
+		size_t arrLocalIndex[3];
+		size_t arrGlobalIndex[3];
+		for(int i=0; i<3; i++)
+			arrGlobalIndex[i] = m_cellParam.ctNeededCells[i];
+
+		ComputeKernel::ComputeLocalIndexSpace(3, m_lpKernelTetMeshCountCells->getKernelWorkGroupSize(), arrLocalIndex);
+		ComputeKernel::ComputeGlobalIndexSpace(3, arrLocalIndex, arrGlobalIndex);
+
+		//Zero out the array before writing
+		U32* lpIncludedVertices = new U32[m_gridParam.ctTotalPoints];
+		memset(lpIncludedVertices, 0, m_gridParam.ctTotalPoints * sizeof(U32));
+		m_lpGPU->enqueueWriteBuffer(m_inoutMemHighEdgesCount, m_gridParam.ctTotalPoints * sizeof(U32), lpIncludedVertices);
+		SAFE_DELETE_ARRAY(lpIncludedVertices);
+
+
+		/*
+			__kernel void TetMeshCells(__global U8* arrInCellConfig,
+										__constant struct CellParam* inCellParam,
+										__constant struct GridParam* inGridParam,
+										__global U32* arrOutIncludedCells,
+										__global U32* arrOutIncludedVertices) {
+		*/
+		m_lpKernelTetMeshCountCells->setArg(0, sizeof(cl_mem), &m_inoutMemCellConfig);
+		m_lpKernelTetMeshCountCells->setArg(1, sizeof(cl_mem), &m_inMemCellParam);
+		m_lpKernelTetMeshCountCells->setArg(2, sizeof(cl_mem), &m_inMemGridParam);
+		m_lpKernelTetMeshCountCells->setArg(3, sizeof(cl_mem), &m_inoutMemCellElementsCount);
+		m_lpKernelTetMeshCountCells->setArg(4, sizeof(cl_mem), &m_inoutMemHighEdgesCount);
+
+		m_lpGPU->enqueueNDRangeKernel(m_lpKernelTetMeshCountCells, 3, arrGlobalIndex, arrLocalIndex);
+		m_lpGPU->finishAllCommands();
+
+		return 1;
+	}
+
+	int GPUPoly::computeTetMeshVertices(U32 ctVertices) {
+		size_t arrLocalIndex[3];
+		size_t arrGlobalIndex[3];
+		for(int i=0; i<3; i++)
+			arrGlobalIndex[i] = m_gridParam.ctGridPoints[i];
+
+		ComputeKernel::ComputeLocalIndexSpace(3, m_lpKernelTetMeshVertices->getKernelWorkGroupSize(), arrLocalIndex);
+		ComputeKernel::ComputeGlobalIndexSpace(3, arrLocalIndex, arrGlobalIndex);
+
+		//Vertex Attrib Buffers
+		GLsizeiptr szVertexBuffer = ctVertices * 3 * sizeof(float);
+		m_outMemTetMeshVertices = m_lpGPU->createMemBuffer(szVertexBuffer, ComputeDevice::memReadWrite);
+		/*
+			__kernel void TetMeshVertices(__global float4* arrInFields,
+										  __global U32* arrInVerticesIncluded,
+										  __global U32* arrInVerticesOffset,
+										  __constant struct GridParam* inGridParam,
+										  __global float* arrOutTetMeshVertices)
+		*/
+		m_lpKernelTetMeshVertices->setArg(0, sizeof(cl_mem), &m_inoutMemAllFields);
+		m_lpKernelTetMeshVertices->setArg(1, sizeof(cl_mem), &m_inoutMemHighEdgesCount);
+		m_lpKernelTetMeshVertices->setArg(2, sizeof(cl_mem), &m_inMemHighEdgesOffset);
+		m_lpKernelTetMeshVertices->setArg(3, sizeof(cl_mem), &m_inMemGridParam);
+		m_lpKernelTetMeshVertices->setArg(4, sizeof(cl_mem), &m_outMemTetMeshVertices);
+
+		//Enqueue Kernel
+		m_lpGPU->enqueueNDRangeKernel(m_lpKernelTetMeshVertices, 3, arrGlobalIndex, arrLocalIndex);
+		m_lpGPU->finishAllCommands();
+
+
+		//Read Vertices
+		/*
+		float* arrVertices = new float[m_ctVertices*4];
+		m_lpGPU->enqueueReadBuffer(outMemMeshVertex, sizeof(float) * 4 * m_ctVertices, arrVertices);
+			//PrintArrayF(arrVertices, 4 * m_ctVertices);
+		SAFE_DELETE(arrVertices);
+		*/
+
+		return 1;
+	}
+
+
+	int GPUPoly::computeTetMeshElements(U32 ctElements) {
+
+		size_t arrLocalIndex[3];
+		size_t arrGlobalIndex[3];
+		for(int i=0; i<3; i++)
+			arrGlobalIndex[i] = m_cellParam.ctNeededCells[i];
+
+		ComputeKernel::ComputeLocalIndexSpace(3, m_lpKernelTetMeshElements->getKernelWorkGroupSize(), arrLocalIndex);
+		ComputeKernel::ComputeGlobalIndexSpace(3, arrLocalIndex, arrGlobalIndex);
+
+		//Each Tetrahedra has 4 indices
+		GLsizeiptr szElementsBuffer = ctElements * 4 * sizeof(U32);
+		m_outMemTetMeshElements = m_lpGPU->createMemBuffer(szElementsBuffer, ComputeDevice::memReadWrite);
+
+
+		/*
+			__kernel void TetMeshElements(__global U32* arrInVerticesOffset,
+										  __global U32* arrInCellTetOffset,
+										  __global U32* arrInCellsIncluded,
+										  __constant struct GridParam* inGridParam,
+										  __constant struct CellParam* inCellParam,
+										  __global U32* arrOutTetMeshIndices)
+		*/
+		m_lpKernelTetMeshElements->setArg(0, sizeof(cl_mem), &m_inMemHighEdgesOffset);
+		m_lpKernelTetMeshElements->setArg(1, sizeof(cl_mem), &m_inMemCellElementsOffset);
+		m_lpKernelTetMeshElements->setArg(2, sizeof(cl_mem), &m_inoutMemCellElementsCount);
+		m_lpKernelTetMeshElements->setArg(3, sizeof(cl_mem), &m_inMemGridParam);
+		m_lpKernelTetMeshElements->setArg(4, sizeof(cl_mem), &m_inMemCellParam);
+		m_lpKernelTetMeshElements->setArg(5, sizeof(cl_mem), &m_outMemTetMeshElements);
+
+		m_lpGPU->enqueueNDRangeKernel(m_lpKernelTetMeshElements, 3, arrGlobalIndex, arrLocalIndex);
+		m_lpGPU->finishAllCommands();
+
+		return 1;
+	}
+
+	//Export VEGA
+	bool GPUPoly::storeTetMeshInVegaFormat(const char* chrFilePath)
+	{
+		if((m_ctTetMeshVertices == 0)||(m_ctTetMeshElements == 0))
+			return false;
+
+		float* arrTetMeshVertices = new float[3 * m_ctTetMeshVertices];
+		U32* arrTetMeshIndices = new U32[4 * m_ctTetMeshElements];
+
+		m_lpGPU->enqueueReadBuffer(m_outMemTetMeshVertices, sizeof(float) * 3 * m_ctTetMeshVertices, arrTetMeshVertices);
+		m_lpGPU->enqueueReadBuffer(m_outMemTetMeshElements, sizeof(U32) * 4 * m_ctTetMeshElements, arrTetMeshIndices);
+
+
+		ofstream ofs;
+		ofs.open(chrFilePath, ios::out);
+		ofs << "# Vega Mesh File, Generated by FemBrain." << endl;
+		ofs << "# " << m_ctTetMeshVertices << " vertices, " << m_ctTetMeshElements << " elements" << endl;
+		ofs << endl;
+		ofs << "*VERTICES" << endl;
+		ofs << m_ctTetMeshVertices << " 3 0 0" << endl;
+		for(U32 i=0; i < m_ctTetMeshVertices; i++)
+		{
+			ofs << i+1 << " " << arrTetMeshVertices[i*3 + 0] << " " << arrTetMeshVertices[i*3 + 1] << " " << arrTetMeshVertices[i*3 + 2] << endl;
+		}
+
+		ofs << endl;
+		ofs << "*ELEMENTS" << endl;
+		ofs << "TET" << endl;
+		ofs << m_ctTetMeshElements << " 4 0"<< endl;
+		for(U32 i=0; i < m_ctTetMeshElements; i++)
+		{
+			ofs << i+1 << " " << arrTetMeshIndices[i*4 + 0] + 1 << " " << arrTetMeshIndices[i*4 + 1] + 1 << " " << arrTetMeshIndices[i*4 + 2] + 1 << " " << arrTetMeshIndices[i*4 + 3] + 1 << endl;
+		}
+
+		ofs << endl;
+		ofs << "*MATERIAL BODY" << endl;
+		ofs << "ENU, 1000, 10000000, 0.45" << endl;
+		ofs << endl;
+
+		ofs << "*REGION" << endl;
+		ofs << "allElements, BODY" << endl;
+		ofs.close();
+
+		return true;
+	}
 
 }
 }

@@ -149,14 +149,21 @@ private:
 	int computeCellConfigs();
 	int computeElements(U32 ctElements);
 
-	//FEM Passes
-	int tetrahedralize();
+	//Tetrahedralizer Passes for FEM
+	int computeTetMeshCellsInsideOrCrossed();
+	int computeTetMeshVertices(U32 ctVertices);
+	int computeTetMeshElements(U32 ctElements);
+
+
+
+	bool storeTetMeshInVegaFormat(const char* chrFilePath);
 
 	//Set traversal route
 	bool setTraversalRoute();
 	void printBlobTree(const char* chrFilePath) const;
 
 private:
+
     struct CellParam{
 		U8 corner1[12];
 		U8 corner2[12];
@@ -173,6 +180,10 @@ private:
     	float cellsize;
     };
 
+    //Model
+    string m_strModelFilePath;
+
+    //Grid and Cell
 	CellParam m_cellParam;
 	GridParam m_gridParam;
 
@@ -194,6 +205,12 @@ private:
 	ComputeKernel* m_lpKernelComputeVertexAttribs;
 	ComputeKernel* m_lpKernelComputeCellConfigs;
 	ComputeKernel* m_lpKernelComputeElements;
+
+	//Kernels for Tetrahedralization
+	ComputeKernel* m_lpKernelTetMeshEdgeTable;
+	ComputeKernel* m_lpKernelTetMeshVertices;
+	ComputeKernel* m_lpKernelTetMeshCountCells;
+	ComputeKernel* m_lpKernelTetMeshElements;
 
 
 	//Reusable vars
@@ -217,6 +234,12 @@ private:
 	cl_mem m_inoutMemCellConfig;
 	cl_mem m_inoutMemCellElementsCount;
 	cl_mem m_inMemCellElementsOffset;
+
+	//TetMesh
+	U32 m_ctTetMeshVertices;
+	U32 m_ctTetMeshElements;
+	cl_mem m_outMemTetMeshVertices;
+	cl_mem m_outMemTetMeshElements;
 
 
 	//Model
