@@ -6,3 +6,5 @@ To Create mesh using blender:
 	.node and .ele files. Example: ./tetgen /home/pourya/Desktop/disc/disc.off
 3. Use FemBrain VegWriter class in PS_Deformable Package to produce the .veg file. 
 Just pass the .node file and it will find the .ele file by itself and produces the mesh.
+
+4. Screencast: ffmpeg -f x11grab -r 25 -s 1280x800 -i :0.0 -sameq Desktop/out.mp4

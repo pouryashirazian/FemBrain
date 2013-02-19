@@ -116,7 +116,7 @@ public:
 	int runTandem(float cellsize = DEFAULT_CELL_SIZE);
 
 	//Multi-Pass polygonization
-	int runMultiPass(float cellsize = DEFAULT_CELL_SIZE);
+	int runMultiPass(float cellsize = DEFAULT_CELL_SIZE, bool outputTetMesh = true);
 
 	//Draws the mesh using accelerated memory buffer objects
 	void drawBBox();

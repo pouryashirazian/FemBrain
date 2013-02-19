@@ -24,6 +24,10 @@
 #include "PS_Deformable/PS_VegWriter.h"
 #include "PS_Deformable/Avatar.h"
 
+#include "volumetricMeshLoader.h"
+#include "generateSurfaceMesh.h"
+
+
 
 using namespace std;
 using namespace PS;
@@ -55,8 +59,9 @@ public:
 	AppSettings(){
 		this->bDrawWireFrame = false;
 		this->bPanCamera = false;
-		this->bShowElements = false;
+		this->bDrawTetMesh = true;
 		this->bDrawAffineWidgets = true;
+		this->bDrawIsoSurface = true;
 		this->bLogSql = true;
 		this->idxCollisionFace = -1;
 		this->timerInterval = DEFAULT_TIMER_MILLIS;
@@ -71,7 +76,8 @@ public:
 public:
 	bool bPanCamera;
 	bool bDrawWireFrame;
-	bool bShowElements;
+	bool bDrawIsoSurface;
+	bool bDrawTetMesh;
 	bool bDrawAffineWidgets;
 	bool bLogSql;
 
@@ -95,6 +101,12 @@ public:
 	//vec3d worldDragEnd;
 	vec2i screenDragStart;
 	vec2i screenDragEnd;
+
+	//Fixed Vertices
+	vector<int> vFixedVertices;
+
+	//Propagate force to neighborhood
+	int hapticNeighborhoodPropagationRadius;
 };
 
 std::map<int, vec3d> g_hashVertices;
@@ -171,8 +183,12 @@ void Draw()
 	//Render
 	g_arcBallCam.look();
 
+	//Draw Deformable Mesh
+	if(g_lpDeformable && g_appSettings.bDrawTetMesh)
+		g_lpDeformable->draw();
+
 	//Draw Polygonizer output
-	if(g_lpBlobRender)
+	if(g_lpBlobRender && g_appSettings.bDrawIsoSurface)
 	{
 		g_lpBlobRender->setWireFrameMode(g_appSettings.bDrawWireFrame);
 		g_lpBlobRender->drawBBox();
@@ -180,6 +196,7 @@ void Draw()
 			g_lpBlobRender->draw();
 		glDisable(GL_LIGHTING);
 	}
+
 
 	//Draw Interaction Avatar
 	if(g_lpAvatarCube)
@@ -708,6 +725,13 @@ void SpecialKey(int key, int x, int y)
 {
 	switch(key)
 	{
+		case(GLUT_KEY_F1):
+		{
+			g_appSettings.bDrawTetMesh = !g_appSettings.bDrawTetMesh;
+			LogInfoArg1("Draw tetmesh: %d", g_appSettings.bDrawTetMesh);
+			break;
+		}
+
 		case(GLUT_KEY_F2):
 		{
 			g_appSettings.bDrawWireFrame = !g_appSettings.bDrawWireFrame;
@@ -788,6 +812,13 @@ void SpecialKey(int key, int x, int y)
 			break;
 		}
 
+		case(GLUT_KEY_F10):
+		{
+			g_appSettings.bDrawIsoSurface = !g_appSettings.bDrawIsoSurface;
+			LogInfoArg1("Draw IsoSurface: %d", g_appSettings.bDrawIsoSurface);
+			break;
+		}
+
 		case(GLUT_KEY_F11):
 		{
 			//Saving Settings and Exit
@@ -837,8 +868,7 @@ void LoadSettings()
 	DAnsiStr strBlobFile = cfg.readString("MODEL", "BLOBTREEFILE", "");
 
 	int ctFixed = 	cfg.readInt("MODEL", "FIXEDVERTICESCOUNT", 0);
-	vector<int> vFixedVertices;
-	bool bres = cfg.readIntArray("MODEL", "FIXEDVERTICES", ctFixed, vFixedVertices);
+	bool bres = cfg.readIntArray("MODEL", "FIXEDVERTICES", ctFixed, g_appSettings.vFixedVertices);
 	if(!bres)
 		LogError("Unable to read specified number of fixed vertices!");
 
@@ -853,12 +883,7 @@ void LoadSettings()
 	g_appSettings.hapticForceCoeff = cfg.readInt("SYSTEM", "FORCECOEFF", DEFAULT_FORCE_COEFF);
 	g_appSettings.bLogSql = cfg.readBool("SYSTEM", "LOGSQL", g_appSettings.bLogSql);
 	g_appSettings.cellsize = cfg.readFloat("SYSTEM", "CELLSIZE", DEFAULT_CELL_SIZE);
-
-	//Create Deformable Model
-	g_lpDeformable = new Deformable(strVegFile.cptr(),
-									strObjFile.cptr(),
-									vFixedVertices);
-	g_lpDeformable->setHapticForceRadius(cfg.readInt("AVATAR", "RADIUS"));
+	g_appSettings.hapticNeighborhoodPropagationRadius = cfg.readInt("AVATAR", "RADIUS");
 
 	//Avatar
 	vec3f thickness = cfg.readVec3f("AVATAR", "THICKNESS");
@@ -976,14 +1001,28 @@ int main(int argc, char* argv[])
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/sphere.txt";
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/testDisc3.scene";
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/CylinderWithHoles.scene";
-	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/range.scene";
+	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/peanut.scene";
 
+	//Process BlobTree, Produce TetMesh
 	g_lpBlobRender = new GPUPoly();
 	g_lpBlobRender->readModel(strFPModel.cptr());
-	g_lpBlobRender->runMultiPass(g_appSettings.cellsize);
-	//g_lpBlobRender->runTandem(g_appSettings.cellsize);
-	//g_lpBlobRender->testScan();
+	g_lpBlobRender->runMultiPass(g_appSettings.cellsize, true);
 
+
+	//Create Deformable Model from: Triangle Mesh and Tetrahedra Mesh
+	DAnsiStr strVegFile = strFPModel + ".veg";
+	DAnsiStr strObjFile = strFPModel + ".obj";
+
+	//Produce special obj mesh with the same vertices and surface triangles
+    VolumetricMesh * mesh = VolumetricMeshLoader::load(strVegFile.ptr());
+	GenerateSurfaceMesh generateSurfaceMesh;
+	ObjMesh * objMesh = generateSurfaceMesh.ComputeMesh(mesh, true);
+	objMesh->save(string(strObjFile.cptr()));
+
+	g_lpDeformable = new Deformable(strVegFile.cptr(),
+									strObjFile.cptr(),
+									g_appSettings.vFixedVertices);
+	g_lpDeformable->setHapticForceRadius(g_appSettings.hapticNeighborhoodPropagationRadius);
 
 	/*
 	PS::HPC::RayTracer* lpTracer = new RayTracer(128, 128);
