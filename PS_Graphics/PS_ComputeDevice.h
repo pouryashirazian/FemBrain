@@ -167,6 +167,13 @@ public:
     bool enqueueReadBuffer(cl_mem srcMem, U32 size, void* lpDest);
 
     /*!
+     * Enqueues a copy buffer from source to destination
+     */
+    bool enqueueCopyBuffer(cl_mem srcMem, cl_mem dstMem,
+    						  U32 src_offset, U32 dst_offset, U32 bufferSize);
+
+
+    /*!
      * Wait to finish all commands in the command q
      */
     void finishAllCommands();

@@ -63,6 +63,8 @@ void Deformable::setup(const char* lpVegFilePath,
 						  const char* lpObjFilePath,
 						  std::vector<int>& vFixedVertices)
 {
+	m_fOnDeform = NULL;
+
 	m_lpDeformableMesh = new SceneObjectDeformable(const_cast<char*>(lpObjFilePath));
 	//m_lpDeformableMesh->EnableVertexSelection();
 	m_lpDeformableMesh->ResetDeformationToRest();
@@ -145,6 +147,7 @@ void Deformable::setup(const char* lpVegFilePath,
 	m_aabb.set(vec3(lo[0], lo[1], lo[2]), vec3(up[0], up[1], up[2]));
 
 	//Compute model rest volume
+	/*
 	int ctVertices = m_lpTetMesh->getNumVertices();
 	if(ctVertices == m_lpDeformableMesh->GetNumVertices())
 	{
@@ -158,9 +161,7 @@ void Deformable::setup(const char* lpVegFilePath,
 					objVertex[0], objVertex[1], objVertex[2]);
 		}
 	}
-
-
-
+	*/
 
 	U32 ctElems = m_lpTetMesh->getNumElements();
 	m_arrElementVolumes = new double[ctElems];
@@ -176,6 +177,7 @@ void Deformable::setup(U32 ctVertices, double* lpVertices,
 						  U32 ctElements, int* lpElements,
 						  std::vector<int>& vFixedVertices)
 {
+	m_fOnDeform = NULL;
 	//m_lpDeformableMesh = new SceneObjectDeformable(const_cast<char*>(lpObjFilePath));
 	//m_lpDeformableMesh->EnableVertexSelection();
 	m_lpDeformableMesh->ResetDeformationToRest();
@@ -382,6 +384,10 @@ void Deformable::timestep()
 	m_lpIntegrator->GetqState(m_arrDisplacements);
 
 	m_lpDeformableMesh->SetVertexDeformations(m_arrDisplacements);
+
+	//Apply deformations
+	if(m_fOnDeform)
+		m_fOnDeform(m_dof, m_arrDisplacements);
 
 	//Increment time step
 	m_ctTimeStep++;

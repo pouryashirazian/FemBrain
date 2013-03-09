@@ -63,6 +63,9 @@ namespace HPC{
 	{
 		GLMeshBuffer::cleanup();
 
+		//Cleanup rest pos vertices
+		clReleaseMemObject(m_inoutMemRestPos);
+
 		//Clear MC Tables
 		clReleaseMemObject(m_inMemTriangleTable);
 		clReleaseMemObject(m_inMemVertexCountTable);
@@ -591,6 +594,9 @@ namespace HPC{
 		m_lpKernelTetMeshElements = lpProgram->addKernel("TetMeshElements");
 		m_lpGPU->getKernelWorkgroupSize(m_lpKernelTetMeshElements);
 
+		m_lpKernelApplyDeformations = lpProgram->addKernel("ApplyVertexDeformations");
+		m_lpGPU->getKernelWorkgroupSize(m_lpKernelApplyDeformations);
+
 		//Init some vars
 		m_ctTetMeshVertices = m_ctTetMeshElements = 0;
 
@@ -1085,6 +1091,55 @@ namespace HPC{
 		return 1;
 	}
 
+	bool GPUPoly::readBackMesh(U32& ctVertices, vector<float>& vertices,
+								  U32& ctFaceElements, vector<U32>& elements) {
+		if(!m_isValidIndex)
+			return false;
+
+		ctVertices = m_ctVertices;
+		ctFaceElements = m_ctFaceElements;
+
+		//Vertices
+		vector<float> homogenousVertices;
+		homogenousVertices.resize(m_ctVertices * 4);
+		vertices.resize(m_ctVertices * 3);
+		elements.resize(m_ctFaceElements);
+
+		//Vertices
+		U32 szVertexBuffer = sizeof(float) * 4 * m_ctVertices;
+		U32 szIndexBuffer = sizeof(U32) * m_ctFaceElements;
+
+
+		//Vertices
+		cl_mem outMemMeshVertices = m_lpGPU->createMemBufferFromGL(m_vboVertex, ComputeDevice::memReadOnly);
+		m_lpGPU->enqueueAcquireGLObject(1, &outMemMeshVertices);
+		m_lpGPU->enqueueReadBuffer(outMemMeshVertices, szVertexBuffer, &homogenousVertices[0]);
+		m_lpGPU->enqueueReleaseGLObject(1, &outMemMeshVertices);
+		m_lpGPU->finishAllCommands();
+
+		//Copy from homogenous coordinate system
+		for(U32 i=0; i<m_ctVertices; i++) {
+			vertices[i*3] = homogenousVertices[i*4];
+			vertices[i*3 + 1] = homogenousVertices[i*4 + 1];
+			vertices[i*3 + 2] = homogenousVertices[i*4 + 2];
+		}
+
+
+		//Elements
+		cl_mem outMemMeshElements = m_lpGPU->createMemBufferFromGL(m_iboFaces, ComputeDevice::memReadOnly);
+		m_lpGPU->enqueueAcquireGLObject(1, &outMemMeshElements);
+		m_lpGPU->enqueueReadBuffer(outMemMeshElements, szIndexBuffer, &elements[0]);
+		m_lpGPU->enqueueReleaseGLObject(1, &outMemMeshElements);
+		m_lpGPU->finishAllCommands();
+		//PrintArray(&elements[0], 512);
+
+		clReleaseMemObject(outMemMeshVertices);
+		clReleaseMemObject(outMemMeshElements);
+
+		return true;
+	}
+
+
 
 	int GPUPoly::computeElements(U32 ctElements)
 	{
@@ -1124,10 +1179,11 @@ namespace HPC{
 		m_lpKernelComputeElements->setArg(7, sizeof(cl_mem), &m_inMemCellParam);
 		m_lpKernelComputeElements->setArg(8, sizeof(cl_mem), &outMemMeshElements);
 
+		//Q commands
 		m_lpGPU->enqueueNDRangeKernel(m_lpKernelComputeElements, 3, arrGlobalIndex, arrLocalIndex);
-		m_lpGPU->finishAllCommands();
-
 		m_lpGPU->enqueueReleaseGLObject(1, &outMemMeshElements);
+
+		//Execute All
 		m_lpGPU->finishAllCommands();
 
 		//Check Indices
@@ -1205,6 +1261,9 @@ namespace HPC{
 		GLsizeiptr szVertexBuffer = ctVertices * m_stepVertex * sizeof(float);
 		GLsizeiptr szNormalBuffer = ctVertices * 3 * sizeof(float);
 
+		//Create memory buffer for vertex rest positions
+		m_inoutMemRestPos = m_lpGPU->createMemBuffer(szVertexBuffer, ComputeDevice::memReadWrite);
+
 		//Vertex
 		glGenBuffers(1, &m_vboVertex);
 		glBindBuffer(GL_ARRAY_BUFFER, m_vboVertex);
@@ -1257,17 +1316,22 @@ namespace HPC{
 
 		//Enqueue Kernel
 		m_lpGPU->enqueueNDRangeKernel(m_lpKernelComputeVertexAttribs, 3, arrGlobalIndex, arrLocalIndex);
-		m_lpGPU->finishAllCommands();
 
+		//Copy Mesh Vertices to Rest Pos Mesh
+		m_lpGPU->enqueueCopyBuffer(outMemMeshVertex, m_inoutMemRestPos, 0, 0, szVertexBuffer);
 
-		//Release Object
+		//Release All objects
 		m_lpGPU->enqueueReleaseGLObject(1, &outMemMeshVertex);
 		m_lpGPU->enqueueReleaseGLObject(1, &outMemMeshColor);
 		m_lpGPU->enqueueReleaseGLObject(1, &outMemMeshNormal);
 
+		//Execute all commands in command q
+		m_lpGPU->finishAllCommands();
+
 		//Vertices
 		m_isValidVertex = m_isValidColor = m_isValidNormal = true;
 		m_ctVertices = ctVertices;
+
 
 		//Read Vertices
 		/*
@@ -1500,6 +1564,62 @@ namespace HPC{
 		m_lpGPU->finishAllCommands();
 
 		return 1;
+	}
+
+
+	bool GPUPoly::applyFemDisplacements(U32 dof, double* displacements) {
+
+		if(!m_isValidVertex)
+			return false;
+
+		size_t arrLocalIndex[3];
+		size_t arrGlobalIndex[3];
+		arrGlobalIndex[0] = m_ctVertices;
+		arrGlobalIndex[1] = 0;
+		arrGlobalIndex[2] = 0;
+		ComputeKernel::ComputeLocalIndexSpace(1, m_lpKernelApplyDeformations->getKernelWorkGroupSize(), arrLocalIndex);
+		ComputeKernel::ComputeGlobalIndexSpace(1, arrLocalIndex, arrGlobalIndex);
+
+		U32 szVertexBuffer = m_ctVertices * 4 * sizeof(float);
+		vector<float> homogenousDisplacements;
+		homogenousDisplacements.resize(m_ctVertices * 4);
+		for(U32 i=0; i < m_ctVertices; i++) {
+			homogenousDisplacements[i * 4] = displacements[i * 3];
+			homogenousDisplacements[i * 4 + 1] = displacements[i * 3 + 1];
+			homogenousDisplacements[i * 4 + 2] = displacements[i * 3 + 2];
+			homogenousDisplacements[i * 4 + 3] = 0;
+		}
+
+		//Copy displacements
+		cl_mem inMemDisplacements = m_lpGPU->createMemBuffer(szVertexBuffer, ComputeDevice::memReadOnly);
+		m_lpGPU->enqueueWriteBuffer(inMemDisplacements, szVertexBuffer, &homogenousDisplacements[0]);
+
+		//Vertices
+		cl_mem outMemMeshVertices = m_lpGPU->createMemBufferFromGL(m_vboVertex, ComputeDevice::memWriteOnly);
+		m_lpGPU->enqueueAcquireGLObject(1, &outMemMeshVertices);
+
+
+		//		__kernel void ApplyVertexDeformations(U32 ctVertices,
+		//											  __global float4* arrInRestPos,
+		//											  __global float4* arrInDeformation,
+		//											  __global float4* arrOutMeshVertex)
+		m_lpKernelApplyDeformations->setArg(0, sizeof(U32), (void *)&m_ctVertices);
+		m_lpKernelApplyDeformations->setArg(1, sizeof(cl_mem), &m_inoutMemRestPos);
+		m_lpKernelApplyDeformations->setArg(2, sizeof(cl_mem), &inMemDisplacements);
+		m_lpKernelApplyDeformations->setArg(3, sizeof(cl_mem), &outMemMeshVertices);
+
+		m_lpGPU->enqueueNDRangeKernel(m_lpKernelApplyDeformations, 1, arrGlobalIndex, arrLocalIndex);
+		m_lpGPU->finishAllCommands();
+
+		m_lpGPU->enqueueReleaseGLObject(1, &outMemMeshVertices);
+
+
+		//Release all mem objects
+		clReleaseMemObject(inMemDisplacements);
+		clReleaseMemObject(outMemMeshVertices);
+
+
+		return true;
 	}
 
 	//Export VEGA

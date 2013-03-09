@@ -617,6 +617,22 @@ bool ComputeDevice::enqueueReadBuffer(cl_mem srcMem, U32 size, void* lpDest)
     return true;
 }
 
+bool ComputeDevice::enqueueCopyBuffer(cl_mem srcMem, cl_mem dstMem,
+										   U32 src_offset, U32 dst_offset,
+										   U32 bufferSize) {
+
+	cl_int err = clEnqueueCopyBuffer(m_clCommandQueue,
+										srcMem, dstMem,	src_offset, dst_offset,
+										bufferSize, 0, NULL, NULL);
+	if(err != CL_SUCCESS) {
+		LogErrorArg1("Failed to copy buffer from source to destination. Ocl Error: %s", oclErrorString(err));
+		return false;
+	}
+
+	return true;
+}
+
+
 void ComputeDevice::finishAllCommands()
 {
 	clFinish(m_clCommandQueue);

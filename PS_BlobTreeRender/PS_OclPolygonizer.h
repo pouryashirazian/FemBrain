@@ -110,10 +110,6 @@ public:
 
 	void testScan();
 
-	/*!
-	 * Run the algorithm in tandem
-	 */
-	int runTandem(float cellsize = DEFAULT_CELL_SIZE);
 
 	//Multi-Pass polygonization
 	int runMultiPass(float cellsize = DEFAULT_CELL_SIZE, bool outputTetMesh = true);
@@ -121,6 +117,17 @@ public:
 	//Draws the mesh using accelerated memory buffer objects
 	void drawBBox();
 
+	//Read-back Mesh
+	bool readBackMesh(U32& ctVertices, vector<float>& vertices,
+						U32& ctFaceElements, vector<U32>& elements);
+
+	/*!
+	 * Applies computed displacements from FEM Integrator on the polygonized mesh vertices
+	 * @dof degrees of freedom in displacements
+	 * @displacement vertex displacements
+	 * @return true if displacements applied successfully.
+	 */
+	bool applyFemDisplacements(U32 dof, double* displacements);
 private:
 	struct NODE {
 		U32 index;
@@ -141,6 +148,10 @@ private:
 	 */
 	int init();
 
+	/*!
+	 * Run the algorithm in tandem
+	 */
+	int runTandem(float cellsize = DEFAULT_CELL_SIZE);
 
 	//Polygonizer Passes
 	int computeAllFields(float cellsize);
@@ -153,7 +164,6 @@ private:
 	int computeTetMeshCellsInsideOrCrossed();
 	int computeTetMeshVertices(U32 ctVertices);
 	int computeTetMeshElements(U32 ctElements);
-
 
 
 	bool storeTetMeshInVegaFormat(const char* chrFilePath);
@@ -212,6 +222,9 @@ private:
 	ComputeKernel* m_lpKernelTetMeshCountCells;
 	ComputeKernel* m_lpKernelTetMeshElements;
 
+	//Finite Element
+	ComputeKernel* m_lpKernelApplyDeformations;
+
 
 	//Reusable vars
 	cl_mem m_inMemVertexCountTable;
@@ -234,6 +247,10 @@ private:
 	cl_mem m_inoutMemCellConfig;
 	cl_mem m_inoutMemCellElementsCount;
 	cl_mem m_inMemCellElementsOffset;
+
+	//FEM
+	cl_mem m_inoutMemRestPos;
+
 
 	//TetMesh
 	U32 m_ctTetMeshVertices;

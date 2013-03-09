@@ -1161,6 +1161,17 @@ __kernel void ComputeEdgeTable(__global float4* arrInFields,
 	arrOutHighEdgesFlags[idxVertex] = flag; 
 }
 
+__kernel void ApplyVertexDeformations(U32 ctVertices,
+									  __global float4* arrInRestPos,
+									  __global float4* arrInDeformation,
+									  __global float4* arrOutMeshVertex) {
+	int idX = get_global_id(0);
+	if(idX >= ctVertices)
+		return;
+	
+	arrOutMeshVertex[idX] = arrInRestPos[idX] + arrInDeformation[idX];
+}
+
 //Compute Vertex Attribs
 __kernel void ComputeVertexAttribs(__global float4* arrInHeader4,
 								   __global float4* arrInOps4,										 

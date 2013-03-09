@@ -27,6 +27,11 @@
 using namespace std;
 using namespace PS::MATH;
 
+
+//ApplyDeformations
+typedef void (*FOnApplyDeformations)(U32 dof, double* displacements);
+
+
 /*!
  *	Deformable model
  */
@@ -102,9 +107,19 @@ public:
 	double computeVolume() const;
 	bool isVolumeChanged() const { return  !EssentiallyEquald(this->computeVolume(), m_restVolume, 0.0001);}
 
+	//Access TetMesh for stats
+	TetMesh* getTetMesh() const {return m_lpTetMesh;}
+
 	//ModelName
 	DAnsiStr getModelName() const {return m_strModelName;}
 	void setModelName(const DAnsiStr& strModelName) {m_strModelName = strModelName;}
+
+
+	//Set callbacks
+	void setDeformCallback(FOnApplyDeformations fOnDeform) {
+		m_fOnDeform = fOnDeform;
+	}
+
 
 	/*!
 	 * Return: Outputs number of dofs
@@ -128,6 +143,10 @@ private:
 	void cleanup();
 
 private:
+	//Callbacks
+	FOnApplyDeformations m_fOnDeform;
+
+
 	AABB m_aabb;
 
 	double m_dampingStiffnessCoeff;

@@ -23,10 +23,10 @@
 #include "PS_Deformable/PS_Deformable.h"
 #include "PS_Deformable/PS_VegWriter.h"
 #include "PS_Deformable/Avatar.h"
+#include "PS_Deformable/TetGenExporter.h"
 
 #include "volumetricMeshLoader.h"
 #include "generateSurfaceMesh.h"
-
 
 
 using namespace std;
@@ -46,10 +46,12 @@ using namespace PS::HPC;
 #define INDEX_CAMERA_INFO 1
 #define INDEX_HAPTIC_INFO 2
 #define INDEX_ANIMATION_INFO 3
+#define INDEX_MESH_INFO 4
 
 
 
 enum HAPTICMODES {hmDynamic, hmSceneEdit};
+enum DRAWISOSURFACE {disNone, disWireFrame, disFull, disCount};
 
 //Application Settings
 class AppSettings{
@@ -57,11 +59,10 @@ public:
 
 	//Set to default values in constructor
 	AppSettings(){
-		this->bDrawWireFrame = false;
+		this->drawIsoSurface = disFull;
 		this->bPanCamera = false;
 		this->bDrawTetMesh = true;
 		this->bDrawAffineWidgets = true;
-		this->bDrawIsoSurface = true;
 		this->bLogSql = true;
 		this->idxCollisionFace = -1;
 		this->timerInterval = DEFAULT_TIMER_MILLIS;
@@ -74,9 +75,9 @@ public:
 	}
 
 public:
+	int  drawIsoSurface;
+
 	bool bPanCamera;
-	bool bDrawWireFrame;
-	bool bDrawIsoSurface;
 	bool bDrawTetMesh;
 	bool bDrawAffineWidgets;
 	bool bLogSql;
@@ -137,6 +138,7 @@ void MouseMove(int x, int y);
 void MousePassiveMove(int x, int y);
 void MouseWheel(int button, int dir, int x, int y);
 
+void ApplyDeformations(U32 dof, double* displacements);
 
 void NormalKey(unsigned char key, int x, int y);
 void SpecialKey(int key, int x, int y);
@@ -188,9 +190,9 @@ void Draw()
 		g_lpDeformable->draw();
 
 	//Draw Polygonizer output
-	if(g_lpBlobRender && g_appSettings.bDrawIsoSurface)
+	if(g_lpBlobRender && (g_appSettings.drawIsoSurface != disNone))
 	{
-		g_lpBlobRender->setWireFrameMode(g_appSettings.bDrawWireFrame);
+		g_lpBlobRender->setWireFrameMode(g_appSettings.drawIsoSurface == disWireFrame);
 		g_lpBlobRender->drawBBox();
 		glEnable(GL_LIGHTING);
 			g_lpBlobRender->draw();
@@ -249,7 +251,7 @@ void Draw()
 		glPopMatrix();
 	}
 
-	//Write Camera Info
+	//Write Info
 	{
 		char chrMsg[1024];
 		sprintf(chrMsg,"Camera [Roll=%.1f, Tilt=%.1f, PanX=%.2f, PanY=%.2f]",
@@ -261,6 +263,16 @@ void Draw()
 
 		sprintf(chrMsg, "ANIMATION FRAME# %08llu, LOGS# %08llu, ", g_appSettings.ctAnimFrame, g_appSettings.ctLogsCollected);
 		g_infoLines[INDEX_ANIMATION_INFO] = string(chrMsg);
+
+		if(g_lpBlobRender && g_lpDeformable) {
+			sprintf(chrMsg, "MESH CELLSIZE:%.3f, ISOSURF: V# %d, TRI# %d, VOLUME: V# %d, TET# %d",
+					g_appSettings.cellsize,
+					g_lpBlobRender->countVertices(),
+					g_lpBlobRender->countFaceElements() / 3,
+					g_lpDeformable->getTetMesh()->getNumVertices(),
+					g_lpDeformable->getTetMesh()->getNumElements());
+			g_infoLines[INDEX_MESH_INFO] = string(chrMsg);
+		}
 	}
 
 	//Write Model Info
@@ -590,6 +602,12 @@ void MouseWheel(int button, int dir, int x, int y)
 	glutPostRedisplay();
 }
 
+void ApplyDeformations(U32 dof, double* displacements) {
+
+	if(g_lpBlobRender)
+		g_lpBlobRender->applyFemDisplacements(dof, displacements);
+}
+
 void Close()
 {
 	//Cleanup
@@ -734,8 +752,7 @@ void SpecialKey(int key, int x, int y)
 
 		case(GLUT_KEY_F2):
 		{
-			g_appSettings.bDrawWireFrame = !g_appSettings.bDrawWireFrame;
-			LogInfoArg1("Draw wireframe mode: %d", g_appSettings.bDrawWireFrame);
+			g_appSettings.drawIsoSurface = (g_appSettings.drawIsoSurface + 1) % disCount;
 			break;
 		}
 
@@ -809,13 +826,6 @@ void SpecialKey(int key, int x, int y)
 		case(GLUT_KEY_F9):
 		{
 			g_appSettings.bDrawAffineWidgets = !g_appSettings.bDrawAffineWidgets;
-			break;
-		}
-
-		case(GLUT_KEY_F10):
-		{
-			g_appSettings.bDrawIsoSurface = !g_appSettings.bDrawIsoSurface;
-			LogInfoArg1("Draw IsoSurface: %d", g_appSettings.bDrawIsoSurface);
 			break;
 		}
 
@@ -906,7 +916,7 @@ void LoadSettings()
 	g_infoLines.push_back(string("CAMERA"));
 	g_infoLines.push_back(string("HAPTIC"));
 	g_infoLines.push_back(string("ANIMATION"));
-
+	g_infoLines.push_back(string("MESH"));
 }
 
 void SaveSettings()
@@ -1008,10 +1018,23 @@ int main(int argc, char* argv[])
 	g_lpBlobRender->readModel(strFPModel.cptr());
 	g_lpBlobRender->runMultiPass(g_appSettings.cellsize, true);
 
+	//Read Back Polygonized Mesh
+	U32 ctVertices, ctElements;
+	vector<U32> elements;
+	vector<float> vertices;
+	g_lpBlobRender->readBackMesh(ctVertices, vertices, ctElements, elements);
+
+	//Produce Quality Tetrahedral Mesh
+	TetGenExporter tetgen;
+	tetgen.compute(ctVertices, &vertices[0], ctElements, &elements[0]);
+
+	//
+	VegWriter::WriteVegFile("barout.node");
+
 
 	//Create Deformable Model from: Triangle Mesh and Tetrahedra Mesh
-	DAnsiStr strVegFile = strFPModel + ".veg";
-	DAnsiStr strObjFile = strFPModel + ".obj";
+	DAnsiStr strVegFile = "barout.veg";
+	DAnsiStr strObjFile = "barout.obj";
 
 	//Produce special obj mesh with the same vertices and surface triangles
     VolumetricMesh * mesh = VolumetricMeshLoader::load(strVegFile.ptr());
@@ -1022,6 +1045,7 @@ int main(int argc, char* argv[])
 	g_lpDeformable = new Deformable(strVegFile.cptr(),
 									strObjFile.cptr(),
 									g_appSettings.vFixedVertices);
+	g_lpDeformable->setDeformCallback(ApplyDeformations);
 	g_lpDeformable->setHapticForceRadius(g_appSettings.hapticNeighborhoodPropagationRadius);
 
 	/*
