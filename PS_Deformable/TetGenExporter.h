@@ -1,0 +1,26 @@
+/*
+ * TetGenExporter.h
+ *
+ *  Created on: Mar 7, 2013
+ *      Author: pourya
+ */
+
+#ifndef TETGENEXPORTER_H_
+#define TETGENEXPORTER_H_
+
+#include "../PS_Base/PS_MathBase.h"
+
+class TetGenExporter {
+public:
+	TetGenExporter();
+	//TetGenExporter
+
+	virtual ~TetGenExporter();
+
+	int compute(U32 ctVertices, float* arrVertices,
+			 U32 ctFaceElements, U32* arrElements);
+
+};
+
+
+#endif /* TETGENEXPORTER_H_ */
