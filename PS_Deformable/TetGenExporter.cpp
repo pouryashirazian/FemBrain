@@ -16,8 +16,10 @@ TetGenExporter::~TetGenExporter() {
 
 }
 
-int TetGenExporter::compute(U32 ctVertices, float* arrVertices,
-								U32 ctFaceElements, U32* arrElements)
+int TetGenExporter::tesselate(U32 ctVertices, float* arrVertices,
+								  U32 ctFaceElements, U32* arrElements,
+								  const char* chrInputTitle,
+								  const char* chrOutputTitle)
 {
 	tetgenio in, out;
 	tetgenio::facet *f;
@@ -56,19 +58,20 @@ int TetGenExporter::compute(U32 ctVertices, float* arrVertices,
 	}
 
 	// Output the PLC to files 'barin.node' and 'barin.poly'.
-	in.save_nodes("barin");
-	in.save_poly("barin");
+	in.save_nodes(const_cast<char*>(chrInputTitle));
+	in.save_poly(const_cast<char*>(chrInputTitle));
 
 	// Tetrahedralize the PLC. Switches are chosen to read a PLC (p),
 	//   do quality mesh generation (q) with a specified quality bound
 	//   (1.414), and apply a maximum volume constraint (a0.1).
 
-	tetrahedralize("pq1.414a0.1", &in, &out);
+	//tetrahedralize("pq1.414a0.1", &in, &out);
+	tetrahedralize("pq", &in, &out);
 
 	// Output mesh to files 'barout.node', 'barout.ele' and 'barout.face'.
-	out.save_nodes("barout");
-	out.save_elements("barout");
-	out.save_faces("barout");
+	out.save_nodes(const_cast<char*>(chrOutputTitle));
+	out.save_elements(const_cast<char*>(chrOutputTitle));
+	out.save_faces(const_cast<char*>(chrOutputTitle));
 
 	return 1;
 }

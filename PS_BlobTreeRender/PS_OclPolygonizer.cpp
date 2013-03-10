@@ -179,6 +179,9 @@ namespace HPC{
 				m_arrOps[i * DATASIZE_OPERATOR + OFFSET_OP_AABB_HI + 3] = 1.0f;
 			}
 		}
+		else {
+			m_arrOps[OFFSET_OP_NEXT] = NULL_BLOB;
+		}
 
 		//Set Traversal Route
 		if(!setTraversalRoute())

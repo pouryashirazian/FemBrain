@@ -859,7 +859,7 @@ void TimeStep(int t)
 			g_lpDeformable->statFillRecord(rec);
 			TheDataBaseLogger::Instance().append(rec);
 			g_appSettings.ctAnimLogger = g_appSettings.ctAnimFrame;
-			g_appSettings.ctLogsCollected = g_appSettings.ctLogsCollected + 1;
+			g_appSettings.ctLogsCollected ++;
 		}
 	}
 
@@ -1008,10 +1008,10 @@ int main(int argc, char* argv[])
 	LoadSettings();
 
 	DAnsiStr strFPModel = ExtractFilePath(GetExePath());
-	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/sphere.txt";
+	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/sphere.txt";
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/testDisc3.scene";
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/CylinderWithHoles.scene";
-	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/peanut.scene";
+	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/peanut.scene";
 
 	//Process BlobTree, Produce TetMesh
 	g_lpBlobRender = new GPUPoly();
@@ -1025,26 +1025,30 @@ int main(int argc, char* argv[])
 	g_lpBlobRender->readBackMesh(ctVertices, vertices, ctElements, elements);
 
 	//Produce Quality Tetrahedral Mesh
-	TetGenExporter tetgen;
-	tetgen.compute(ctVertices, &vertices[0], ctElements, &elements[0]);
+	TetGenExporter::tesselate(ctVertices, &vertices[0], ctElements, &elements[0], "IsoSurfMeshIn", "TetMeshOut");
 
-	//
-	VegWriter::WriteVegFile("barout.node");
+	//Export a veg file for the Fem Engine
+	VegWriter::WriteVegFile("TetMeshOut.node");
 
 
 	//Create Deformable Model from: Triangle Mesh and Tetrahedra Mesh
-	DAnsiStr strVegFile = "barout.veg";
-	DAnsiStr strObjFile = "barout.obj";
+	DAnsiStr strVegFile = "TetMeshOut.veg";
+	DAnsiStr strObjFile = "TetMeshOut.obj";
 
+	//TODO: Obj mesh can be skipped and instead the polygonized mesh used.
+	//Obj mesh is useful though for viewing the boundary tetrahedra produced by tetgen
 	//Produce special obj mesh with the same vertices and surface triangles
     VolumetricMesh * mesh = VolumetricMeshLoader::load(strVegFile.ptr());
 	GenerateSurfaceMesh generateSurfaceMesh;
 	ObjMesh * objMesh = generateSurfaceMesh.ComputeMesh(mesh, true);
 	objMesh->save(string(strObjFile.cptr()));
 
+	//Setup Deformable object
 	g_lpDeformable = new Deformable(strVegFile.cptr(),
 									strObjFile.cptr(),
 									g_appSettings.vFixedVertices);
+
+	//Deformations will be applied using opencl kernel
 	g_lpDeformable->setDeformCallback(ApplyDeformations);
 	g_lpDeformable->setHapticForceRadius(g_appSettings.hapticNeighborhoodPropagationRadius);
 
@@ -1065,10 +1069,8 @@ int main(int argc, char* argv[])
    // g_lpSurface->saveAsPPM("/home/pourya/Desktop/110.ppm");
 
 
-
+	//Draw the first time
 	glutPostRedisplay();
-
-	
 
 	//Run App
 	glutMainLoop();

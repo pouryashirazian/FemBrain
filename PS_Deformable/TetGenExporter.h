@@ -17,8 +17,11 @@ public:
 
 	virtual ~TetGenExporter();
 
-	int compute(U32 ctVertices, float* arrVertices,
-			 U32 ctFaceElements, U32* arrElements);
+	static int tesselate(U32 ctVertices, float* arrVertices,
+						    U32 ctFaceElements, U32* arrElements,
+						    const char* chrInputTitle = "IsoSurfMeshIn",
+							const char* chrOutputTitle = "TetrahedraMeshOut");
+
 
 };
 
