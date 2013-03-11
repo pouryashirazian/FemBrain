@@ -610,16 +610,16 @@ void ApplyDeformations(U32 dof, double* displacements) {
 
 void Close()
 {
+	//Flush events to db and text log files
+	TheDataBaseLogger::Instance().flush();
+	PS::TheEventLogger::Instance().flush();
+
 	//Cleanup
 	cout << "Cleanup Memory objects" << endl;
 	SAFE_DELETE(g_lpSurface);
 	SAFE_DELETE(g_lpBlobRender);
 	SAFE_DELETE(g_lpDeformable);
 	SAFE_DELETE(g_lpAvatarCube);
-
-
-	PS::TheEventLogger::Instance().flush();
-	TheDataBaseLogger::Instance().flush();
 }
 
 string QueryOGL(GLenum name)

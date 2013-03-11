@@ -1612,14 +1612,15 @@ namespace HPC{
 		m_lpKernelApplyDeformations->setArg(3, sizeof(cl_mem), &outMemMeshVertices);
 
 		m_lpGPU->enqueueNDRangeKernel(m_lpKernelApplyDeformations, 1, arrGlobalIndex, arrLocalIndex);
-		m_lpGPU->finishAllCommands();
-
 		m_lpGPU->enqueueReleaseGLObject(1, &outMemMeshVertices);
+
+		m_lpGPU->finishAllCommands();
 
 
 		//Release all mem objects
 		clReleaseMemObject(inMemDisplacements);
 		clReleaseMemObject(outMemMeshVertices);
+		homogenousDisplacements.resize(0);
 
 
 		return true;
