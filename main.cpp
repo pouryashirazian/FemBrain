@@ -61,6 +61,7 @@ public:
 	AppSettings(){
 		this->drawIsoSurface = disFull;
 		this->bPanCamera = false;
+		this->bDrawAABB = true;
 		this->bDrawTetMesh = true;
 		this->bDrawAffineWidgets = true;
 		this->bLogSql = true;
@@ -76,8 +77,8 @@ public:
 
 public:
 	int  drawIsoSurface;
-
 	bool bPanCamera;
+	bool bDrawAABB;
 	bool bDrawTetMesh;
 	bool bDrawAffineWidgets;
 	bool bLogSql;
@@ -193,7 +194,9 @@ void Draw()
 	if(g_lpBlobRender && (g_appSettings.drawIsoSurface != disNone))
 	{
 		g_lpBlobRender->setWireFrameMode(g_appSettings.drawIsoSurface == disWireFrame);
-		g_lpBlobRender->drawBBox();
+
+		if(g_appSettings.bDrawAABB)
+			g_lpBlobRender->drawBBox();
 		glEnable(GL_LIGHTING);
 			g_lpBlobRender->draw();
 		glDisable(GL_LIGHTING);
@@ -348,6 +351,22 @@ void Resize(int w, int h)
 
 void MousePress(int button, int state, int x, int y)
 {
+	// Wheel reports as button 3(scroll up) and button 4(scroll down)
+	if ((button == 3) || (button == 4)) // It's a wheel event
+	{
+		// Each wheel event reports like a button click, GLUT_DOWN then GLUT_UP
+		if (state == GLUT_UP)
+			return; // Disregard redundant GLUT_UP events
+
+		if(button == 3)
+			g_arcBallCam.setZoom(g_arcBallCam.getZoom() - 0.5);
+		else
+			g_arcBallCam.setZoom(g_arcBallCam.getZoom() + 0.5);
+
+		return;
+	}
+
+
 	g_appSettings.screenDragStart = vec2i(x, y);
 	g_appSettings.screenDragEnd = vec2i(x, y);
 
@@ -753,14 +772,14 @@ void SpecialKey(int key, int x, int y)
 		case(GLUT_KEY_F2):
 		{
 			g_appSettings.drawIsoSurface = (g_appSettings.drawIsoSurface + 1) % disCount;
+			LogInfoArg1("Draw isosurf mode: %d", g_appSettings.drawIsoSurface);
 			break;
 		}
 
 		case(GLUT_KEY_F3):
 		{
-			LogInfo("Re-Polygonize Model");
-			g_lpBlobRender->runMultiPass(g_appSettings.cellsize);
-			glutPostRedisplay();
+			g_appSettings.bDrawAABB = !g_appSettings.bDrawAABB;
+			LogInfoArg1("Draw the AABB: %d", g_appSettings.bDrawAABB);
 			break;
 		}
 

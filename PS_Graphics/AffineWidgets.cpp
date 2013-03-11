@@ -400,7 +400,7 @@ void TranslateWidget::createWidget() {
 	glLineWidth(3.0f);
 	glBegin(GL_LINES);
 		glColor4fv(maskColor(uiaX).ptr());
-		glVertex4fv(origin.ptr());
+		glVertex3fv(origin.ptr());
 		glVertex3fv(ptEnd[0].ptr());
 
 		glColor4fv(maskColor(uiaY).ptr());
