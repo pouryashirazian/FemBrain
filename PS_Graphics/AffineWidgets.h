@@ -75,7 +75,6 @@ public:
     virtual ~RotationWidget();
 
 
-
     void draw();
     void createWidget();
 

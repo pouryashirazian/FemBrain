@@ -19,6 +19,8 @@
 #include "PS_Graphics/AffineWidgets.h"
 #include "PS_Graphics/PS_Vector.h"
 #include "PS_Graphics/OclRayTracer.h"
+#include "PS_Graphics/GroundMartrix.h"
+#include "PS_Graphics/SceneBox.h"
 
 #include "PS_Deformable/PS_Deformable.h"
 #include "PS_Deformable/PS_VegWriter.h"
@@ -116,6 +118,9 @@ std::map<int, vec3d> g_hashVertices;
 //Global Variables
 AvatarCube* g_lpAvatarCube = NULL;
 AbstractWidget*	g_lpAffineWidget = NULL;
+GroundMatrix* g_lpGroundMatrix = NULL;
+SceneBox* g_lpSceneBox = NULL;
+
 PS::ArcBallCamera g_arcBallCam;
 PS::HPC::GPUPoly* g_lpBlobRender = NULL;
 Deformable* g_lpDeformable = NULL;
@@ -185,6 +190,12 @@ void Draw()
 
 	//Render
 	g_arcBallCam.look();
+
+	if(g_lpSceneBox)
+		g_lpSceneBox->draw();
+
+	if(g_lpGroundMatrix)
+		g_lpGroundMatrix->draw();
 
 	//Draw Deformable Mesh
 	if(g_lpDeformable && g_appSettings.bDrawTetMesh)
@@ -639,6 +650,8 @@ void Close()
 	SAFE_DELETE(g_lpBlobRender);
 	SAFE_DELETE(g_lpDeformable);
 	SAFE_DELETE(g_lpAvatarCube);
+	SAFE_DELETE(g_lpGroundMatrix);
+	SAFE_DELETE(g_lpSceneBox);
 }
 
 string QueryOGL(GLenum name)
@@ -1025,6 +1038,10 @@ int main(int argc, char* argv[])
 
 	//Load Settings
 	LoadSettings();
+
+	//Ground and Room
+	g_lpGroundMatrix = new GroundMatrix(32, 32, 0.2);
+	g_lpSceneBox = new SceneBox();
 
 	DAnsiStr strFPModel = ExtractFilePath(GetExePath());
 	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/sphere.txt";
