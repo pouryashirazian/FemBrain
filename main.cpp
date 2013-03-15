@@ -61,11 +61,13 @@ public:
 
 	//Set to default values in constructor
 	AppSettings(){
+		this->groundLevel = 0.0f;
 		this->drawIsoSurface = disFull;
 		this->bPanCamera = false;
 		this->bDrawAABB = true;
 		this->bDrawTetMesh = true;
 		this->bDrawAffineWidgets = true;
+		this->bDrawGround = true;
 		this->bLogSql = true;
 		this->idxCollisionFace = -1;
 		this->timerInterval = DEFAULT_TIMER_MILLIS;
@@ -79,6 +81,7 @@ public:
 
 public:
 	int  drawIsoSurface;
+	bool bDrawGround;
 	bool bPanCamera;
 	bool bDrawAABB;
 	bool bDrawTetMesh;
@@ -100,11 +103,13 @@ public:
 	int hapticMode;
 
 	float cellsize;
+	float groundLevel;
 	//vec3d worldAvatarPos;
 	//vec3d worldDragStart;
 	//vec3d worldDragEnd;
 	vec2i screenDragStart;
 	vec2i screenDragEnd;
+
 
 	//Fixed Vertices
 	vector<int> vFixedVertices;
@@ -191,11 +196,24 @@ void Draw()
 	//Render
 	g_arcBallCam.look();
 
-	if(g_lpSceneBox)
+	//Draw Box
+	if(g_lpSceneBox) {
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		glDisable(GL_CULL_FACE);
 		g_lpSceneBox->draw();
 
-	if(g_lpGroundMatrix)
+		glEnable(GL_CULL_FACE);
+		glPopAttrib();
+	}
+
+	//Draw Ground Level
+	if(g_lpGroundMatrix && g_appSettings.bDrawGround) {
+		glPushMatrix();
+		glTranslatef(0.0f, g_appSettings.groundLevel, 0.0f);
 		g_lpGroundMatrix->draw();
+		glPopMatrix();
+	}
 
 	//Draw Deformable Mesh
 	if(g_lpDeformable && g_appSettings.bDrawTetMesh)
@@ -757,6 +775,11 @@ void NormalKey(unsigned char key, int x, int y)
 
 		break;
 	}
+	case('d'): {
+		g_appSettings.bDrawGround = !g_appSettings.bDrawGround;
+		glutPostRedisplay();
+		break;
+	}
 	case('['):{
 		g_arcBallCam.setZoom(g_arcBallCam.getZoom() + 0.5);
 		glutPostRedisplay();
@@ -903,7 +926,6 @@ void LoadSettings()
 	LogInfo("Loading Settings from the ini file.");
 
 	CSketchConfig cfg(ChangeFileExt(GetExePath(), ".ini"), CSketchConfig::fmRead);
-	TheUITransform::Instance().translate = cfg.readVec3f("AVATAR", "POS");
 
 	DAnsiStr strVegFile = cfg.readString("MODEL", "VEGFILE", "");
 	DAnsiStr strObjFile = cfg.readString("MODEL", "OBJFILE", "");
@@ -922,12 +944,14 @@ void LoadSettings()
 	g_lpAffineWidget->setTransform(mtx);
 
 	//System settings
+	g_appSettings.groundLevel = cfg.readInt("SYSTEM", "GROUNDLEVEL", 0.0f);
 	g_appSettings.hapticForceCoeff = cfg.readInt("SYSTEM", "FORCECOEFF", DEFAULT_FORCE_COEFF);
 	g_appSettings.bLogSql = cfg.readBool("SYSTEM", "LOGSQL", g_appSettings.bLogSql);
 	g_appSettings.cellsize = cfg.readFloat("SYSTEM", "CELLSIZE", DEFAULT_CELL_SIZE);
 	g_appSettings.hapticNeighborhoodPropagationRadius = cfg.readInt("AVATAR", "RADIUS");
 
 	//Avatar
+	TheUITransform::Instance().translate = cfg.readVec3f("AVATAR", "POS");
 	vec3f thickness = cfg.readVec3f("AVATAR", "THICKNESS");
 	vec3d thicknessd = vec3d(thickness.x, thickness.y, thickness.z);
 	g_lpAvatarCube = new AvatarCube(thicknessd * (-0.5), thicknessd * 0.5);
@@ -964,6 +988,11 @@ void SaveSettings()
 
 	//Write Cellsize
 	cfg.writeFloat("SYSTEM", "CELLSIZE", g_appSettings.cellsize);
+
+	//Avatar
+	vec3d sides = g_lpAvatarCube->upper() - g_lpAvatarCube->lower();
+	cfg.writeVec3f("AVATAR", "POS", TheUITransform::Instance().translate);
+	cfg.writeVec3f("AVATAR", "THICKNESS", vec3f(sides.x, sides.y, sides.z));
 }
 
 
@@ -1041,10 +1070,11 @@ int main(int argc, char* argv[])
 
 	//Ground and Room
 	g_lpGroundMatrix = new GroundMatrix(32, 32, 0.2);
-	g_lpSceneBox = new SceneBox();
+	g_lpSceneBox = new SceneBox(vec3f(-10,-10,-16), vec3f(10,10,16));
+	g_lpSceneBox->setShaderEffectProgram(g_uiShader);
 
 	DAnsiStr strFPModel = ExtractFilePath(GetExePath());
-	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/sphere.txt";
+	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/disk.scene";
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/testDisc3.scene";
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/CylinderWithHoles.scene";
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/peanut.scene";

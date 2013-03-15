@@ -991,6 +991,12 @@ namespace HPC{
 			SAFE_DELETE(lpEdgeTableOffsets);
 		}
 
+		//If the search for iso-surface didn't return any points!
+		if(m_ctVertices == 0) {
+			LogError("No edges intersected with the surface!");
+			return -1;
+		}
+
 		//4. Compute VertexAttribs
 		computeVertexAttribs(m_ctVertices);
 

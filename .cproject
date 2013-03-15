@@ -117,7 +117,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/AA_VegaFem/include}&quot;"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.other.other.187829704" name="Other flags" superClass="gnu.cpp.compiler.option.other.other" value="-c -fmessage-length=0 -march=corei7-avx -mtune=corei7-avx" valueType="string"/>
-								<option id="gnu.cpp.compiler.option.preprocessor.def.107137020" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">
+								<option id="gnu.cpp.compiler.option.preprocessor.def.107137020" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="TETLIBRARY"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1756364624" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
