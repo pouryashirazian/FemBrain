@@ -1027,7 +1027,7 @@ int main(int argc, char* argv[])
 
 	//Setup Shading Environment
 	static const GLfloat lightColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-	static const GLfloat lightPos[4] = { 5.0f, 5.0f, 10.0f, 0.0f };
+	static const GLfloat lightPos[4] = { 0.0f, 9.0f, 0.0f, 1.0f };
 
 	//Setup Light0 Position and Color
 	glLightfv(GL_LIGHT0, GL_AMBIENT, lightColor);
@@ -1074,7 +1074,7 @@ int main(int argc, char* argv[])
 	g_lpSceneBox->setShaderEffectProgram(g_uiShader);
 
 	DAnsiStr strFPModel = ExtractFilePath(GetExePath());
-	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/disk.scene";
+	strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/flatdisk.scene";
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/testDisc3.scene";
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/CylinderWithHoles.scene";
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/peanut.scene";
