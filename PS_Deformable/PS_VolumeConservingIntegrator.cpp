@@ -190,6 +190,7 @@ int VolumeConservingIntegrator::DoTimestep() {
 		char solverString[16] = "PARDISO";
 #endif
 
+		//Profile finds this function as a hotspot
 #ifdef PCG
 		int info =
 				jacobiPreconditionedCGSolver->SolveLinearSystemWithJacobiPreconditioner(

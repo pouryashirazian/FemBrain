@@ -8,3 +8,6 @@ To Create mesh using blender:
 Just pass the .node file and it will find the .ele file by itself and produces the mesh.
 
 4. Screencast: ffmpeg -f x11grab -r 25 -s 1280x800 -i :0.0 -sameq Desktop/out.mp4
+
+
+FOR AVX include this flags: -march=corei7-avx -mtune=corei7-avx

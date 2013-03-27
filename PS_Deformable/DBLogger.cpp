@@ -6,7 +6,7 @@
  */
 
 #include "DBLogger.h"
-#include "../AA_Sqlite/sqlite3.h"
+
 #include "../AA_Sqlite/CppSQLite3.h"
 #include "../PS_Base/PS_Logger.h"
 #include "../PS_Base/PS_FileDirectory.h"
@@ -14,12 +14,23 @@
 using namespace PS;
 using namespace PS::FILESTRINGUTILS;
 
+//Global result to notify caller of the result of running the task
+tbb::concurrent_queue<TaskLogInsertResult> g_resultQ;
+
+//Callback handler for insertion operation
+void insertionCompleted() {
+	TaskLogInsertResult result;
+	g_resultQ.try_pop(result);
+	LogInfoArg1("Insertion task completed! Written records: %d\n", result.ctWrittenRecords);
+}
+
 DBLogger::DBLogger()
 {
 	DAnsiStr strFP = ExtractFilePath(GetExePath()) + "fembrain_logs.db";
 	m_strDB = string(strFP.c_str());
 
 	this->createTable();
+	m_lastXPID = getLastXPID();
 }
 
 DBLogger::~DBLogger()
@@ -177,6 +188,17 @@ bool DBLogger::createTable()
 	return true;
 }
 
+void DBLogger::flush()
+{
+//	for(U32 i=0; i<m_vRecords.size(); i++)
+//		this->insert(m_vRecords[i]);
+//	m_vRecords.resize(0);
+	DBInsertionTask* t = new( tbb::task::allocate_root()) DBInsertionTask(m_strDB, m_vRecords, insertionCompleted);
+	tbb::task::enqueue(*t);
+
+	m_vRecords.resize(0);
+}
+
 
 string DBLogger::timestamp()
 {
@@ -190,4 +212,125 @@ string DBLogger::timestamp()
 		strftime(chrTimeStamp, TIME_STRING_LENGTH, "%Y-%m-%d %H:%M:%S", currentTime);
 	}
 	return string(chrTimeStamp);
+}
+////////////////////////////////////////////////////////////////////////////////////////
+DBInsertionTask::DBInsertionTask(const string& strDB,
+		  const std::vector<DBLogger::Record>& vRecords,
+		  FOnInsertionCompleted fOnCompleted) {
+
+	m_strDB = strDB;
+	m_vRecords.assign(vRecords.begin(), vRecords.end());
+	m_fOnCompleted = fOnCompleted;
+}
+
+
+/*!
+ * Perform all record insertions
+ */
+tbb::task* DBInsertionTask::execute() {
+
+	TaskLogInsertResult result;
+	result.ctWrittenRecords = 0;
+
+	//Open DB
+	//printf("DBPATH: %s\n", m_strDB.c_str());
+
+	sqlite3* lpDB = NULL;
+	int rc = sqlite3_open(m_strDB.c_str(), &lpDB);
+	if(rc)
+	{
+		printf("Can't open database: %s", sqlite3_errmsg(lpDB));
+		sqlite3_close(lpDB);
+		lpDB = NULL;
+	}
+
+	if(!lpDB) {
+		g_resultQ.push(result);
+		return NULL;
+	}
+
+	int ctInserted = 0;
+
+	//Insert all records to db
+	for(int i=0; i<m_vRecords.size(); i++) {
+		if(insertRecord(lpDB, m_vRecords[i]))
+			ctInserted++;
+	}
+
+	//Close DB
+	sqlite3_close(lpDB);
+
+	//Inform GUI Thread
+	result.ctWrittenRecords = ctInserted;
+	g_resultQ.push(result);
+	if(m_fOnCompleted)
+		m_fOnCompleted();
+
+	return NULL;
+}
+
+bool DBInsertionTask::insertRecord(sqlite3* lpDB,
+		const DBLogger::Record& record) {
+
+	printf("WRITING: %s\n", record.xpTime.c_str());
+	char* lpSqlError = 0;
+	const char *strSQL =
+			"INSERT INTO tblPerfLog (xpID, xpModelName, xpTime, xpForceModel, xpIntegrator, totalVolume, restVolume, ctVertices, ctElements, elementType, poissonRatio, youngModulo) values"
+					"(@xp_id, @xp_model_name, @xp_time, @xp_force_model, @xp_integrator, @total_volume, @rest_volume, @ct_vertices, @ct_elements, @element_type, @poisson_ratio, @young_modulo);";
+	sqlite3_stmt* statement;
+	sqlite3_prepare_v2(lpDB, strSQL, -1, &statement, NULL);
+
+	int idxParam = sqlite3_bind_parameter_index(statement, "@xp_id");
+	sqlite3_bind_int(statement, idxParam, record.xpID);
+
+	//Bind All Parameters for Insert Statement
+	idxParam = sqlite3_bind_parameter_index(statement, "@xp_model_name");
+	sqlite3_bind_text(statement, idxParam, record.xpModelName.c_str(), -1,
+			SQLITE_TRANSIENT );
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@xp_time");
+	sqlite3_bind_text(statement, idxParam, record.xpTime.c_str(), -1,
+			SQLITE_TRANSIENT );
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@xp_force_model");
+	sqlite3_bind_text(statement, idxParam, record.xpForceModel.c_str(), -1,
+			SQLITE_TRANSIENT );
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@xp_integrator");
+	sqlite3_bind_text(statement, idxParam, record.xpIntegrator.c_str(), -1,
+			SQLITE_TRANSIENT );
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@total_volume");
+	sqlite3_bind_double(statement, idxParam, record.totalVolume);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@rest_volume");
+	sqlite3_bind_double(statement, idxParam, record.restVolume);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@ct_vertices");
+	sqlite3_bind_int(statement, idxParam, record.ctVertices);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@ct_elements");
+	sqlite3_bind_int(statement, idxParam, record.ctElements);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@element_type");
+	sqlite3_bind_text(statement, idxParam, record.xpElementType.c_str(), -1,
+			SQLITE_TRANSIENT );
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@poisson_ratio");
+	sqlite3_bind_double(statement, idxParam, record.poissonRatio);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@young_modulo");
+	sqlite3_bind_double(statement, idxParam, record.youngModulo);
+
+	int rc = sqlite3_step(statement);
+	if (rc != SQLITE_DONE) {
+		printf("SQL error: %s", sqlite3_errmsg(lpDB));
+		sqlite3_free(lpSqlError);
+		return false;
+	}
+
+	//Free Statement
+	sqlite3_finalize(statement);
+
+	return true;
 }

@@ -7,6 +7,8 @@
 #include <fstream>
 #include <map>
 
+#include <tbb/task_scheduler_init.h>
+
 
 #include "PS_Base/PS_MathBase.h"
 #include "PS_Base/PS_Logger.h"
@@ -1061,6 +1063,9 @@ int main(int argc, char* argv[])
 		fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
 		exit(1);
 	}
+
+	//Init Task Schedular
+	tbb::task_scheduler_init init(task_scheduler_init::default_num_threads());
 
 	//Build Shaders for drawing the mesh
 	CompileShaderCode(g_lpVertexShaderCode, g_lpFragShaderCode, g_uiShader);
