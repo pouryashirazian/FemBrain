@@ -68,6 +68,7 @@ public:
 	void setWireFrameMode(bool bSet) { m_bWireFrame = bSet;}
 
 	U32 countVertices() const {return m_ctVertices;}
+	U32 countTriangles() const {return m_ctFaceElements/3;}
 	U32 countFaceElements() const {return m_ctFaceElements;}
 	int getFaceMode() const {return m_faceMode;}
 

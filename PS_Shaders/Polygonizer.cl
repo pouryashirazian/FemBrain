@@ -1,5 +1,9 @@
 //OpenCL BlobTree Polygonizer: Pourya Shirazian
 
+
+//Enabling Newton-Raphson will take forever to compile cl file 
+//#define USE_NEWTONRAPHSON
+
 //DATASIZES
 #define DATASIZE_HEADER		12
 #define DATASIZE_OPERATOR	16
@@ -63,6 +67,7 @@
 //Constants
 #define ISO_VALUE 0.5f
 #define NORMAL_DELTA 0.0001f
+#define FIELD_VALUE_EPSILON 0.001f
 
 #define ZERO4 {0.0f, 0.0f, 0.0f, 0.0f}
 #define AXISX {1.0f, 0.0f, 0.0f, 0.0f}
@@ -1047,6 +1052,7 @@ float ComputeFieldAndColor(float4 v,
 /*!
  * Compute Normal
  */
+/*
 float3 ComputeNormal(float4 v,
 		   __global float4* arrHeader4, 
 		   __global float4* arrOps4,
@@ -1068,6 +1074,90 @@ float3 ComputeNormal(float4 v,
 	n = normalize(n);
 	//printf("Prenormalized N= [%.2f, %.2f, %.2f, %.2f] \n", n.x, n.y, n.z, n.w); 
 	return n;
+}
+*/
+
+/*!
+ * Compute Gradient and FieldValue, Uses 4 evals
+ */
+float3 ComputeGradientAndField(float4 v,
+							   float* outField,
+							   __global float4* arrHeader4, 
+							   __global float4* arrOps4,
+							   __global float4* arrPrims4,
+							   __global float4* arrMtxNodes4)
+{
+	const float deltaInv = 1.0f / NORMAL_DELTA;	
+	*outField = ComputeField(v, arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);	
+	float3 grad;
+	grad.x = ComputeField(v + (float4)(NORMAL_DELTA,0,0,0), arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);
+	grad.y = ComputeField(v + (float4)(0, NORMAL_DELTA, 0, 0), arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);
+	grad.z = ComputeField(v + (float4)(0, 0, NORMAL_DELTA, 0), arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);
+
+	grad = deltaInv * (grad - (float3)(*outField, *outField, *outField)); 
+	return grad;
+}
+
+
+/*!
+ * Compute Gradient and FieldValue, Uses 4 evals
+ */
+float4 ComputeGradientWithPrevField(float4 v,
+								   __global float4* arrHeader4, 
+								   __global float4* arrOps4,
+								   __global float4* arrPrims4,
+								   __global float4* arrMtxNodes4)
+{
+	float inField = v.w;
+	v.w = 1.0f;
+	
+	float4 grad;
+	grad.x = ComputeField(v + (float4)(NORMAL_DELTA,0,0,0), arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);
+	grad.y = ComputeField(v + (float4)(0, NORMAL_DELTA, 0, 0), arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);
+	grad.z = ComputeField(v + (float4)(0, 0, NORMAL_DELTA, 0), arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);
+	grad.w = 0;
+
+	grad = (1.0f / NORMAL_DELTA) * (grad - (float4)(inField, inField, inField, 0)); 
+	return grad;
+}
+
+/*!
+ * Computes the root using shrink-wrap method and the root marching 
+ * Algorithm.
+ */
+float4 ComputeRootNewtonRaphson(float4 a, float4 b, 
+								__global float4* arrInHeader4,
+								__global float4* arrInOps4,										 
+								__global float4* arrInPrims4,											 
+								__global float4* arrInMtxNodes4) {
+	
+	//Number of iterations to get to the root is 8	
+	float4 x;
+	float4 grad;
+	
+	if(isless(fabs(a.w - ISO_VALUE), fabs(b.w - ISO_VALUE))) {
+		x = a;
+	}
+	else {
+		x = b;
+	}
+
+	//March toward the iso-surface
+	for(int i=0; i<8; i++)
+	{
+		grad = ComputeGradientWithPrevField(x, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+		
+		//Uses shrink-wrap method to converge to surface
+		x += ((ISO_VALUE - x.w) * grad) / dot(grad, grad);
+		
+		//Compute field for the displaced vertex. x.w will be set to 1 in ComputeField to be in homogenous
+		x.w = ComputeField(x, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+		
+		if(isless(fabs(x.w - ISO_VALUE), FIELD_VALUE_EPSILON))
+			break;
+	}
+
+	return x;
 }
 
 
@@ -1201,11 +1291,8 @@ __kernel void ComputeVertexAttribs(__global float4* arrInHeader4,
 		return;
 
 	float4 va = arrInFields[idxVertex];
-	float fa = va.w;
-	float fb;
-	va.w = 0;
-	
 	float4 vb;
+
 	U8 flag = arrInHighEdgesFlags[idxVertex];
 	U32 idxVertexNbor = 0;
 	U32 idxStore = arrInHighEdgesOffset[idxVertex];
@@ -1216,18 +1303,19 @@ __kernel void ComputeVertexAttribs(__global float4* arrInHeader4,
 	{
 		idxVertexNbor = idZ * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + idY * inGridParam->ctGridPoints[0] + (idX+1);
 		vb = arrInFields[idxVertexNbor];
-		fb = vb.w;
-		vb.w = 0;
 
-		//Compute Scale
-		float scale = (ISO_VALUE - fa)/(fb - fa);
-
-		//Use Linear Interpolation for now. Upgrade to Newton-Raphson (Gradient Marching)
-		float4 v = va + scale * (vb - va);
-
-		//Compute Normal
-		float3 n = ComputeNormal(v, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
-
+		//Compute Root vertex and normal
+#ifdef USE_NEWTONRAPHSON				
+		float4 v = ComputeRootNewtonRaphson(va, vb, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+		float4 n = ComputeGradientWithPrevField(v, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+		n = normalize(-1 * n);
+#else
+		float field;
+		float4 v = va + ((ISO_VALUE - va.w)/(vb.w - va.w)) * (vb - va);
+		float3 n = ComputeGradientAndField(v, &field, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+		n = normalize(-1 * n);
+#endif
+	
 		//Compute Field and Color
 		float4 color;
 		ComputeFieldAndColor(v, &color, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
@@ -1248,17 +1336,18 @@ __kernel void ComputeVertexAttribs(__global float4* arrInHeader4,
 	{
 		idxVertexNbor = idZ * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + (idY+1) * inGridParam->ctGridPoints[0] + idX;
 		vb = arrInFields[idxVertexNbor];
-		fb = vb.w;
-		vb.w = 0;
 
-		//Compute Scale
-		float scale = (ISO_VALUE - fa)/(fb - fa);
-
-		//Use Linear Interpolation for now. Upgrade to Newton-Raphson (Gradient Marching)
-		float4 v = va + scale * (vb - va);
-
-		//Compute Normal
-		float3 n = ComputeNormal(v, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+		//Compute Root vertex and normal
+#ifdef USE_NEWTONRAPHSON		
+		float4 v = ComputeRootNewtonRaphson(va, vb, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+		float4 n = ComputeGradientWithPrevField(v, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+		n = normalize(-1 * n);
+#else
+		float field;
+		float4 v = va + ((ISO_VALUE - va.w)/(vb.w - va.w)) * (vb - va);
+		float3 n = ComputeGradientAndField(v, &field, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+		n = normalize(-1 * n);
+#endif
 
 		//Compute Field and Color
 		float4 color;
@@ -1280,17 +1369,18 @@ __kernel void ComputeVertexAttribs(__global float4* arrInHeader4,
 	{
 		idxVertexNbor = (idZ+1) * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + idY * inGridParam->ctGridPoints[0] + idX;
 		vb = arrInFields[idxVertexNbor];
-		fb = vb.w;
-		vb.w = 0;
 
-		//Compute Scale
-		float scale = (ISO_VALUE - fa)/(fb - fa);
-
-		//Use Linear Interpolation for now. Upgrade to Newton-Raphson (Gradient Marching)
-		float4 v = va + scale * (vb - va);
-
-		//Compute Normal
-		float3 n = ComputeNormal(v, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+		//Compute Root vertex and normal
+#ifdef USE_NEWTONRAPHSON		
+		float4 v = ComputeRootNewtonRaphson(va, vb, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+		float4 n = ComputeGradientWithPrevField(v, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+		n = normalize(-1 * n);
+#else
+		float field;
+		float4 v = va + ((ISO_VALUE - va.w)/(vb.w - va.w)) * (vb - va);
+		float3 n = ComputeGradientAndField(v, &field, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+		n = normalize(-1 * n);
+#endif
 
 		//Compute Field and Color
 		float4 color;
@@ -1415,142 +1505,6 @@ __kernel void ComputeElements(__global U32* arrInHighEdgesOffset,
 		arrOutElements[idxStore + i] = arrInHighEdgesOffset[idxCorners[idxEdgeStart]] + incr[idxEdgeAxis]; 
 	}
 }
-
-//Tetrahedralization
-//If the cell config is non-zero then it will be exploded to 6 tets
-__kernel void TetMeshCells(__global U8* arrInCellConfig,
-						    __constant struct CellParam* inCellParam,
-						    __constant struct GridParam* inGridParam,
-						    __global U32* arrOutIncludedCells,
-						    __global U32* arrOutIncludedVertices) {
-	
-	int idX = get_global_id(0);
-	int idY = get_global_id(1);
-	int idZ = get_global_id(2);
-	if((idX >= inCellParam->ctNeededCells[0])||(idY >= inCellParam->ctNeededCells[1])||(idZ >= inCellParam->ctNeededCells[2]))
-		return;
-	U32 idxCell = idZ * (inCellParam->ctNeededCells[0] * inCellParam->ctNeededCells[1]) + idY * inCellParam->ctNeededCells[0] + idX;
-	if(idxCell >= inCellParam->ctTotalCells)
-		return;
-	
-	//In the cell is inside or crossing the surface then count it
-	arrOutIncludedCells[idxCell] = (arrInCellConfig[idxCell] != 0);
-	
-	if(arrOutIncludedCells[idxCell]) {
-		U32 dx = inGridParam->ctGridPoints[0];	
-		U32 dxdy = inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1];
-		
-		//Compute Configuration index
-	    arrOutIncludedVertices[idZ * dxdy + idY * dx + idX] = 1;
-	    arrOutIncludedVertices[(idZ+1) * dxdy + idY * dx + idX] = 1;
-	    arrOutIncludedVertices[idZ * dxdy + (idY+1) * dx + idX] = 1;
-	    arrOutIncludedVertices[(idZ+1) * dxdy + (idY+1) * dx + idX] = 1;
-	    arrOutIncludedVertices[idZ * dxdy + idY * dx + idX + 1] = 1;
-	    arrOutIncludedVertices[(idZ+1) * dxdy + idY * dx + idX + 1] = 1;
-	    arrOutIncludedVertices[idZ * dxdy + (idY+1) * dx + idX + 1] = 1;
-	    arrOutIncludedVertices[(idZ+1) * dxdy + (idY+1) * dx + idX + 1] = 1;
-	}
-}
-
-
-//Compute mesh vertices
-__kernel void TetMeshVertices(__global float4* arrInFields,
-							  __global U32* arrInVerticesIncluded,
-							  __global U32* arrInVerticesOffset,
-							  __constant struct GridParam* inGridParam,
-							  __global float* arrOutTetMeshVertices)
-{
-	int idX = get_global_id(0);
-	int idY = get_global_id(1);
-	int idZ = get_global_id(2);
-	if((idX >= inGridParam->ctGridPoints[0])||(idY >= inGridParam->ctGridPoints[1])||(idZ >= inGridParam->ctGridPoints[2]))
-		return;
-	U32 idxVertex = idZ * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + idY * inGridParam->ctGridPoints[0] + idX;
-	if(idxVertex >= inGridParam->ctTotalPoints)
-		return;
-		
-	//IF This vertex has no hot edges then return
-	if(arrInVerticesIncluded[idxVertex] == 0)
-		return;
-	
-	float4 v = arrInFields[idxVertex];
-	U32 idxStore = arrInVerticesOffset[idxVertex] * 3;
-	
-	arrOutTetMeshVertices[idxStore] = v.x;
-	arrOutTetMeshVertices[idxStore + 1] = v.y;
-	arrOutTetMeshVertices[idxStore + 2] = v.z;		
-}
-
-//Explode each crossing or inside cell into 6 tetrahedra
-__kernel void TetMeshElements(__global U32* arrInVerticesOffset,
-							  __global U32* arrInCellTetOffset,   	  	  	  	  	  
-							  __global U32* arrInCellsIncluded,							  
-							  __constant struct GridParam* inGridParam,
-							  __constant struct CellParam* inCellParam,
-							  __global U32* arrOutTetMeshIndices) 
-{
-	int idX = get_global_id(0);
-	int idY = get_global_id(1);
-	int idZ = get_global_id(2);
-	if((idX >= inCellParam->ctNeededCells[0])||(idY >= inCellParam->ctNeededCells[1])||(idZ >= inCellParam->ctNeededCells[2]))
-		return;
-	U32 idxCell = idZ * (inCellParam->ctNeededCells[0] * inCellParam->ctNeededCells[1]) + idY * inCellParam->ctNeededCells[0] + idX;
-	if(idxCell >= inCellParam->ctTotalCells)
-		return;
-	if(arrInCellsIncluded[idxCell] == 0)
-		return;
-
-	U32 dx = inGridParam->ctGridPoints[0];	
-	U32 dxdy = inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1];
-
-	//Where to store the indices
-    U32 offsetTet = arrInCellTetOffset[idxCell] * 24;
-	
-	//Compute Configuration index
-    U32 idxCorners[8];
-    idxCorners[0] = arrInVerticesOffset[idZ * dxdy + idY * dx + idX];
-    idxCorners[1] = arrInVerticesOffset[(idZ+1) * dxdy + idY * dx + idX];
-    idxCorners[2] = arrInVerticesOffset[idZ * dxdy + (idY+1) * dx + idX];
-    idxCorners[3] = arrInVerticesOffset[(idZ+1) * dxdy + (idY+1) * dx + idX];
-    idxCorners[4] = arrInVerticesOffset[idZ * dxdy + idY * dx + idX + 1];
-    idxCorners[5] = arrInVerticesOffset[(idZ+1) * dxdy + idY * dx + idX + 1];
-    idxCorners[6] = arrInVerticesOffset[idZ * dxdy + (idY+1) * dx + idX + 1];
-    idxCorners[7] = arrInVerticesOffset[(idZ+1) * dxdy + (idY+1) * dx + idX + 1];
-
-    
-	arrOutTetMeshIndices[offsetTet + 0] = idxCorners[LBN];
-	arrOutTetMeshIndices[offsetTet + 1] = idxCorners[LTN];
-	arrOutTetMeshIndices[offsetTet + 2] = idxCorners[RBN];
-	arrOutTetMeshIndices[offsetTet + 3] = idxCorners[LBF];
-	
-	arrOutTetMeshIndices[offsetTet + 4] = idxCorners[RTN];
-	arrOutTetMeshIndices[offsetTet + 5] = idxCorners[LTN];
-	arrOutTetMeshIndices[offsetTet + 6] = idxCorners[LBF];
-	arrOutTetMeshIndices[offsetTet + 7] = idxCorners[RBN];
-
-	arrOutTetMeshIndices[offsetTet + 8] = idxCorners[RTN];
-	arrOutTetMeshIndices[offsetTet + 9] = idxCorners[LTN];
-	arrOutTetMeshIndices[offsetTet + 10] = idxCorners[LTF];
-	arrOutTetMeshIndices[offsetTet + 11] = idxCorners[LBF];
-
-	arrOutTetMeshIndices[offsetTet + 12] = idxCorners[RTN];
-	arrOutTetMeshIndices[offsetTet + 13] = idxCorners[RBN];
-	arrOutTetMeshIndices[offsetTet + 14] = idxCorners[LBF];
-	arrOutTetMeshIndices[offsetTet + 15] = idxCorners[RBF];
-
-	arrOutTetMeshIndices[offsetTet + 16] = idxCorners[RTN];
-	arrOutTetMeshIndices[offsetTet + 17] = idxCorners[LBF];
-	arrOutTetMeshIndices[offsetTet + 18] = idxCorners[LTF];
-	arrOutTetMeshIndices[offsetTet + 19] = idxCorners[RBF];
-
-	arrOutTetMeshIndices[offsetTet + 20] = idxCorners[RTN];
-	arrOutTetMeshIndices[offsetTet + 21] = idxCorners[LTF];
-	arrOutTetMeshIndices[offsetTet + 22] = idxCorners[RTF];
-	arrOutTetMeshIndices[offsetTet + 23] = idxCorners[RBF];
-}
-
-
-
 
 
 

@@ -8,7 +8,7 @@
 #include <algorithm>
 
 #define DEFAULT_TIME_STEP 0.0333
-#define DEFAULT_FORCE_NEIGHBORHOOD_SIZE 5
+
 
 Deformable::Deformable()
 {

@@ -546,10 +546,12 @@ namespace HPC{
 		this->setShaderEffectProgram(m_uShaderEffectProgram);
 		
 		//Reading kernels for opencl
-		DAnsiStr strFP = ExtractFilePath(GetExePath());
-		strFP = ExtractOneLevelUp(strFP);
-		strFP += DAnsiStr("PS_Shaders/Polygonizer.cl");
+		DAnsiStr strCodePath = ExtractFilePath(GetExePath());
+		strCodePath = ExtractOneLevelUp(strCodePath);
 		
+		DAnsiStr strPolyFP = strCodePath + DAnsiStr("PS_Shaders/Polygonizer.cl");
+		DAnsiStr strTetFP = strCodePath + DAnsiStr("PS_Shaders/Tetrahedralizer.cl");
+
 		LogInfo("1.Setup compute device. Prefer AMD GPU.");
 		//Create a GPU Compute Device
 		m_lpGPU = new ComputeDevice(ComputeDevice::dtGPU, true, false, "AMD");
@@ -559,9 +561,9 @@ namespace HPC{
 		//Create the OCL Scan Primitive
 		//PS::HPC::Scan* lpScanner = new PS::HPC::Scan(lpGPU);
 		//lpScanner->scanExclusiveLarge()
-		LogInfo("2.Compile OpenCL program.");
-		ComputeProgram* lpProgram = m_lpGPU->tryLoadBinaryThenCompile(strFP.cptr());
-		assert(lpProgram != NULL);
+		LogInfo("2.Compile OpenCL polygonizer program.");
+		ComputeProgram* lpProgramPoly = m_lpGPU->tryLoadBinaryThenCompile(strPolyFP.cptr());
+		assert(lpProgramPoly != NULL);
 
 
 		//Build Kernel
@@ -570,35 +572,42 @@ namespace HPC{
 		//m_lpKernelComputeConfig = lpProgram->addKernel("ComputeConfig");
 		//m_lpKernelComputeMesh = lpProgram->addKernel("ComputeMesh");
 
-
 		//Polygonizer
-		m_lpKernelComputeAllFields = lpProgram->addKernel("ComputeAllFields");
+		m_lpKernelComputeAllFields = lpProgramPoly->addKernel("ComputeAllFields");
 		m_lpGPU->getKernelWorkgroupSize(m_lpKernelComputeAllFields);
 
-		m_lpKernelComputeEdgeTable = lpProgram->addKernel("ComputeEdgeTable");
+		m_lpKernelComputeEdgeTable = lpProgramPoly->addKernel("ComputeEdgeTable");
 		m_lpGPU->getKernelWorkgroupSize(m_lpKernelComputeEdgeTable);
 
-		m_lpKernelComputeVertexAttribs = lpProgram->addKernel("ComputeVertexAttribs");
+		m_lpKernelComputeVertexAttribs = lpProgramPoly->addKernel("ComputeVertexAttribs");
 		m_lpGPU->getKernelWorkgroupSize(m_lpKernelComputeVertexAttribs);
 
-		m_lpKernelComputeCellConfigs = lpProgram->addKernel("ComputeCellConfigs");
+		m_lpKernelComputeCellConfigs = lpProgramPoly->addKernel("ComputeCellConfigs");
 		m_lpGPU->getKernelWorkgroupSize(m_lpKernelComputeCellConfigs);
 
-		m_lpKernelComputeElements = lpProgram->addKernel("ComputeElements");
+		m_lpKernelComputeElements = lpProgramPoly->addKernel("ComputeElements");
 		m_lpGPU->getKernelWorkgroupSize(m_lpKernelComputeElements);
 
+		//Apply Deformations to Polygonized Mesh
+		m_lpKernelApplyDeformations = lpProgramPoly->addKernel("ApplyVertexDeformations");
+		m_lpGPU->getKernelWorkgroupSize(m_lpKernelApplyDeformations);
+
+
 		//Tetrahedralizer
-		m_lpKernelTetMeshCountCells = lpProgram->addKernel("TetMeshCells");
+		/*
+		LogInfo("3.Compile OpenCL Tetrahedralizer program");
+		ComputeProgram* lpProgramTet = m_lpGPU->tryLoadBinaryThenCompile(strTetFP.cptr());
+		assert(lpProgramTet != NULL);
+
+		m_lpKernelTetMeshCountCells = lpProgramTet->addKernel("TetMeshCells");
 		m_lpGPU->getKernelWorkgroupSize(m_lpKernelTetMeshCountCells);
 
-		m_lpKernelTetMeshVertices = lpProgram->addKernel("TetMeshVertices");
+		m_lpKernelTetMeshVertices = lpProgramTet->addKernel("TetMeshVertices");
 		m_lpGPU->getKernelWorkgroupSize(m_lpKernelTetMeshVertices);
 
-		m_lpKernelTetMeshElements = lpProgram->addKernel("TetMeshElements");
+		m_lpKernelTetMeshElements = lpProgramTet->addKernel("TetMeshElements");
 		m_lpGPU->getKernelWorkgroupSize(m_lpKernelTetMeshElements);
-
-		m_lpKernelApplyDeformations = lpProgram->addKernel("ApplyVertexDeformations");
-		m_lpGPU->getKernelWorkgroupSize(m_lpKernelApplyDeformations);
+		*/
 
 		//Init some vars
 		m_ctTetMeshVertices = m_ctTetMeshElements = 0;
@@ -962,7 +971,7 @@ namespace HPC{
 	}
 
 	//Runs a multipass High Performance Polygonizer
-	int GPUPoly::runMultiPass(float cellsize, bool outputTetMesh)
+	int GPUPoly::runPolygonizer(float cellsize, bool outputTetMesh)
 	{
 		if(DefinitelyLessThan(cellsize, 0.01, EPSILON))
 			return -1;
@@ -1021,57 +1030,6 @@ namespace HPC{
 		//7. Compute Elements
 		computeElements(m_ctFaceElements);
 
-		/////////////////////////////////////////////////////////////////////
-		// Tetrahedralization
-		if(outputTetMesh) {
-			//8. Find all cells and vertices includes in the tetmesh
-			computeTetMeshCellsInsideOrCrossed();
-
-			//SumScan to Compute Total Tetrahedra elements produced and elements offset
-			{
-				//Read-back Elements Count
-				U32* lpCellElementsOffset = new U32[m_cellParam.ctTotalCells];
-				m_lpGPU->enqueueReadBuffer(m_inoutMemCellElementsCount, sizeof(U32) * m_cellParam.ctTotalCells, lpCellElementsOffset);
-
-				//9. SumScan to read all elements, 6 Tetrahedra per each cell
-				m_ctTetMeshElements = m_lpOclSumScan->compute(lpCellElementsOffset, m_cellParam.ctTotalCells);
-				m_ctTetMeshElements *= 6;
-
-				//Write Element Offsets
-				//m_inMemCellElementsOffset = m_lpGPU->createMemBuffer(sizeof(U32) * m_cellParam.ctTotalCells, ComputeDevice::memReadOnly);
-				m_lpGPU->enqueueWriteBuffer(m_inMemCellElementsOffset, sizeof(U32) * m_cellParam.ctTotalCells, lpCellElementsOffset);
-				SAFE_DELETE(lpCellElementsOffset);
-			}
-
-			//SumScan to Compute Total Vertices count and vertex list offsets
-			{
-				//Read-back EdgeTable Count
-				U32* lpVerticesIncluded = new U32[m_gridParam.ctTotalPoints];
-				m_lpGPU->enqueueReadBuffer(m_inoutMemHighEdgesCount, sizeof(U32) * m_gridParam.ctTotalPoints, lpVerticesIncluded);
-
-				//10. SumScan to compute included vertices
-				m_ctTetMeshVertices = m_lpOclSumScan->compute(lpVerticesIncluded, m_gridParam.ctTotalPoints);
-
-				//Write Edge Offsets to device memory
-				//m_inMemHighEdgesOffset = m_lpGPU->createMemBuffer(sizeof(U32) * m_gridParam.ctTotalPoints, ComputeDevice::memReadOnly);
-				m_lpGPU->enqueueWriteBuffer(m_inMemHighEdgesOffset, sizeof(U32) * m_gridParam.ctTotalPoints, lpVerticesIncluded);
-				SAFE_DELETE(lpVerticesIncluded);
-			}
-
-			//11. Compute Tetmesh vertices
-			computeTetMeshVertices(m_ctTetMeshVertices);
-
-			//12.Compute Tetrahedra for all inside or crossed cells (6 tets per each cell)
-			computeTetMeshElements(m_ctTetMeshElements);
-
-			//13. Store tet mesh as vega format
-			string strVegaFP = m_strModelFilePath + string(".veg");
-			storeTetMeshInVegaFormat(strVegaFP.c_str());
-
-			//Release Temp vars for tetmesh
-			clReleaseMemObject(m_outMemTetMeshVertices);
-			clReleaseMemObject(m_outMemTetMeshElements);
-		}
 
 		//Draw Mesh
 		m_isValidIndex = true;
@@ -1096,6 +1054,68 @@ namespace HPC{
 		clReleaseMemObject(m_inoutMemCellElementsCount);
 		clReleaseMemObject(m_inMemCellElementsOffset);
 
+
+		return 1;
+	}
+
+	/*!
+	 * Run GPU Tetrahedralizer
+	 */
+	int GPUPoly::runTetrahedralizer() {
+
+		//8. Find all cells and vertices includes in the tetmesh
+		computeTetMeshCellsInsideOrCrossed();
+
+		//SumScan to Compute Total Tetrahedra elements produced and elements offset
+		{
+			//Read-back Elements Count
+			U32* lpCellElementsOffset = new U32[m_cellParam.ctTotalCells];
+			m_lpGPU->enqueueReadBuffer(m_inoutMemCellElementsCount,
+					sizeof(U32) * m_cellParam.ctTotalCells, lpCellElementsOffset);
+
+			//9. SumScan to read all elements, 6 Tetrahedra per each cell
+			m_ctTetMeshElements = m_lpOclSumScan->compute(lpCellElementsOffset,
+					m_cellParam.ctTotalCells);
+			m_ctTetMeshElements *= 6;
+
+			//Write Element Offsets
+			//m_inMemCellElementsOffset = m_lpGPU->createMemBuffer(sizeof(U32) * m_cellParam.ctTotalCells, ComputeDevice::memReadOnly);
+			m_lpGPU->enqueueWriteBuffer(m_inMemCellElementsOffset,
+					sizeof(U32) * m_cellParam.ctTotalCells, lpCellElementsOffset);
+			SAFE_DELETE(lpCellElementsOffset);
+		}
+
+		//SumScan to Compute Total Vertices count and vertex list offsets
+		{
+			//Read-back EdgeTable Count
+			U32* lpVerticesIncluded = new U32[m_gridParam.ctTotalPoints];
+			m_lpGPU->enqueueReadBuffer(m_inoutMemHighEdgesCount,
+					sizeof(U32) * m_gridParam.ctTotalPoints, lpVerticesIncluded);
+
+			//10. SumScan to compute included vertices
+			m_ctTetMeshVertices = m_lpOclSumScan->compute(lpVerticesIncluded,
+					m_gridParam.ctTotalPoints);
+
+			//Write Edge Offsets to device memory
+			//m_inMemHighEdgesOffset = m_lpGPU->createMemBuffer(sizeof(U32) * m_gridParam.ctTotalPoints, ComputeDevice::memReadOnly);
+			m_lpGPU->enqueueWriteBuffer(m_inMemHighEdgesOffset,
+					sizeof(U32) * m_gridParam.ctTotalPoints, lpVerticesIncluded);
+			SAFE_DELETE(lpVerticesIncluded);
+		}
+
+		//11. Compute Tetmesh vertices
+		computeTetMeshVertices(m_ctTetMeshVertices);
+
+		//12.Compute Tetrahedra for all inside or crossed cells (6 tets per each cell)
+		computeTetMeshElements(m_ctTetMeshElements);
+
+		//13. Store tet mesh as vega format
+		string strVegaFP = m_strModelFilePath + string(".veg");
+		storeTetMeshInVegaFormat(strVegaFP.c_str());
+
+		//Release Temp vars for tetmesh
+		clReleaseMemObject(m_outMemTetMeshVertices);
+		clReleaseMemObject(m_outMemTetMeshElements);
 
 		return 1;
 	}

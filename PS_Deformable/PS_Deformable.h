@@ -27,6 +27,8 @@
 using namespace std;
 using namespace PS::MATH;
 
+#define DEFAULT_FORCE_NEIGHBORHOOD_SIZE 5
+
 
 //ApplyDeformations
 typedef void (*FOnApplyDeformations)(U32 dof, double* displacements);

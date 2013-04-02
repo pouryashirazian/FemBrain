@@ -8,7 +8,7 @@
 using namespace std;
 using namespace Loki;
 
-#define RECORDS_STORAGE_SPACE 8
+#define RECORDS_STORAGE_SPACE 32
 
 //Structure to share result between gui and task thread
 struct TaskLogInsertResult {

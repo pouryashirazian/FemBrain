@@ -112,7 +112,10 @@ public:
 
 
 	//Multi-Pass polygonization
-	int runMultiPass(float cellsize = DEFAULT_CELL_SIZE, bool outputTetMesh = true);
+	int runPolygonizer(float cellsize = DEFAULT_CELL_SIZE, bool outputTetMesh = true);
+
+	//Run tetrahedralization process
+	int runTetrahedralizer();
 
 	//Draws the mesh using accelerated memory buffer objects
 	void drawBBox();

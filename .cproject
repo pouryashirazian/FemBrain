@@ -62,6 +62,7 @@
 									<listOptionValue builtIn="false" value="tbb"/>
 									<listOptionValue builtIn="false" value="ssl"/>
 									<listOptionValue builtIn="false" value="crypto"/>
+									<listOptionValue builtIn="false" value="minc2"/>
 								</option>
 								<option id="gnu.cpp.link.option.paths.1451060664" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
 									<listOptionValue builtIn="false" value="/usr/lib/fglrx"/>
@@ -133,15 +134,16 @@
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.base.813671169" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.base"/>
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.base.306214580" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.base">
 								<option id="gnu.cpp.link.option.libs.1132655833" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
+									<listOptionValue builtIn="false" value="tbb"/>
 									<listOptionValue builtIn="false" value="OpenCL"/>
 									<listOptionValue builtIn="false" value="GLEW"/>
 									<listOptionValue builtIn="false" value="glut"/>
 									<listOptionValue builtIn="false" value="GLU"/>
 									<listOptionValue builtIn="false" value="GL"/>
 									<listOptionValue builtIn="false" value="rt"/>
-									<listOptionValue builtIn="false" value="tbb"/>
 									<listOptionValue builtIn="false" value="ssl"/>
 									<listOptionValue builtIn="false" value="crypto"/>
+									<listOptionValue builtIn="false" value="minc2"/>
 								</option>
 								<option id="gnu.cpp.link.option.paths.1705414817" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
 									<listOptionValue builtIn="false" value="/usr/lib/fglrx"/>
