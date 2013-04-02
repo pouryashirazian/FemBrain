@@ -4,6 +4,9 @@
 #include <iostream>
 #include <fstream>
 #include <openssl/md5.h>
+#ifdef PS_OS_MAC
+    #include <CGLCurrent.h>
+#endif
 
 using namespace PS;
 
@@ -136,20 +139,26 @@ bool ComputeDevice::initDevice(DEVICETYPE dev,
     // Create a compute context
     if(bWithOpenGLInterOp)
     {
-		#ifdef PS_OS_WINDOWS
-		  HGLRC glCtx = wglGetCurrentContext();
-		#else //!_WIN32
-		  GLXContext glCtx = glXGetCurrentContext();
-		#endif //!_WIN32
 
-		cl_context_properties props[] = { CL_CONTEXT_PLATFORM,
-						  (cl_context_properties)m_clPlatform,
-		#ifdef PS_OS_WINDOWS
-						  CL_WGL_HDC_KHR, (intptr_t) wglGetCurrentDC(),
-		#else //!_WIN32
-						  CL_GLX_DISPLAY_KHR, (intptr_t) glXGetCurrentDisplay(),
-		#endif //!_WIN32
-						  CL_GL_CONTEXT_KHR, (intptr_t) glCtx, 0};
+#ifdef PS_OS_WINDOWS
+        HGLRC glCtx = wglGetCurrentContext();
+        cl_context_properties props[] = { CL_CONTEXT_PLATFORM,
+                          (cl_context_properties)m_clPlatform,
+                          CL_WGL_HDC_KHR, (intptr_t) wglGetCurrentDC(),
+                          CL_GL_CONTEXT_KHR, (intptr_t) glCtx, 0};
+#elif defined(PS_OS_MAC)
+        CGLContextObj glContext = CGLGetCurrentContext();
+        CGLShareGroupObj shareGroup = CGLGetShareGroup(glContext);
+        cl_context_properties props[] = {
+           CL_CONTEXT_PROPERTY_USE_CGL_SHAREGROUP_APPLE,
+           (cl_context_properties)shareGroup, 0};
+#else
+        GLXContext glCtx = glXGetCurrentContext();
+        cl_context_properties props[] = { CL_CONTEXT_PLATFORM,
+                          (cl_context_properties)m_clPlatform,
+                          CL_GLX_DISPLAY_KHR, (intptr_t) glXGetCurrentDisplay(),
+                          CL_GL_CONTEXT_KHR, (intptr_t) glCtx, 0};
+#endif
 		m_clContext = clCreateContext(props, 1, &m_clDeviceID, NULL, NULL, &err);
     }
     else
@@ -297,8 +306,12 @@ int ComputeDevice::oclGetDevCap(cl_device_id device)
     if(bDevAttributeQuery)
     {
         cl_int iComputeCapMajor, iComputeCapMinor;
+#ifdef CL_DEVICE_COMPUTE_CAPABILITY_MAJOR_NV
         clGetDeviceInfo(device, CL_DEVICE_COMPUTE_CAPABILITY_MAJOR_NV, sizeof(cl_uint), (void*)&iComputeCapMajor, NULL);
+#endif
+#ifdef CL_DEVICE_COMPUTE_CAPABILITY_MINOR_NV
         clGetDeviceInfo(device, CL_DEVICE_COMPUTE_CAPABILITY_MINOR_NV, sizeof(cl_uint), (void*)&iComputeCapMinor, NULL);
+#endif
         iDevArch = (10 * iComputeCapMajor) + iComputeCapMinor;
     }
 
@@ -828,6 +841,7 @@ bool ComputeDevice::storeProgramBinary(ComputeProgram* lpProgram,
 
 
 string ComputeDevice::ComputeCheckSum(const char* chrFilePath) {
+#ifdef PS_OS_LINUX
 	unsigned char c[MD5_DIGEST_LENGTH];
 	MD5_CTX mdContext;
 
@@ -853,6 +867,10 @@ string ComputeDevice::ComputeCheckSum(const char* chrFilePath) {
 		strOut += string(buffer);
 	}
 	return strOut;
+#else
+	return string("OPENSSL Not Supported!");
+#endif
+
 }
 
 bool ComputeDevice::LoadSourceCheckSum(const char* chrFilePath, string& checksum) {

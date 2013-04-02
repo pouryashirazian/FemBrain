@@ -2,8 +2,9 @@
 #ifndef MATHHELPER_H
 #define MATHHELPER_H
 
-#include <limits>
 #include <math.h>
+#include <limits>
+#include <float.h>
 #include <stdlib.h>
 #include <assert.h>
 
@@ -26,6 +27,24 @@
 #ifdef PS_OS_LINUX
     #include <cmath>
     #include <cfloat>
+#endif
+
+// Check windows
+#if _WIN32 || _WIN64
+#if _WIN64
+	#define PS_ENVIRONMENT64
+#else
+	#define PS_ENVIRONMENT32
+#endif
+#endif
+
+// Check GCC
+#if __GNUC__
+#if __x86_64__ || __ppc64__
+	#define PS_ENVIRONMENT64
+#else
+	#define PS_ENVIRONMENT32
+#endif
 #endif
 
 #define PS_PLUS_INFINITY FLT_MAX

@@ -40,7 +40,13 @@ inline bool SimdDetectFeature(U32 idFeature)
 	if( (CPUInfo[3] & idFeature ) == 1)
 		return true;
 	return false;
-#elif defined(PS_OS_LINUX)
+#elif defined(PS_OS_MAC)
+//	int EAX, EBX, ECX, EDX;
+//	cpuid(0, EAX, EBX, ECX, EDX);
+//	if((ECX & idFeature) == idFeature)
+//		return true;
+	return false;
+#else
 	int EAX, EBX, ECX, EDX;
 	cpuid(0, EAX, EBX, ECX, EDX);
 	if((ECX & idFeature) == idFeature)

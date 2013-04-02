@@ -1,16 +1,16 @@
 #include <GL/glew.h>
-#include <GL/freeglut.h>
 #include <iostream>
-
 #include <string>
 #include <vector>
 #include <fstream>
 #include <map>
 
 #include <tbb/task_scheduler_init.h>
-
-
 #include "PS_Base/PS_MathBase.h"
+
+//#include <GL/glew.h>
+#include <GL/freeglut.h>
+
 #include "PS_Base/PS_Logger.h"
 #include "PS_Base/PS_FileDirectory.h"
 #include "PS_BlobTreeRender/PS_OclPolygonizer.h"
@@ -28,7 +28,7 @@
 #include "PS_Deformable/PS_VegWriter.h"
 #include "PS_Deformable/Avatar.h"
 #include "PS_Deformable/TetGenExporter.h"
-#include "PS_Deformable/MincReader.h"
+//#include "PS_Deformable/MincReader.h"
 
 #include "volumetricMeshLoader.h"
 #include "generateSurfaceMesh.h"
@@ -905,6 +905,7 @@ void SpecialKey(int key, int x, int y)
 			SaveSettings(g_appSettings.strSimFilePath);
 
 			LogInfo("Exiting.");
+
 			glutLeaveMainLoop();
 			break;
 		}

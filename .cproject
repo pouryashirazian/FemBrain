@@ -5,6 +5,9 @@
 	<storageModule moduleId="org.eclipse.cdt.core.settings">
 		<cconfiguration id="cdt.managedbuild.config.gnu.cross.exe.debug.796095584">
 			<storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="cdt.managedbuild.config.gnu.cross.exe.debug.796095584" moduleId="org.eclipse.cdt.core.settings" name="Debug">
+				<macros>
+					<stringMacro name="CPP_COMPONENTS" type="VALUE_TEXT" value="/Users/pourya/Desktop/Projects/Dependencies"/>
+				</macros>
 				<externalSettings/>
 				<extensions>
 					<extension id="org.eclipse.cdt.core.ELF" point="org.eclipse.cdt.core.BinaryParser"/>
@@ -27,12 +30,12 @@
 								<option id="gnu.cpp.compiler.option.debugging.level.163294574" name="Debug Level" superClass="gnu.cpp.compiler.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.2115444334" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
-									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/OPENCL/common/inc"/>
-									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/GLUI/src/include"/>
-									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/GLEW/include"/>
-									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/TBB/include"/>
-									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/LOKI/include"/>
-									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/BOARD/include"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/OPENCL/common/inc"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLUI/src/include"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLEW/include"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/TBB/include"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/LOKI/include"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/BOARD/include"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/AA_VegaFem/include}&quot;"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.other.other.1950008776" name="Other flags" superClass="gnu.cpp.compiler.option.other.other" value="-c -fmessage-length=0 -march=corei7-avx -mtune=corei7-avx" valueType="string"/>
@@ -53,24 +56,25 @@
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.base.128711701" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.base"/>
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.base.2033305238" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.base">
 								<option id="gnu.cpp.link.option.libs.776492898" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
+									<listOptionValue builtIn="false" value="tbb"/>
 									<listOptionValue builtIn="false" value="OpenCL"/>
 									<listOptionValue builtIn="false" value="GLEW"/>
 									<listOptionValue builtIn="false" value="glut"/>
 									<listOptionValue builtIn="false" value="GLU"/>
 									<listOptionValue builtIn="false" value="GL"/>
 									<listOptionValue builtIn="false" value="rt"/>
-									<listOptionValue builtIn="false" value="tbb"/>
 									<listOptionValue builtIn="false" value="ssl"/>
 									<listOptionValue builtIn="false" value="crypto"/>
 									<listOptionValue builtIn="false" value="minc2"/>
 								</option>
 								<option id="gnu.cpp.link.option.paths.1451060664" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
 									<listOptionValue builtIn="false" value="/usr/lib/fglrx"/>
-									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/TBB/build/linux_intel64_gcc_cc4.6_libc2.15_kernel3.2.0_release"/>
-									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/BOARD/lib"/>
-									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/GLEW/lib"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/TBB/build/linux_intel64_gcc_cc4.6_libc2.15_kernel3.2.0_release"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/BOARD/lib"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLEW/lib"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/AA_TetGen}&quot;"/>
 								</option>
+								<option id="gnu.cpp.link.option.flags.618014586" name="Linker flags" superClass="gnu.cpp.link.option.flags" value="-framework OpenCL -framework OpenGL" valueType="string"/>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.907987824" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
@@ -87,6 +91,9 @@
 		</cconfiguration>
 		<cconfiguration id="cdt.managedbuild.config.gnu.cross.exe.release.677320393">
 			<storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="cdt.managedbuild.config.gnu.cross.exe.release.677320393" moduleId="org.eclipse.cdt.core.settings" name="Release">
+				<macros>
+					<stringMacro name="CPP_COMPONENTS" type="VALUE_TEXT" value="/Users/pourya/Desktop/Projects/Dependencies"/>
+				</macros>
 				<externalSettings/>
 				<extensions>
 					<extension id="org.eclipse.cdt.core.ELF" point="org.eclipse.cdt.core.BinaryParser"/>
@@ -117,7 +124,7 @@
 									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/BOARD/include"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/AA_VegaFem/include}&quot;"/>
 								</option>
-								<option id="gnu.cpp.compiler.option.other.other.187829704" name="Other flags" superClass="gnu.cpp.compiler.option.other.other" value="-c -fmessage-length=0 " valueType="string"/>
+								<option id="gnu.cpp.compiler.option.other.other.187829704" name="Other flags" superClass="gnu.cpp.compiler.option.other.other" value="-c -fmessage-length=0 -march=corei7-avx -mtune=corei7-avx" valueType="string"/>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.107137020" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="TETLIBRARY"/>
 								</option>
@@ -161,6 +168,170 @@
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.assembler.base.2009555460" name="GCC Assembler" superClass="cdt.managedbuild.tool.gnu.assembler.base">
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.1254301160" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
+							</tool>
+						</toolChain>
+					</folderInfo>
+				</configuration>
+			</storageModule>
+			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
+		</cconfiguration>
+		<cconfiguration id="cdt.managedbuild.config.gnu.cross.exe.debug.796095584.1679618061">
+			<storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="cdt.managedbuild.config.gnu.cross.exe.debug.796095584.1679618061" moduleId="org.eclipse.cdt.core.settings" name="Apple Debug">
+				<macros>
+					<stringMacro name="CPP_COMPONENTS" type="VALUE_TEXT" value="/Users/pourya/Desktop/Projects/Dependencies"/>
+				</macros>
+				<externalSettings/>
+				<extensions>
+					<extension id="org.eclipse.cdt.core.MachO64" point="org.eclipse.cdt.core.BinaryParser"/>
+					<extension id="org.eclipse.cdt.core.GmakeErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.CWDLocator" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.GCCErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.GASErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.GLDErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+				</extensions>
+			</storageModule>
+			<storageModule moduleId="cdtBuildSystem" version="4.0.0">
+				<configuration artifactName="${ProjName}" buildArtefactType="org.eclipse.cdt.build.core.buildArtefactType.exe" buildProperties="org.eclipse.cdt.build.core.buildType=org.eclipse.cdt.build.core.buildType.debug,org.eclipse.cdt.build.core.buildArtefactType=org.eclipse.cdt.build.core.buildArtefactType.exe" cleanCommand="rm -rf" description="MacOSX Debug" id="cdt.managedbuild.config.gnu.cross.exe.debug.796095584.1679618061" name="Apple Debug" parent="cdt.managedbuild.config.gnu.cross.exe.debug">
+					<folderInfo id="cdt.managedbuild.config.gnu.cross.exe.debug.796095584.1679618061." name="/" resourcePath="">
+						<toolChain id="cdt.managedbuild.toolchain.gnu.macosx.base.1088319527" name="MacOSX GCC" superClass="cdt.managedbuild.toolchain.gnu.macosx.base">
+							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.MachO64" id="cdt.managedbuild.target.gnu.platform.macosx.base.762157054" name="Debug Platform" osList="macosx" superClass="cdt.managedbuild.target.gnu.platform.macosx.base"/>
+							<builder buildPath="${workspace_loc:/FemBrain/Debug MAC}" id="cdt.managedbuild.target.gnu.builder.macosx.base.569825259" keepEnvironmentInBuildfile="false" name="Gnu Make Builder" superClass="cdt.managedbuild.target.gnu.builder.macosx.base"/>
+							<tool id="cdt.managedbuild.tool.macosx.c.linker.macosx.base.1332350852" name="MacOS X C Linker" superClass="cdt.managedbuild.tool.macosx.c.linker.macosx.base"/>
+							<tool id="cdt.managedbuild.tool.macosx.cpp.linker.macosx.base.172046706" name="MacOS X C++ Linker" superClass="cdt.managedbuild.tool.macosx.cpp.linker.macosx.base">
+								<option id="macosx.cpp.link.option.libs.1991554473" name="Libraries (-l)" superClass="macosx.cpp.link.option.libs" valueType="libs">
+									<listOptionValue builtIn="false" value="glut"/>
+									<listOptionValue builtIn="false" value="GLEW"/>
+									<listOptionValue builtIn="false" value="GLU"/>
+									<listOptionValue builtIn="false" value="GL"/>
+									<listOptionValue builtIn="false" value="tbb"/>
+								</option>
+								<option id="macosx.cpp.link.option.paths.1109683583" name="Library search path (-L)" superClass="macosx.cpp.link.option.paths" valueType="libPaths">
+									<listOptionValue builtIn="false" value="/opt/local/lib"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/TBB/build/macos_intel64_gcc_cc4.2.1_os10.7.5_release"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/BOARD/lib"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLEW/lib"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/AA_TetGen}&quot;"/>
+								</option>
+								<option id="macosx.cpp.link.option.flags.64149595" name="Linker flags" superClass="macosx.cpp.link.option.flags" value="-framework OpenCL -framework OpenGL" valueType="string"/>
+								<inputType id="cdt.managedbuild.tool.macosx.cpp.linker.input.308830897" superClass="cdt.managedbuild.tool.macosx.cpp.linker.input">
+									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
+									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
+								</inputType>
+							</tool>
+							<tool id="cdt.managedbuild.tool.gnu.assembler.macosx.base.2059470799" name="GCC Assembler" superClass="cdt.managedbuild.tool.gnu.assembler.macosx.base">
+								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.1812114886" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
+							</tool>
+							<tool id="cdt.managedbuild.tool.gnu.archiver.macosx.base.1789410249" name="GCC Archiver" superClass="cdt.managedbuild.tool.gnu.archiver.macosx.base"/>
+							<tool id="cdt.managedbuild.tool.gnu.cpp.compiler.macosx.base.1508405256" name="GCC C++ Compiler" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.macosx.base">
+								<option id="gnu.cpp.compiler.option.include.paths.964579236" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/AA_VegaFem/include}&quot;"/>
+									<listOptionValue builtIn="false" value="/System/Library/Frameworks/OpenGL.framework/Headers"/>
+									<listOptionValue builtIn="false" value="/opt/X11/include"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/LOKI/include"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/OPENCL/common/inc"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/TBB/include"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLUI/src/include"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLEW/include"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/BOARD/include"/>
+								</option>
+								<option id="gnu.cpp.compiler.option.preprocessor.def.53134013" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">
+									<listOptionValue builtIn="false" value="TETLIBRARY"/>
+								</option>
+								<option id="gnu.cpp.compiler.option.optimization.level.306333280" name="Optimization Level" superClass="gnu.cpp.compiler.option.optimization.level" value="gnu.cpp.compiler.optimization.level.none" valueType="enumerated"/>
+								<option id="gnu.cpp.compiler.option.debugging.level.1008899084" name="Debug Level" superClass="gnu.cpp.compiler.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
+								<option id="gnu.cpp.compiler.option.other.other.1575586151" superClass="gnu.cpp.compiler.option.other.other" value="-c -fmessage-length=0 " valueType="string"/>
+								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.161175415" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
+							</tool>
+							<tool id="cdt.managedbuild.tool.gnu.c.compiler.macosx.base.82919568" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.macosx.base">
+								<option id="gnu.c.compiler.option.include.paths.2129305779" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
+									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/FREEGLUT/include"/>
+									<listOptionValue builtIn="false" value="/opt/AMDAPP/include"/>
+								</option>
+								<option defaultValue="gnu.c.optimization.level.none" id="gnu.c.compiler.option.optimization.level.1699295854" name="Optimization Level" superClass="gnu.c.compiler.option.optimization.level" valueType="enumerated"/>
+								<option id="gnu.c.compiler.option.debugging.level.2119227940" name="Debug Level" superClass="gnu.c.compiler.option.debugging.level" value="gnu.c.debugging.level.max" valueType="enumerated"/>
+								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.95800558" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
+							</tool>
+						</toolChain>
+					</folderInfo>
+				</configuration>
+			</storageModule>
+			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
+		</cconfiguration>
+		<cconfiguration id="cdt.managedbuild.config.gnu.cross.exe.release.677320393.1549472350">
+			<storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="cdt.managedbuild.config.gnu.cross.exe.release.677320393.1549472350" moduleId="org.eclipse.cdt.core.settings" name="Apple Release">
+				<macros>
+					<stringMacro name="CPP_COMPONENTS" type="VALUE_TEXT" value="/Users/pourya/Desktop/Projects/Dependencies"/>
+				</macros>
+				<externalSettings/>
+				<extensions>
+					<extension id="org.eclipse.cdt.core.MachO64" point="org.eclipse.cdt.core.BinaryParser"/>
+					<extension id="org.eclipse.cdt.core.GmakeErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.CWDLocator" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.GCCErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.GASErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.GLDErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+				</extensions>
+			</storageModule>
+			<storageModule moduleId="cdtBuildSystem" version="4.0.0">
+				<configuration artifactName="${ProjName}" buildArtefactType="org.eclipse.cdt.build.core.buildArtefactType.exe" buildProperties="org.eclipse.cdt.build.core.buildType=org.eclipse.cdt.build.core.buildType.release,org.eclipse.cdt.build.core.buildArtefactType=org.eclipse.cdt.build.core.buildArtefactType.exe" cleanCommand="rm -rf" description="MacOSX Release" id="cdt.managedbuild.config.gnu.cross.exe.release.677320393.1549472350" name="Apple Release" parent="cdt.managedbuild.config.gnu.cross.exe.release">
+					<folderInfo id="cdt.managedbuild.config.gnu.cross.exe.release.677320393.1549472350." name="/" resourcePath="">
+						<toolChain id="cdt.managedbuild.toolchain.gnu.macosx.base.1125792819" name="MacOSX GCC" superClass="cdt.managedbuild.toolchain.gnu.macosx.base">
+							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.MachO64" id="cdt.managedbuild.target.gnu.platform.macosx.base.1209906137" name="Debug Platform" osList="macosx" superClass="cdt.managedbuild.target.gnu.platform.macosx.base"/>
+							<builder buildPath="${workspace_loc:/FemBrain/Apple Release}" id="cdt.managedbuild.target.gnu.builder.macosx.base.957012820" name="Gnu Make Builder.Apple Release" superClass="cdt.managedbuild.target.gnu.builder.macosx.base"/>
+							<tool id="cdt.managedbuild.tool.macosx.c.linker.macosx.base.1847324109" name="MacOS X C Linker" superClass="cdt.managedbuild.tool.macosx.c.linker.macosx.base"/>
+							<tool id="cdt.managedbuild.tool.macosx.cpp.linker.macosx.base.1538200600" name="MacOS X C++ Linker" superClass="cdt.managedbuild.tool.macosx.cpp.linker.macosx.base">
+								<option id="macosx.cpp.link.option.libs.1753801322" superClass="macosx.cpp.link.option.libs" valueType="libs">
+									<listOptionValue builtIn="false" value="tbb"/>
+									<listOptionValue builtIn="false" value="OpenCL"/>
+									<listOptionValue builtIn="false" value="GLEW"/>
+									<listOptionValue builtIn="false" value="glut"/>
+									<listOptionValue builtIn="false" value="GLU"/>
+									<listOptionValue builtIn="false" value="GL"/>
+									<listOptionValue builtIn="false" value="rt"/>
+									<listOptionValue builtIn="false" value="ssl"/>
+									<listOptionValue builtIn="false" value="crypto"/>
+									<listOptionValue builtIn="false" value="minc2"/>
+								</option>
+								<option id="macosx.cpp.link.option.paths.554264766" superClass="macosx.cpp.link.option.paths" valueType="libPaths">
+									<listOptionValue builtIn="false" value="/usr/lib/fglrx"/>
+									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/TBB/build/linux_intel64_gcc_cc4.6_libc2.15_kernel3.2.0_release"/>
+									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/BOARD/lib"/>
+									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/GLEW/lib"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/AA_TetGen}&quot;"/>
+								</option>
+								<option id="macosx.cpp.link.option.flags.2050643933" superClass="macosx.cpp.link.option.flags" value="-framework OpenCL -framework OpenGL" valueType="string"/>
+								<inputType id="cdt.managedbuild.tool.macosx.cpp.linker.input.1482841857" superClass="cdt.managedbuild.tool.macosx.cpp.linker.input">
+									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
+									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
+								</inputType>
+							</tool>
+							<tool id="cdt.managedbuild.tool.gnu.assembler.macosx.base.1483616988" name="GCC Assembler" superClass="cdt.managedbuild.tool.gnu.assembler.macosx.base">
+								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.1878964577" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
+							</tool>
+							<tool id="cdt.managedbuild.tool.gnu.archiver.macosx.base.301645360" name="GCC Archiver" superClass="cdt.managedbuild.tool.gnu.archiver.macosx.base"/>
+							<tool id="cdt.managedbuild.tool.gnu.cpp.compiler.macosx.base.980946519" name="GCC C++ Compiler" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.macosx.base">
+								<option id="gnu.cpp.compiler.option.include.paths.1262295066" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
+									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/OPENCL/common/inc"/>
+									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/GLUI/src/include"/>
+									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/GLEW/include"/>
+									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/TBB/include"/>
+									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/LOKI/include"/>
+									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/BOARD/include"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/AA_VegaFem/include}&quot;"/>
+								</option>
+								<option id="gnu.cpp.compiler.option.preprocessor.def.1173552599" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">
+									<listOptionValue builtIn="false" value="TETLIBRARY"/>
+								</option>
+								<option id="gnu.cpp.compiler.option.optimization.level.435317120" superClass="gnu.cpp.compiler.option.optimization.level" value="gnu.cpp.compiler.optimization.level.most" valueType="enumerated"/>
+								<option id="gnu.cpp.compiler.option.debugging.level.313203807" superClass="gnu.cpp.compiler.option.debugging.level" value="gnu.cpp.compiler.debugging.level.none" valueType="enumerated"/>
+								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.807643088" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
+							</tool>
+							<tool id="cdt.managedbuild.tool.gnu.c.compiler.macosx.base.55360899" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.macosx.base">
+								<option defaultValue="gnu.c.optimization.level.most" id="gnu.c.compiler.option.optimization.level.2084761106" superClass="gnu.c.compiler.option.optimization.level" valueType="enumerated"/>
+								<option id="gnu.c.compiler.option.debugging.level.647865681" superClass="gnu.c.compiler.option.debugging.level" value="gnu.c.debugging.level.none" valueType="enumerated"/>
+								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.119863414" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 							</tool>
 						</toolChain>
 					</folderInfo>

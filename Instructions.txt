@@ -10,4 +10,31 @@ Just pass the .node file and it will find the .ele file by itself and produces t
 4. Screencast: ffmpeg -f x11grab -r 25 -s 1280x800 -i :0.0 -sameq Desktop/out.mp4
 
 
+AVX Instructions:
 FOR AVX include this flags: -march=corei7-avx -mtune=corei7-avx
+
+MAC:
+-framework OpenCL -framework OpenGL
+
+Linux Libs:
+OpenCL
+GLEW
+glut
+GLU
+GL
+rt
+tbb
+ssl
+crypto
+minc2
+
+Linux LibPaths:
+/usr/lib/fglrx
+/opt/local/lib
+/home/pourya/Desktop/Projects/Dependencies/TBB/build/linux_intel64_gcc_cc4.6_libc2.15_kernel3.2.0_release
+/home/pourya/Desktop/Projects/Dependencies/BOARD/lib
+/home/pourya/Desktop/Projects/Dependencies/GLEW/lib
+"${workspace_loc:/${ProjName}/AA_TetGen}"
+
+Linux 3rdParty Libraries:
+freeglut, minc2, openssl, board, tbb

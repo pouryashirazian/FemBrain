@@ -328,6 +328,8 @@ int ListFilesInDir(std::vector<DAnsiStr>& lstFiles, const char* pDir, const char
     	}while (FindNextFile(hFind, &ffd) != 0);
 	   FindClose(hFind);
 
+#elif defined(PS_OS_MAC)
+	   return 0;
 #else
 	   DIR *dp;
 	   struct dirent *dirp;

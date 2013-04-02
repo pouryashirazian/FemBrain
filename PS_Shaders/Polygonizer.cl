@@ -2,7 +2,7 @@
 
 
 //Enabling Newton-Raphson will take forever to compile cl file 
-//#define USE_NEWTONRAPHSON
+#define USE_NEWTONRAPHSON
 
 //DATASIZES
 #define DATASIZE_HEADER		12

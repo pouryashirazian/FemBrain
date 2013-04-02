@@ -6,7 +6,11 @@
  */
 #include "PS_GLFuncs.h"
 #include "GL/glew.h"
-#include "GL/freeglut.h"
+#ifdef PS_OS_MAC
+	#include <GLUT/glut.h>
+#else
+	#include "GL/freeglut.h"
+#endif
 
 #include <string.h>
 #include <iostream>

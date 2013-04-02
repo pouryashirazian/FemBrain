@@ -7,6 +7,7 @@
 
 #include <string.h>
 #include <limits.h>
+#include <float.h>
 #include "PS_GNUPLOT_Driver.h"
 #include "../PS_Base/PS_FileDirectory.h"
 using namespace PS;

@@ -81,15 +81,28 @@ void ProcessorInfo::getLevelInfo(int level)
 	}
 }
 
-#if defined(__APPLE__)
+#if defined(PS_OS_MAC)
 
 #include <sys/sysctl.h>
 U32 ProcessorInfo::GetCacheLineSize()
 {
-    U32 line_size = 0;
-    U32 sizeof_line_size = sizeof(line_size);
+    size_t line_size = 0;
+    size_t sizeof_line_size = sizeof(line_size);
     sysctlbyname("hw.cachelinesize", &line_size, &sizeof_line_size, 0, 0);
     return line_size;
+}
+
+U32 ProcessorInfo::GetCacheSize(int level, CACHE_TYPE cacheType) {
+	return 0;
+}
+
+ProcessorInfo::CACHE_TYPE ProcessorInfo::GetCacheType(int level, CACHE_TYPE cacheType) {
+	return ctUnified;
+}
+
+bool ProcessorInfo::HasCacheLevel(int level, CACHE_TYPE cacheType)
+{
+	return false;
 }
 
 #elif defined(PS_OS_WINDOWS)

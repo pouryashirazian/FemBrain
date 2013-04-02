@@ -12,7 +12,10 @@
 	#include <CL/opencl.h>
 	#include <GL/glxew.h>
 #elif defined(PS_OS_MAC)
-//#include <open>
+    #include <OpenCL/cl.h>
+    #include <OpenCL/cl_gl.h>
+    #include <OpenCL/cl_gl_ext.h>
+    #include <GL/glxew.h>
 #endif
 
 

@@ -3,7 +3,7 @@
 
 //#include "PS_VectorMath.h"
 #include "../PS_Base/PS_AlignedAlloc.h"
-#include <malloc.h>
+#include <malloc>
 
 #if defined(PS_OS_WINDOWS)
 	#include "windows.h"

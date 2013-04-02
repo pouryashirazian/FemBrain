@@ -542,7 +542,7 @@ inline float ComputeWyvillIsoDistance(float fv)
 {
 	if(fv == 0.0f) return 1.0f;
 	float oneThird = 1.0f / 3.0f;
-	return std::sqrt(1.0f - std::pow(fv, oneThird));
+	return sqrt(1.0f - pow(fv, oneThird));
 }
 
 inline bool BoxIntersect(const svec3f& lo1, const svec3f& hi1,
