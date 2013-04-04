@@ -34,8 +34,9 @@ using namespace PS::HPC;
 #define ERR_GPUPOLY_BUFFER_NOT_READ -3
 #define ERR_GPUPOLY_TRITABLE_NOT_READ -4
 #define ERR_GPUPOLY_VERTEXTABLE_NOT_READ -5
-#define ERR_GPUPOLY_FIELDSTABLE	-6
-#define ERR_NO_CROSSED_CELLS -6
+#define ERR_GPUPOLY_FIELDSTABLE		-6
+#define ERR_NO_CROSSED_CELLS 		-7
+#define ERR_INVALID_INPUT_PARAM 	-8
 
 
 #define MAX_VERTICES_COUNT_PER_CELL		15
@@ -465,9 +466,73 @@ namespace HPC{
 		ofs.close();
 	}
 
+	void GPUPoly::getModelAABB(vec3f& lo, vec3f& hi) {
+		lo = vec3f(m_bboxLo.x, m_bboxLo.y, m_bboxLo.z);
+		hi = vec3f(m_bboxHi.x, m_bboxHi.y, m_bboxHi.z);
+	}
+
 	void GPUPoly::drawBBox()
 	{
 		DrawBox(m_bboxLo, m_bboxHi, svec3f(0,0,1), 1.0f);
+	}
+
+	GLMeshBuffer* GPUPoly::prepareMeshBufferForDrawingNormals(float len) {
+		if(!m_isValidVertex || !m_isValidNormal)
+			return NULL;
+
+		U32 ctVertices;
+		vector<float> vertices;
+		vector<float> normals;
+		readBackNormals(ctVertices, vertices, normals);
+
+		vector<float> allvertices;
+		//vector<U32> elements;
+
+		allvertices.resize(ctVertices* 3 * 2);
+		//elements.resize(ctVertices * 2);
+		for(U32 i=0; i < ctVertices; i++) {
+			vec3f ptStart = vec3f(&vertices[i*3]);
+			vec3f ptEnd = ptStart + vec3f(&normals[i*3]) * len;
+			allvertices[i*6] = ptStart.x;
+			allvertices[i*6 + 1] = ptStart.y;
+			allvertices[i*6 + 2] = ptStart.z;
+			allvertices[i*6 + 3] = ptEnd.x;
+			allvertices[i*6 + 4] = ptEnd.y;
+			allvertices[i*6 + 5] = ptEnd.z;
+		}
+
+		//Create scene node
+		GLMeshBuffer* lpDrawNormal = new GLMeshBuffer();
+		lpDrawNormal->setupPerVertexColor(vec4f(0,0,1,1), ctVertices*2, 4);
+		lpDrawNormal->setupVertexAttribs(allvertices, 3, vatPosition);
+		lpDrawNormal->setFaceMode(ftLines);
+
+		return lpDrawNormal;
+	}
+
+	void GPUPoly::drawNormals() {
+		if(!m_isValidVertex || !m_isValidNormal)
+			return;
+
+		U32 ctVertices;
+		vector<float> vertices;
+		vector<float> normals;
+
+		readBackNormals(ctVertices, vertices, normals);
+
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+		glColor3f(0, 0, 1);
+		glBegin(GL_LINES);
+		for(U32 i=0; i < ctVertices; i++) {
+			vec3f ptStart = vec3f(&vertices[i*3]);
+			vec3f ptEnd = ptStart + vec3f(&normals[i*3]) * 0.3f;
+			glVertex3fv(ptStart.ptr());
+			glVertex3fv(ptEnd.ptr());
+		}
+
+		glEnd();
+		glPopAttrib();
+
 	}
 
 	void GPUPoly::DrawBox(const svec3f& lo, const svec3f& hi, const svec3f& color, float lineWidth)
@@ -591,6 +656,12 @@ namespace HPC{
 		//Apply Deformations to Polygonized Mesh
 		m_lpKernelApplyDeformations = lpProgramPoly->addKernel("ApplyVertexDeformations");
 		m_lpGPU->getKernelWorkgroupSize(m_lpKernelApplyDeformations);
+
+		m_lpKernelComputeFieldArray = lpProgramPoly->addKernel("ComputeFieldArray");
+		m_lpGPU->getKernelWorkgroupSize(m_lpKernelComputeFieldArray);
+
+		m_lpKernelComputeOffSurfacePointsAndFields = lpProgramPoly->addKernel("ComputeOffSurfacePointsAndFields");
+		m_lpGPU->getKernelWorkgroupSize(m_lpKernelComputeOffSurfacePointsAndFields);
 
 
 		//Tetrahedralizer
@@ -1045,7 +1116,7 @@ namespace HPC{
 		clReleaseMemObject(m_inMemCellParam);
 		clReleaseMemObject(m_inMemGridParam);
 
-		clReleaseMemObject(m_inoutMemAllFields);
+		//clReleaseMemObject(m_inoutMemAllFields);
 		clReleaseMemObject(m_inoutMemHighEdgesCount);
 		clReleaseMemObject(m_inoutMemHighEdgesFlags);
 		clReleaseMemObject(m_inMemHighEdgesOffset);
@@ -1168,6 +1239,188 @@ namespace HPC{
 		return true;
 	}
 
+	bool GPUPoly::readBackNormals(U32& ctVertices, vector<float>& vertices, vector<float>& normals) {
+		if(!m_isValidIndex)
+			return false;
+
+		ctVertices = m_ctVertices;
+
+		//Allocate buffers
+		vector<float> homogenousVertices;
+		homogenousVertices.resize(m_ctVertices * 4);
+		vertices.resize(m_ctVertices * 3);
+		normals.resize(m_ctVertices * 3);
+
+		//Sizes
+		U32 szVertexBuffer = sizeof(float) * 4 * m_ctVertices;
+		U32 szNormalBuffer = sizeof(float) * 3 * m_ctVertices;
+
+		//Vertices
+		cl_mem outMemMeshVertices = m_lpGPU->createMemBufferFromGL(m_vboVertex, ComputeDevice::memReadOnly);
+		cl_mem outMemMeshNormals = m_lpGPU->createMemBufferFromGL(m_vboNormal, ComputeDevice::memReadOnly);
+
+		//Vertices
+		m_lpGPU->enqueueAcquireGLObject(1, &outMemMeshVertices);
+		m_lpGPU->enqueueReadBuffer(outMemMeshVertices, szVertexBuffer, &homogenousVertices[0]);
+		m_lpGPU->enqueueReleaseGLObject(1, &outMemMeshVertices);
+
+		//Normals
+		m_lpGPU->enqueueAcquireGLObject(1, &outMemMeshNormals);
+		m_lpGPU->enqueueReadBuffer(outMemMeshNormals, szNormalBuffer, &normals[0]);
+		m_lpGPU->enqueueReleaseGLObject(1, &outMemMeshNormals);
+
+		m_lpGPU->finishAllCommands();
+
+		//Copy from homogenous coordinate system
+		for(U32 i=0; i<m_ctVertices; i++) {
+			vertices[i*3] = homogenousVertices[i*4];
+			vertices[i*3 + 1] = homogenousVertices[i*4 + 1];
+			vertices[i*3 + 2] = homogenousVertices[i*4 + 2];
+		}
+
+
+		//Release memory buffers
+		clReleaseMemObject(outMemMeshVertices);
+		clReleaseMemObject(outMemMeshNormals);
+
+		return true;
+	}
+
+	bool GPUPoly::readBackVoxelGridSamples(vec4u& dim, vector<float>& arrXYZF) {
+		if(!m_isValidIndex)
+			return false;
+
+//		int idX = get_global_id(0);
+//		int idY = get_global_id(1);
+//		int idZ = get_global_id(2);
+//		if((idX >= inGridParam->ctGridPoints[0])||(idY >= inGridParam->ctGridPoints[1])||(idZ >= inGridParam->ctGridPoints[2]))
+//			return;
+//		U32 idxVertex = idZ * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + idY * inGridParam->ctGridPoints[0] + idX;
+//		if(idxVertex >= inGridParam->ctTotalPoints)
+//			return;
+		//Copy Grid Dimension
+		dim.x = m_gridParam.ctGridPoints[0];
+		dim.y = m_gridParam.ctGridPoints[1];
+		dim.z = m_gridParam.ctGridPoints[2];
+		dim.w = m_gridParam.ctTotalPoints;
+
+		arrXYZF.resize(m_gridParam.ctTotalPoints * 4);
+		U32 szBuffer = m_gridParam.ctTotalPoints * 4 * sizeof(float);
+		m_lpGPU->enqueueReadBuffer(m_inoutMemAllFields, szBuffer, &arrXYZF[0]);
+		m_lpGPU->finishAllCommands();
+
+		return true;
+	}
+
+
+	int GPUPoly::computeFieldArray(U32 ctVertices, U32 step, vector<float>& vertices) {
+		if(step != 4)
+			return ERR_INVALID_INPUT_PARAM;
+		//Computes field value for an array of vertices
+//		__kernel void ComputeFieldArray(U32 ctVertices,
+//									   __global float4* arrInHeader4,
+//									   __global float4* arrInOps4,
+//									   __global float4* arrInPrims4,
+//									   __global float4* arrInMtxNodes4,
+//									   __global float4* arrInOutVertexFields)
+		size_t arrLocalIndex[3];
+		size_t arrGlobalIndex[3];
+		arrGlobalIndex[0] = ctVertices;
+		arrGlobalIndex[1] = 0;
+		arrGlobalIndex[2] = 0;
+
+		ComputeKernel::ComputeLocalIndexSpace(1, m_lpKernelComputeFieldArray->getKernelWorkGroupSize(), arrLocalIndex);
+		ComputeKernel::ComputeGlobalIndexSpace(1, arrLocalIndex, arrGlobalIndex);
+
+		//Create Memory for all field points
+		U32 szVertexBuffer = sizeof(float) * step * ctVertices;
+		cl_mem inoutMemFieldArray = m_lpGPU->createMemBuffer(szVertexBuffer, ComputeDevice::memReadWrite);
+		if(!m_lpGPU->enqueueWriteBuffer(inoutMemFieldArray, szVertexBuffer, &vertices[0]))
+			return ERR_GPUPOLY_BUFFER_NOT_WRITTEN;
+
+		m_lpKernelComputeFieldArray->setArg(0, sizeof(U32), (void *)&ctVertices);
+		m_lpKernelComputeFieldArray->setArg(1, sizeof(cl_mem), &m_inMemHeader);
+		m_lpKernelComputeFieldArray->setArg(2, sizeof(cl_mem), &m_inMemOps);
+		m_lpKernelComputeFieldArray->setArg(3, sizeof(cl_mem), &m_inMemPrims);
+		m_lpKernelComputeFieldArray->setArg(4, sizeof(cl_mem), &m_inMemMtx);
+		m_lpKernelComputeFieldArray->setArg(5, sizeof(cl_mem), &inoutMemFieldArray);
+
+		// Execute the kernel over the vector using the
+		// maximum number of work group items for this device
+		m_lpGPU->enqueueNDRangeKernel(m_lpKernelComputeFieldArray, 1, arrGlobalIndex, arrLocalIndex);
+		m_lpGPU->enqueueReadBuffer(inoutMemFieldArray, szVertexBuffer, &vertices[0]);
+
+		// Wait for all commands to complete
+		m_lpGPU->finishAllCommands();
+
+
+
+		return 1;
+	}
+
+	int GPUPoly::computeOffSurfacePointsAndFields(U32 interval, float len, U32& ctOutVertices, vector<float>& outOffSurfacePoints) {
+//		__kernel void ComputeOffSurfacePointsAndFields(float len,
+//													  U32 ctVertices,
+//													  __global float4* arrInMeshVertex,
+//													  __global float3* arrInMeshNormal,
+//													  __global float4* arrInHeader4,
+//													  __global float4* arrInOps4,
+//													  __global float4* arrInPrims4,
+//													  __global float4* arrInMtxNodes4,
+//													  __global float4* arrOutOffSurfaceXYZF)
+		size_t arrLocalIndex[3];
+		size_t arrGlobalIndex[3];
+		arrGlobalIndex[0] = m_ctVertices;
+		arrGlobalIndex[1] = 0;
+		arrGlobalIndex[2] = 0;
+
+
+		ComputeKernel::ComputeLocalIndexSpace(1, m_lpKernelComputeOffSurfacePointsAndFields->getKernelWorkGroupSize(), arrLocalIndex);
+		ComputeKernel::ComputeGlobalIndexSpace(1, arrLocalIndex, arrGlobalIndex);
+
+		//Create Memory for all field points
+		ctOutVertices = m_ctVertices*2;
+		outOffSurfacePoints.resize(m_stepVertex * ctOutVertices);
+		U32 szOffSurfaceBuffer = sizeof(float) * m_stepVertex * ctOutVertices;
+		cl_mem inoutMemOffSurface = m_lpGPU->createMemBuffer(szOffSurfaceBuffer, ComputeDevice::memReadWrite);
+
+
+		//Vertices
+		cl_mem outMemMeshVertices = m_lpGPU->createMemBufferFromGL(m_vboVertex, ComputeDevice::memReadOnly);
+		cl_mem outMemMeshNormals = m_lpGPU->createMemBufferFromGL(m_vboNormal, ComputeDevice::memReadOnly);
+
+		//Vertices
+		m_lpGPU->enqueueAcquireGLObject(1, &outMemMeshVertices);
+		m_lpGPU->enqueueAcquireGLObject(1, &outMemMeshNormals);
+
+
+		m_lpKernelComputeOffSurfacePointsAndFields->setArg(0, sizeof(float), (void *)&len);
+		m_lpKernelComputeOffSurfacePointsAndFields->setArg(1, sizeof(U32), (void *)&m_ctVertices);
+		m_lpKernelComputeOffSurfacePointsAndFields->setArg(2, sizeof(cl_mem), &outMemMeshVertices);
+		m_lpKernelComputeOffSurfacePointsAndFields->setArg(3, sizeof(cl_mem), &outMemMeshNormals);
+
+		m_lpKernelComputeOffSurfacePointsAndFields->setArg(4, sizeof(cl_mem), &m_inMemHeader);
+		m_lpKernelComputeOffSurfacePointsAndFields->setArg(5, sizeof(cl_mem), &m_inMemOps);
+		m_lpKernelComputeOffSurfacePointsAndFields->setArg(6, sizeof(cl_mem), &m_inMemPrims);
+		m_lpKernelComputeOffSurfacePointsAndFields->setArg(7, sizeof(cl_mem), &m_inMemMtx);
+		m_lpKernelComputeOffSurfacePointsAndFields->setArg(8, sizeof(cl_mem), &inoutMemOffSurface);
+
+		// Execute the kernel over the vector using the
+		// maximum number of work group items for this device
+		m_lpGPU->enqueueNDRangeKernel(m_lpKernelComputeOffSurfacePointsAndFields, 1, arrGlobalIndex, arrLocalIndex);
+
+		//Release Mesh Buffer
+		m_lpGPU->enqueueReleaseGLObject(1, &outMemMeshVertices);
+		m_lpGPU->enqueueReleaseGLObject(1, &outMemMeshNormals);
+
+		//ReadBack Offsurface Points
+		m_lpGPU->enqueueReadBuffer(inoutMemOffSurface, szOffSurfaceBuffer, &outOffSurfacePoints[0]);
+
+		// Wait for all commands to complete
+		m_lpGPU->finishAllCommands();
+
+		return 1;
+	}
 
 
 	int GPUPoly::computeElements(U32 ctElements)

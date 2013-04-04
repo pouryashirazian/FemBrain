@@ -180,8 +180,16 @@ Vec2<T> Vec2<T>::maxP(const Vec2& a, const Vec2& b)
 typedef Vec2<double> vec2d;
 typedef Vec2<float> vec2f;
 typedef Vec2<psreal> vec2;
-typedef Vec2<int> vec2i;
 typedef Vec2<bool> vec2b;
+
+typedef Vec2<I32>   vec2i;
+typedef Vec2<U32>	 vec2u;
+typedef Vec2<I16>   vec2i16;
+typedef Vec2<U16>	 vec2u16;
+typedef Vec2<I32>   vec2i32;
+typedef Vec2<U32>	 vec2u32;
+typedef Vec2<I64>   vec2i64;
+typedef Vec2<U64>	 vec2u64;
 
 ////////////////////////////////////////////////////////////////
 /*!
@@ -192,6 +200,7 @@ class Vec3{
 public:
     //Constructors
     Vec3() {}
+    Vec3(T a_):x(a_), y(a_), z(a_) {}
     Vec3(T x_, T y_, T z_):x(x_), y(y_), z(z_) {}
     Vec3(const Vec3& rhs):x(rhs.x), y(rhs.y), z(rhs.z) {}
     Vec3(const T *lpValues)
@@ -376,8 +385,17 @@ Vec3<T> Vec3<T>::maxP(const Vec3& a, const Vec3& b)
 typedef Vec3<double> vec3d;
 typedef Vec3<float> vec3f;
 typedef Vec3<psreal> vec3;
-typedef Vec3<int>   vec3i;
 typedef Vec3<bool>  vec3b;
+
+typedef Vec3<I32>   vec3i;
+typedef Vec3<U32>	 vec3u;
+typedef Vec3<I16>   vec3i16;
+typedef Vec3<U16>	 vec3u16;
+typedef Vec3<I32>   vec3i32;
+typedef Vec3<U32>	 vec3u32;
+typedef Vec3<I64>   vec3i64;
+typedef Vec3<U64>	 vec3u64;
+
 
 ////////////////////////////////////////////////////////////////
 /*!
@@ -507,8 +525,17 @@ Vec4<T> Vec4<T>::operator-(const Vec4<T>& rhs) const
 typedef Vec4<double> vec4d;
 typedef Vec4<float> vec4f;
 typedef Vec4<psreal> vec4;
-typedef Vec4<int>  vec4i;
 typedef Vec4<bool> vec4b;
+
+typedef Vec4<I32>   vec4i;
+typedef Vec4<U32>	 vec4u;
+typedef Vec4<I16>   vec4i16;
+typedef Vec4<U16>	 vec4u16;
+typedef Vec4<I32>   vec4i32;
+typedef Vec4<U32>	 vec4u32;
+typedef Vec4<I64>   vec4i64;
+typedef Vec4<U64>	 vec4u64;
+
 }
 }
 #endif // PS_VECTOR_H

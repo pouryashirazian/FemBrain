@@ -14,6 +14,8 @@
 #include "PS_Base/PS_Logger.h"
 #include "PS_Base/PS_FileDirectory.h"
 #include "PS_BlobTreeRender/PS_OclPolygonizer.h"
+#include "PS_BlobTreeRender/PS_RBF.h"
+
 #include "PS_Graphics/PS_ArcBallCamera.h"
 #include "PS_Graphics/PS_GLFuncs.h"
 #include "PS_Graphics/PS_GLSurface.h"
@@ -23,6 +25,7 @@
 #include "PS_Graphics/OclRayTracer.h"
 #include "PS_Graphics/GroundMartrix.h"
 #include "PS_Graphics/SceneBox.h"
+
 
 #include "PS_Deformable/PS_Deformable.h"
 #include "PS_Deformable/PS_VegWriter.h"
@@ -139,11 +142,14 @@ AvatarCube* g_lpAvatarCube = NULL;
 AbstractWidget*	g_lpAffineWidget = NULL;
 GroundMatrix* g_lpGroundMatrix = NULL;
 SceneBox* g_lpSceneBox = NULL;
+GLMeshBuffer* g_lpDrawNormals = NULL;
+
 
 //SimulationObjects
-PS::ArcBallCamera g_arcBallCam;
-PS::HPC::GPUPoly* g_lpBlobRender = NULL;
-Deformable* g_lpDeformable = NULL;
+PS::ArcBallCamera 	g_arcBallCam;
+PS::HPC::GPUPoly* 	g_lpBlobRender = NULL;
+PS::HPC::FastRBF*	g_lpFastRBF = NULL;
+Deformable* 		g_lpDeformable = NULL;
 
 //Info Lines
 std::vector<std::string> g_infoLines;
@@ -173,8 +179,8 @@ void DrawText(const char* chrText, int x, int y);
 string GetGPUInfo();
 
 //Settings
-void LoadSettings(const std::string& strSimFP);
-void SaveSettings(const std::string& strSimFP);
+bool LoadSettings(const std::string& strSimFP);
+bool SaveSettings(const std::string& strSimFP);
 ////////////////////////////////////////////////
 //Vertex Shader Code
 const char * g_lpVertexShaderCode = 
@@ -239,8 +245,14 @@ void Draw()
 	{
 		g_lpBlobRender->setWireFrameMode(g_appSettings.drawIsoSurface == disWireFrame);
 
-		if(g_appSettings.bDrawAABB)
+		//Draw AABB and Normals
+		if(g_appSettings.bDrawAABB) {
 			g_lpBlobRender->drawBBox();
+
+			if(g_lpDrawNormals)
+				g_lpDrawNormals->draw();
+		}
+
 		glEnable(GL_LIGHTING);
 			g_lpBlobRender->draw();
 		glDisable(GL_LIGHTING);
@@ -679,6 +691,8 @@ void Close()
 
 	//Cleanup
 	cout << "Cleanup Memory objects" << endl;
+
+	SAFE_DELETE(g_lpDrawNormals);
 	SAFE_DELETE(g_lpSurface);
 	SAFE_DELETE(g_lpBlobRender);
 	SAFE_DELETE(g_lpDeformable);
@@ -937,8 +951,14 @@ void TimeStep(int t)
 	glutTimerFunc(g_appSettings.timerInterval, TimeStep, 0);
 }
 
-void LoadSettings(const std::string& strSimFP)
+bool LoadSettings(const std::string& strSimFP)
 {
+	if(!PS::FILESTRINGUTILS::FileExists(DAnsiStr(strSimFP.c_str()))) {
+		LogErrorArg1("SIM file not found at: %s", strSimFP.c_str());
+		return false;
+	}
+
+
 	LogInfo("Loading Settings from the ini file.");
 	CSketchConfig cfg(DAnsiStr(strSimFP.c_str()), CSketchConfig::fmRead);
 
@@ -985,9 +1005,10 @@ void LoadSettings(const std::string& strSimFP)
 	g_infoLines.push_back(string("HAPTIC"));
 	g_infoLines.push_back(string("ANIMATION"));
 	g_infoLines.push_back(string("MESH"));
+	return true;
 }
 
-void SaveSettings(const std::string& strSimFP)
+bool SaveSettings(const std::string& strSimFP)
 {
 	LogInfo("Saving settings to ini file");
 	CSketchConfig cfg(DAnsiStr(strSimFP.c_str()), CSketchConfig::fmReadWrite);
@@ -1005,6 +1026,8 @@ void SaveSettings(const std::string& strSimFP)
 	vec3d sides = g_lpAvatarCube->upper() - g_lpAvatarCube->lower();
 	cfg.writeVec3f("AVATAR", "POS", TheUITransform::Instance().translate);
 	cfg.writeVec3f("AVATAR", "THICKNESS", vec3f(sides.x, sides.y, sides.z));
+
+	return true;
 }
 
 
@@ -1111,7 +1134,8 @@ int main(int argc, char* argv[])
 	CompileShaderCode(g_lpVertexShaderCode, g_lpFragShaderCode, g_uiShader);
 
 	//Load Settings
-	LoadSettings(g_appSettings.strSimFilePath);
+	if(!LoadSettings(g_appSettings.strSimFilePath))
+		exit(0);
 
 	//Ground and Room
 	g_lpGroundMatrix = new GroundMatrix(32, 32, 0.2);
@@ -1132,6 +1156,8 @@ int main(int argc, char* argv[])
 		exit(-1);
 	}
 	g_lpBlobRender->runPolygonizer(g_appSettings.cellsize);
+	g_lpDrawNormals = g_lpBlobRender->prepareMeshBufferForDrawingNormals();
+	g_lpFastRBF = new FastRBF(g_lpBlobRender);
 
 	{
 		//Read Back Polygonized Mesh

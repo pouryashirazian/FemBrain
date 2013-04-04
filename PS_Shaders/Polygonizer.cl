@@ -2,7 +2,7 @@
 
 
 //Enabling Newton-Raphson will take forever to compile cl file 
-#define USE_NEWTONRAPHSON
+//#define USE_NEWTONRAPHSON
 
 //DATASIZES
 #define DATASIZE_HEADER		12
@@ -1184,6 +1184,46 @@ __kernel void ComputeAllFields(__global float4* arrInHeader4,
 	
 	v.w = field;		
 	arrOutFields[idxVertex] = v;
+}
+
+//Computes field value for an array of vertices
+__kernel void ComputeFieldArray(U32 ctVertices,
+							   __global float4* arrInHeader4,
+							   __global float4* arrInOps4,										 
+							   __global float4* arrInPrims4,											 
+							   __global float4* arrInMtxNodes4,							
+							   __global float4* arrInOutVertexFields)			
+{
+	int idX = get_global_id(0);
+	if(idX >= ctVertices)
+		return;
+	float field	= ComputeField(arrInOutVertexFields[idX], arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+	arrInOutVertexFields[idX].w = field;
+}
+
+//Per each vertex computes 2 offscreen points and their associated field-values
+//Normals determine the direction of extrusion and intrusion
+__kernel void ComputeOffSurfacePointsAndFields(float len,
+											  U32 ctVertices,											 											
+											  __global float4* arrInMeshVertex,
+											  __global float3* arrInMeshNormal,						  								   
+											  __global float4* arrInHeader4,
+											  __global float4* arrInOps4,										 
+											  __global float4* arrInPrims4,											 
+											  __global float4* arrInMtxNodes4,									
+											  __global float4* arrOutOffSurfaceXYZF) 
+{
+	int idX = get_global_id(0);
+	if(idX >= ctVertices)
+		return;
+	
+	float4 ptOut = arrInMeshVertex[idX] + len * (float4)(arrInMeshNormal[idX], 0);
+	float4 ptIn = arrInMeshVertex[idX] - len * (float4)(arrInMeshNormal[idX], 0);
+	ptOut.w		= ComputeField(ptOut, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+	ptIn.w		= ComputeField(ptIn, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+	
+	arrOutOffSurfaceXYZF[idX*2] = ptOut;
+	arrOutOffSurfaceXYZF[idX*2+1] = ptIn;
 }
 
 //Computes the edgetable for polygonizer

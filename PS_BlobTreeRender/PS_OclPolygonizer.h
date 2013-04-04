@@ -117,12 +117,32 @@ public:
 	//Run tetrahedralization process
 	int runTetrahedralizer();
 
-	//Draws the mesh using accelerated memory buffer objects
+	//Draws the model AABB
+	void getModelAABB(vec3f& lo, vec3f& hi);
 	void drawBBox();
+
+	//Buffer to draw normals
+	GLMeshBuffer* prepareMeshBufferForDrawingNormals(float len = 0.3f);
+
+	//Draws the mesh normals
+	void drawNormals();
 
 	//Read-back Mesh
 	bool readBackMesh(U32& ctVertices, vector<float>& vertices,
 						U32& ctFaceElements, vector<U32>& elements);
+
+	//Reads normals
+	bool readBackNormals(U32& ctVertices, vector<float>& vertices, vector<float>& normals);
+
+	//Read voxel grid vertex fields
+	bool readBackVoxelGridSamples(vec4u& dim, vector<float>& arrXYZF);
+
+	/*
+	 * Computes fieldvalues for an array of points. The fourth component will be assigned
+	 * the field associated with the volume model
+	 */
+	int computeFieldArray(U32 ctVertices, U32 step, vector<float>& vertices);
+	int computeOffSurfacePointsAndFields(U32 interval, float len, U32& ctOutVertices, vector<float>& outOffSurfacePoints);
 
 	/*!
 	 * Applies computed displacements from FEM Integrator on the polygonized mesh vertices
@@ -227,6 +247,8 @@ private:
 
 	//Finite Element
 	ComputeKernel* m_lpKernelApplyDeformations;
+	ComputeKernel* m_lpKernelComputeFieldArray;
+	ComputeKernel* m_lpKernelComputeOffSurfacePointsAndFields;
 
 
 	//Reusable vars

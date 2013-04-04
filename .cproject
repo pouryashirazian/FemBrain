@@ -6,7 +6,7 @@
 		<cconfiguration id="cdt.managedbuild.config.gnu.cross.exe.debug.796095584">
 			<storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="cdt.managedbuild.config.gnu.cross.exe.debug.796095584" moduleId="org.eclipse.cdt.core.settings" name="Debug">
 				<macros>
-					<stringMacro name="CPP_COMPONENTS" type="VALUE_TEXT" value="/Users/pourya/Desktop/Projects/Dependencies"/>
+					<stringMacro name="CPP_COMPONENTS" type="VALUE_TEXT" value="/home/pourya/Desktop/Projects/Dependencies"/>
 				</macros>
 				<externalSettings/>
 				<extensions>
@@ -30,6 +30,7 @@
 								<option id="gnu.cpp.compiler.option.debugging.level.163294574" name="Debug Level" superClass="gnu.cpp.compiler.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.2115444334" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
+									<listOptionValue builtIn="false" value="/usr/local/include/eigen3"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/OPENCL/common/inc"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLUI/src/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLEW/include"/>
@@ -74,7 +75,7 @@
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLEW/lib"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/AA_TetGen}&quot;"/>
 								</option>
-								<option id="gnu.cpp.link.option.flags.618014586" name="Linker flags" superClass="gnu.cpp.link.option.flags" value="-framework OpenCL -framework OpenGL" valueType="string"/>
+								<option id="gnu.cpp.link.option.flags.618014586" name="Linker flags" superClass="gnu.cpp.link.option.flags" value="" valueType="string"/>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.907987824" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
@@ -85,6 +86,9 @@
 							</tool>
 						</toolChain>
 					</folderInfo>
+					<sourceEntries>
+						<entry excluding="3rdparty" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+					</sourceEntries>
 				</configuration>
 			</storageModule>
 			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
@@ -92,7 +96,7 @@
 		<cconfiguration id="cdt.managedbuild.config.gnu.cross.exe.release.677320393">
 			<storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="cdt.managedbuild.config.gnu.cross.exe.release.677320393" moduleId="org.eclipse.cdt.core.settings" name="Release">
 				<macros>
-					<stringMacro name="CPP_COMPONENTS" type="VALUE_TEXT" value="/Users/pourya/Desktop/Projects/Dependencies"/>
+					<stringMacro name="CPP_COMPONENTS" type="VALUE_TEXT" value="/home/pourya/Desktop/Projects/Dependencies"/>
 				</macros>
 				<externalSettings/>
 				<extensions>
@@ -171,6 +175,9 @@
 							</tool>
 						</toolChain>
 					</folderInfo>
+					<sourceEntries>
+						<entry excluding="3rdparty" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+					</sourceEntries>
 				</configuration>
 			</storageModule>
 			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
@@ -254,6 +261,9 @@
 							</tool>
 						</toolChain>
 					</folderInfo>
+					<sourceEntries>
+						<entry excluding="3rdparty" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+					</sourceEntries>
 				</configuration>
 			</storageModule>
 			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
@@ -332,6 +342,9 @@
 							</tool>
 						</toolChain>
 					</folderInfo>
+					<sourceEntries>
+						<entry excluding="3rdparty" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+					</sourceEntries>
 				</configuration>
 			</storageModule>
 			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
@@ -359,10 +372,13 @@
 		<configuration configurationName="Release">
 			<resource resourceType="PROJECT" workspacePath="/FemBrain"/>
 		</configuration>
+		<configuration configurationName="Apple Debug"/>
 		<configuration configurationName="Debug">
 			<resource resourceType="PROJECT" workspacePath="/FemBrain"/>
 		</configuration>
+		<configuration configurationName="Apple Release"/>
 	</storageModule>
 	<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
 	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
+	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
 </cproject>

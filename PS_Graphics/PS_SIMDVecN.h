@@ -3,9 +3,10 @@
 
 //#include "PS_VectorMath.h"
 #include "../PS_Base/PS_AlignedAlloc.h"
-#include <malloc>
 
-#if defined(PS_OS_WINDOWS)
+#ifdef PS_OS_MAC
+	#include <malloc>
+#elif defined(PS_OS_WINDOWS)
 	#include "windows.h"
 	#include "intrin.h"
 #endif

@@ -67,10 +67,15 @@ public:
 	bool getWireFrameMode() const {return m_bWireFrame;}
 	void setWireFrameMode(bool bSet) { m_bWireFrame = bSet;}
 
+	int getFaceMode() const {return m_faceMode;}
+	void setFaceMode(int fmode) {
+		m_faceMode = fmode;
+		m_ctFaceElements = m_ctVertices;
+	}
+
 	U32 countVertices() const {return m_ctVertices;}
 	U32 countTriangles() const {return m_ctFaceElements/3;}
 	U32 countFaceElements() const {return m_ctFaceElements;}
-	int getFaceMode() const {return m_faceMode;}
 
 	//Draw
 	virtual void draw();
