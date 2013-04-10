@@ -6,8 +6,9 @@
  */
 #include "PS_RBF.h"
 #include "PS_Graphics/PS_DebugUtils.h"
-//#include "../3rdparty/eigen/Eigen/Core"
 #undef Success
+
+//Include from 3rdparty source code directory instead of installation
 #include  "3rdparty/eigen/Eigen/Dense"
 
 
