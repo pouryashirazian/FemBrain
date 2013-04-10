@@ -8,7 +8,7 @@
 #include "PS_Graphics/PS_DebugUtils.h"
 //#include "../3rdparty/eigen/Eigen/Core"
 #undef Success
-#include <Eigen/Dense>
+#include  "3rdparty/eigen/Eigen/Dense"
 
 
 using Eigen::MatrixXd;
