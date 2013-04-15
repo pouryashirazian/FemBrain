@@ -24,7 +24,6 @@
 
 using namespace std;
 using namespace PS;
-using namespace PS::DEBUG;
 using namespace PS::FILESTRINGUTILS;
 using namespace PS::HPC;
 
@@ -44,7 +43,7 @@ using namespace PS::HPC;
 
 
 
-
+extern unsigned char g_triTableCompact[256][16];
 
 namespace PS{
 namespace HPC{
@@ -97,8 +96,7 @@ namespace HPC{
 		m_strModelFilePath = string(lpFilePath);
 
 		//Set Header
-		m_bboxLo = tempPrims.bboxLo;
-		m_bboxHi = tempPrims.bboxHi;
+		m_bbox = AABB(vec3f(&tempPrims.bboxLo.x), vec3f(&tempPrims.bboxHi.x));
 		m_arrHeader[0] = tempPrims.bboxLo.x;
 		m_arrHeader[1] = tempPrims.bboxLo.y;
 		m_arrHeader[2] = tempPrims.bboxLo.z;
@@ -466,14 +464,9 @@ namespace HPC{
 		ofs.close();
 	}
 
-	void GPUPoly::getModelAABB(vec3f& lo, vec3f& hi) {
-		lo = vec3f(m_bboxLo.x, m_bboxLo.y, m_bboxLo.z);
-		hi = vec3f(m_bboxHi.x, m_bboxHi.y, m_bboxHi.z);
-	}
-
 	void GPUPoly::drawBBox()
 	{
-		DrawBox(m_bboxLo, m_bboxHi, svec3f(0,0,1), 1.0f);
+		DrawAABB(m_bbox.lower(), m_bbox.upper(), vec3f(0,0,1), 1.0f);
 	}
 
 	GLMeshBuffer* GPUPoly::prepareMeshBufferForDrawingNormals(float len) {
@@ -1191,8 +1184,8 @@ namespace HPC{
 		return 1;
 	}
 
-	bool GPUPoly::readBackMesh(U32& ctVertices, vector<float>& vertices,
-								  U32& ctFaceElements, vector<U32>& elements) {
+	bool GPUPoly::readBackMesh(U32& ctVertices, vector<float>& verticesXYZ,
+								  U32& ctFaceElements, vector<U32>& elements) const {
 		if(!m_isValidIndex)
 			return false;
 
@@ -1202,7 +1195,7 @@ namespace HPC{
 		//Vertices
 		vector<float> homogenousVertices;
 		homogenousVertices.resize(m_ctVertices * 4);
-		vertices.resize(m_ctVertices * 3);
+		verticesXYZ.resize(m_ctVertices * 3);
 		elements.resize(m_ctFaceElements);
 
 		//Vertices
@@ -1219,9 +1212,9 @@ namespace HPC{
 
 		//Copy from homogenous coordinate system
 		for(U32 i=0; i<m_ctVertices; i++) {
-			vertices[i*3] = homogenousVertices[i*4];
-			vertices[i*3 + 1] = homogenousVertices[i*4 + 1];
-			vertices[i*3 + 2] = homogenousVertices[i*4 + 2];
+			verticesXYZ[i*3] = homogenousVertices[i*4];
+			verticesXYZ[i*3 + 1] = homogenousVertices[i*4 + 1];
+			verticesXYZ[i*3 + 2] = homogenousVertices[i*4 + 2];
 		}
 
 
@@ -1239,7 +1232,7 @@ namespace HPC{
 		return true;
 	}
 
-	bool GPUPoly::readBackNormals(U32& ctVertices, vector<float>& vertices, vector<float>& normals) {
+	bool GPUPoly::readBackNormals(U32& ctVertices, vector<float>& verticesXYZ, vector<float>& normals) const {
 		if(!m_isValidIndex)
 			return false;
 
@@ -1248,7 +1241,7 @@ namespace HPC{
 		//Allocate buffers
 		vector<float> homogenousVertices;
 		homogenousVertices.resize(m_ctVertices * 4);
-		vertices.resize(m_ctVertices * 3);
+		verticesXYZ.resize(m_ctVertices * 3);
 		normals.resize(m_ctVertices * 3);
 
 		//Sizes
@@ -1273,9 +1266,9 @@ namespace HPC{
 
 		//Copy from homogenous coordinate system
 		for(U32 i=0; i<m_ctVertices; i++) {
-			vertices[i*3] = homogenousVertices[i*4];
-			vertices[i*3 + 1] = homogenousVertices[i*4 + 1];
-			vertices[i*3 + 2] = homogenousVertices[i*4 + 2];
+			verticesXYZ[i*3] = homogenousVertices[i*4];
+			verticesXYZ[i*3 + 1] = homogenousVertices[i*4 + 1];
+			verticesXYZ[i*3 + 2] = homogenousVertices[i*4 + 2];
 		}
 
 
@@ -1286,7 +1279,7 @@ namespace HPC{
 		return true;
 	}
 
-	bool GPUPoly::readBackVoxelGridSamples(vec4u& dim, vector<float>& arrXYZF) {
+	bool GPUPoly::readBackVoxelGridSamples(vec4u& dim, vector<float>& arrXYZF) const {
 		if(!m_isValidIndex)
 			return false;
 

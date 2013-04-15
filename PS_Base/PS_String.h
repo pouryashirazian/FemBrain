@@ -13,8 +13,8 @@ namespace PS{
 	{
 	public:	
 		CAString(){;}
-		CAString(const wchar_t src[], size_t srcSize = 0);
-		CAString(const char src[], size_t srcSize = 0);
+        CAString(const wchar_t src[], int srcSize = 0);
+        CAString(const char src[], int srcSize = 0);
 		CAString(const CAString& src);
 
 		~CAString(){
@@ -23,21 +23,21 @@ namespace PS{
 
 		typedef char UNIT;
 
-		size_t getInputLength(const char src[]) const;
-		size_t getInputLengthW(const wchar_t src[]) const;
+        int getInputLength(const char src[]) const;
+        int getInputLengthW(const wchar_t src[]) const;
 
-		void copyFromW(const wchar_t src[], size_t srcSize = 0);
+        void copyFromW(const wchar_t src[], int srcSize = 0);
 
-		void appendFromW(const wchar_t src[], size_t srcSize = 0);
+        void appendFromW(const wchar_t src[], int srcSize = 0);
 		void appendFromW(const wchar_t wch);
 
 
 		int  decompose(const char delimiter, std::vector<CAString>& lstWords) const;
-		bool lcompare(const char chrBuffer[], size_t bufSize = 0) const;
+        bool lcompare(const char chrBuffer[], int bufSize = 0) const;
 
 
 		//Useful Funcs
-		CAString substr(size_t offset, size_t count = -1) const;
+        CAString substr(int offset, int count = -1) const;
 		CAString& toUpper();
 		CAString& toLower();
 		CAString& trim();
@@ -76,24 +76,24 @@ namespace PS{
 	{	
 	public:	
 		CWString(){;}
-		CWString(const char src[], size_t srcSize = 0);
-		CWString(const wchar_t src[], size_t srcSize = 0);
+        CWString(const char src[], int srcSize = 0);
+        CWString(const wchar_t src[], int srcSize = 0);
 		CWString(const CWString& src);
 
 		~CWString(){ reset();}
 
 
 		typedef wchar_t UNIT;
-		size_t getInputLength(const wchar_t src[]) const;
+        int getInputLength(const wchar_t src[]) const;
 
 
-		void copyFromA(const char src[], size_t srcSize = 0);
+        void copyFromA(const char src[], int srcSize = 0);
 
-		void appendFromA(const char src[], size_t srcSize = 0);
+        void appendFromA(const char src[], int srcSize = 0);
 		void appendFromA(const char ch);
 
 		//Useful Functions
-		CWString substr(size_t offset, size_t count = -1) const;
+        CWString substr(int offset, int count = -1) const;
 		CWString& toUpper();
 		CWString& toLower();
 

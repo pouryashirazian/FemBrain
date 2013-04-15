@@ -87,7 +87,7 @@ namespace PS{
 			return false;
 
 		DAnsiStr strLine;
-		for(size_t i=0; i < m_content.size(); i++)
+        for(int i=0; i < (int)m_content.size(); i++)
 		{
 			strLine = m_content[i];
 			if(strLine.length() > 0)
@@ -103,7 +103,7 @@ namespace PS{
 	int CAppConfig::hasSection(DAnsiStr strSection)
 	{
 		DAnsiStr str;
-		for(size_t i=0; i < m_content.size(); i++)
+        for(int i=0; i < (int)m_content.size(); i++)
 		{
 			str = m_content[i];
 			char ch = str.firstChar();
@@ -133,7 +133,7 @@ namespace PS{
 		if(startPos >= 0)
 		{
 			//Record file pos
-			for(size_t i=startPos+1; i < m_content.size(); i++)
+            for(int i=startPos+1; i < (int)m_content.size(); i++)
 			{
 				strLine = m_content[i];
 
@@ -150,7 +150,7 @@ namespace PS{
 				else
 				{
 					//Check Variable
-					for(size_t iChar=0; iChar < strLine.length(); iChar++)
+                    for(int iChar=0; iChar < strLine.length(); iChar++)
 					{
 						if(strLine[iChar] == L'=')
 						{
@@ -189,7 +189,7 @@ namespace PS{
 		if(startPos < 0) return false;
 
 		//Record file pos
-		for(size_t i=startPos+1; i < m_content.size(); i++)
+        for(int i=startPos+1; i < (int)m_content.size(); i++)
 		{
 			strLine = m_content[i];
 
@@ -205,7 +205,7 @@ namespace PS{
 			}
 			else
 			{
-				for(size_t iChar=0; iChar < strLine.length(); iChar++)
+                for(int iChar=0; iChar < strLine.length(); iChar++)
 				{
 					if(strLine[iChar] == L'=')
 					{
@@ -231,8 +231,8 @@ namespace PS{
 		DAnsiStr strLine = "";
 		if(readLine(section, variable, strLine))
 		{
-			size_t len = strLine.length();
-			for(size_t i=0; i < len; i++)
+            int len = strLine.length();
+            for(int i=0; i < len; i++)
 			{
 				if(strLine[i] == L'=')
 				{
@@ -339,7 +339,7 @@ namespace PS{
 		DAnsiStr strVal;
 		if(readValue(section, variable, strVal))
 		{
-			size_t pos;
+            int pos;
 			int iComp = 0;
 			DAnsiStr strTemp;
 			if(strVal.firstChar() == '(')
@@ -374,11 +374,11 @@ namespace PS{
 		DAnsiStr strValue, strTemp;
 		if(arrayInt.size() > 1)
 		{
-			for(size_t i=0; i<arrayInt.size(); i++)
+            for(int i=0; i<(int)arrayInt.size(); i++)
 			{
 				if(i == 0)
 					strTemp = printToAStr("(%d, ", arrayInt[i]);
-				else if(i == arrayInt.size() - 1)
+                else if(i == (int)arrayInt.size() - 1)
 					strTemp = printToAStr("%d)", arrayInt[i]);
 				else
 					strTemp = printToAStr("%d, ", arrayInt[i]);

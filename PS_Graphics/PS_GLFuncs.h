@@ -80,5 +80,13 @@ int  ScreenToWorld(const vec3d& screenP, vec3d& worldP);
  */
 int  ScreenToWorldReadStencil(int x, int y, vec3d& world);
 
+/*!
+ * \brief DrawAABB using direct model rendering
+ * \param lo
+ * \param hi
+ * \param color
+ * \param lineWidth
+ */
+void DrawAABB(const vec3f& lo, const vec3f& hi, const vec3f& color, float lineWidth = 1.0f);
 
 #endif /* PS_GLFUNCS_H_ */

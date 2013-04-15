@@ -6,11 +6,8 @@
  */
 #include "PS_GLFuncs.h"
 #include "GL/glew.h"
-#ifdef PS_OS_MAC
-	#include <GLUT/glut.h>
-#else
-	#include "GL/freeglut.h"
-#endif
+#include "GL/freeglut.h"
+//#include <GLUT/glut.h>
 
 #include <string.h>
 #include <iostream>
@@ -586,4 +583,28 @@ int ScreenToWorldReadStencil(int x, int y, vec3d& world)
 	world = vec3d(worldX, worldY, worldZ);
 
 	return stencilValue;
+}
+
+void DrawAABB(const vec3f& lo, const vec3f& hi, const vec3f& color, float lineWidth) {
+    float l = lo.x; float r = hi.x;
+    float b = lo.y; float t = hi.y;
+    float n = lo.z; float f = hi.z;
+
+    GLfloat vertices [][3] = {{l, b, f}, {l, t, f}, {r, t, f},
+                              {r, b, f}, {l, b, n}, {l, t, n},
+                              {r, t, n}, {r, b, n}};
+
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
+        glColor3f(color.x, color.y, color.z);
+        glLineWidth(lineWidth);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        glBegin(GL_QUADS);
+            glVertex3fv(vertices[0]); glVertex3fv(vertices[3]); glVertex3fv(vertices[2]); glVertex3fv(vertices[1]);
+            glVertex3fv(vertices[4]); glVertex3fv(vertices[5]); glVertex3fv(vertices[6]); glVertex3fv(vertices[7]);
+            glVertex3fv(vertices[3]); glVertex3fv(vertices[0]); glVertex3fv(vertices[4]); glVertex3fv(vertices[7]);
+            glVertex3fv(vertices[1]); glVertex3fv(vertices[2]); glVertex3fv(vertices[6]); glVertex3fv(vertices[5]);
+            glVertex3fv(vertices[2]); glVertex3fv(vertices[3]); glVertex3fv(vertices[7]); glVertex3fv(vertices[6]);
+            glVertex3fv(vertices[5]); glVertex3fv(vertices[4]); glVertex3fv(vertices[0]); glVertex3fv(vertices[1]);
+        glEnd();
+    glPopAttrib();
 }

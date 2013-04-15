@@ -5,6 +5,7 @@
 #include <fstream>
 #include <map>
 
+//#include "PS_BlobTreeRender/_CellConfigTableCompact.h";
 #include <tbb/task_scheduler_init.h>
 #include "PS_Base/PS_MathBase.h"
 
@@ -16,8 +17,8 @@
 #include "PS_BlobTreeRender/PS_OclPolygonizer.h"
 #include "PS_BlobTreeRender/PS_RBF.h"
 
+#include "PS_Graphics/ShaderManager.h"
 #include "PS_Graphics/PS_ArcBallCamera.h"
-#include "PS_Graphics/PS_GLFuncs.h"
 #include "PS_Graphics/PS_GLSurface.h"
 #include "PS_Graphics/PS_SketchConfig.h"
 #include "PS_Graphics/AffineWidgets.h"
@@ -25,6 +26,8 @@
 #include "PS_Graphics/OclRayTracer.h"
 #include "PS_Graphics/GroundMartrix.h"
 #include "PS_Graphics/SceneBox.h"
+#include "PS_Graphics/MeshRenderer.h"
+#include "PS_Graphics/PS_DebugUtils.h"
 
 
 #include "PS_Deformable/PS_Deformable.h"
@@ -95,7 +98,7 @@ public:
 
 public:
 	string strSimFilePath;
-	string strBlobFilePath;
+	string strModelFilePath;
 	int  drawIsoSurface;
 	bool bDrawGround;
 	bool bPanCamera;
@@ -144,7 +147,6 @@ GroundMatrix* g_lpGroundMatrix = NULL;
 SceneBox* g_lpSceneBox = NULL;
 GLMeshBuffer* g_lpDrawNormals = NULL;
 
-
 //SimulationObjects
 PS::ArcBallCamera 	g_arcBallCam;
 PS::HPC::GPUPoly* 	g_lpBlobRender = NULL;
@@ -156,13 +158,11 @@ std::vector<std::string> g_infoLines;
 
 GLSurface* g_lpSurface = NULL;
 AppSettings g_appSettings;
-GLuint g_uiShader;
 
 
 ////////////////////////////////////////////////
 //Function Prototype
 void Draw();
-void DrawBox(const vec3f& lo, const vec3f& hi, const vec3f& color, float lineWidth);
 void Resize(int w, int h);
 void TimeStep(int t);
 void MousePress(int button, int state, int x, int y);
@@ -240,7 +240,23 @@ void Draw()
 	if(g_lpDeformable && g_appSettings.bDrawTetMesh)
 		g_lpDeformable->draw();
 
+	if(g_lpFastRBF && (g_appSettings.drawIsoSurface != disNone)) {
+		g_lpFastRBF->setWireFrameMode(g_appSettings.drawIsoSurface == disWireFrame);
+
+		//Draw AABB and Normals
+		if(g_appSettings.bDrawAABB) {
+			g_lpFastRBF->drawBBox();
+			if(g_lpDrawNormals)
+				g_lpDrawNormals->draw();
+		}
+
+		glEnable(GL_LIGHTING);
+			g_lpFastRBF->draw();
+		glDisable(GL_LIGHTING);
+	}
+
 	//Draw Polygonizer output
+	/*
 	if(g_lpBlobRender && (g_appSettings.drawIsoSurface != disNone))
 	{
 		g_lpBlobRender->setWireFrameMode(g_appSettings.drawIsoSurface == disWireFrame);
@@ -257,6 +273,7 @@ void Draw()
 			g_lpBlobRender->draw();
 		glDisable(GL_LIGHTING);
 	}
+	*/
 
 
 	//Draw Interaction Avatar
@@ -323,6 +340,7 @@ void Draw()
 		sprintf(chrMsg, "ANIMATION FRAME# %08llu, LOGS# %08llu, ", g_appSettings.ctAnimFrame, g_appSettings.ctLogsCollected);
 		g_infoLines[INDEX_ANIMATION_INFO] = string(chrMsg);
 
+		/*
 		if(g_lpBlobRender && g_lpDeformable) {
 			sprintf(chrMsg, "MESH CELLSIZE:%.3f, ISOSURF: V# %d, TRI# %d, VOLUME: V# %d, TET# %d",
 					g_appSettings.cellsize,
@@ -332,6 +350,17 @@ void Draw()
 					g_lpDeformable->getTetMesh()->getNumElements());
 			g_infoLines[INDEX_MESH_INFO] = string(chrMsg);
 		}
+		*/
+		if(g_lpFastRBF && g_lpDeformable) {
+			sprintf(chrMsg, "MESH CELLSIZE:%.3f, ISOSURF: V# %d, TRI# %d, VOLUME: V# %d, TET# %d",
+					g_appSettings.cellsize,
+					g_lpFastRBF->countVertices(),
+					g_lpFastRBF->countTriangles(),
+					g_lpDeformable->getTetMesh()->getNumVertices(),
+					g_lpDeformable->getTetMesh()->getNumElements());
+			g_infoLines[INDEX_MESH_INFO] = string(chrMsg);
+		}
+
 	}
 
 	//Write Model Info
@@ -343,30 +372,7 @@ void Draw()
 	glutSwapBuffers();
 }
 
-void DrawBox(const vec3f& lo, const vec3f& hi, const vec3f& color, float lineWidth)
-{
-	float l = lo.x; float r = hi.x;
-	float b = lo.y; float t = hi.y;
-	float n = lo.z; float f = hi.z;
 
-	GLfloat vertices [][3] = {{l, b, f}, {l, t, f}, {r, t, f},
-							  {r, b, f}, {l, b, n}, {l, t, n},
-							  {r, t, n}, {r, b, n}};
-
-	glPushAttrib(GL_ALL_ATTRIB_BITS);
-		glColor3f(color.x, color.y, color.z);
-		glLineWidth(lineWidth);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		glBegin(GL_QUADS);
-			glVertex3fv(vertices[0]); glVertex3fv(vertices[3]); glVertex3fv(vertices[2]); glVertex3fv(vertices[1]);
-			glVertex3fv(vertices[4]); glVertex3fv(vertices[5]); glVertex3fv(vertices[6]); glVertex3fv(vertices[7]);
-			glVertex3fv(vertices[3]); glVertex3fv(vertices[0]); glVertex3fv(vertices[4]); glVertex3fv(vertices[7]);
-			glVertex3fv(vertices[1]); glVertex3fv(vertices[2]); glVertex3fv(vertices[6]); glVertex3fv(vertices[5]);
-			glVertex3fv(vertices[2]); glVertex3fv(vertices[3]); glVertex3fv(vertices[7]); glVertex3fv(vertices[6]);
-			glVertex3fv(vertices[5]); glVertex3fv(vertices[4]); glVertex3fv(vertices[0]); glVertex3fv(vertices[1]);
-		glEnd();
-	glPopAttrib();
-}
 
 void DrawText(const char* chrText, int x, int y)
 {
@@ -678,9 +684,10 @@ void MouseWheel(int button, int dir, int x, int y)
 }
 
 void ApplyDeformations(U32 dof, double* displacements) {
-
-	if(g_lpBlobRender)
-		g_lpBlobRender->applyFemDisplacements(dof, displacements);
+//	if(g_lpBlobRender)
+//		g_lpBlobRender->applyFemDisplacements(dof, displacements);
+	if(g_lpFastRBF)
+		g_lpFastRBF->applyFemDisplacements(dof, displacements);
 }
 
 void Close()
@@ -694,7 +701,7 @@ void Close()
 
 	SAFE_DELETE(g_lpDrawNormals);
 	SAFE_DELETE(g_lpSurface);
-	SAFE_DELETE(g_lpBlobRender);
+	SAFE_DELETE(g_lpFastRBF);
 	SAFE_DELETE(g_lpDeformable);
 	SAFE_DELETE(g_lpAvatarCube);
 	SAFE_DELETE(g_lpGroundMatrix);
@@ -963,7 +970,7 @@ bool LoadSettings(const std::string& strSimFP)
 	CSketchConfig cfg(DAnsiStr(strSimFP.c_str()), CSketchConfig::fmRead);
 
 	//MODEL
-	g_appSettings.strBlobFilePath = (string)(cfg.readString("MODEL", "BLOBFILE").c_str());
+	g_appSettings.strModelFilePath = (string)(cfg.readString("MODEL", "INPUTFILE").c_str());
 	int ctFixed = 	cfg.readInt("MODEL", "FIXEDVERTICESCOUNT", 0);
 	bool bres = cfg.readIntArray("MODEL", "FIXEDVERTICES", ctFixed, g_appSettings.vFixedVertices);
 	if(!bres) LogError("Unable to read specified number of fixed vertices!");
@@ -1131,7 +1138,7 @@ int main(int argc, char* argv[])
 	}
 
 	//Build Shaders for drawing the mesh
-	CompileShaderCode(g_lpVertexShaderCode, g_lpFragShaderCode, g_uiShader);
+	TheShaderManager::Instance().add(g_lpVertexShaderCode, g_lpFragShaderCode, "phong");
 
 	//Load Settings
 	if(!LoadSettings(g_appSettings.strSimFilePath))
@@ -1140,31 +1147,50 @@ int main(int argc, char* argv[])
 	//Ground and Room
 	g_lpGroundMatrix = new GroundMatrix(32, 32, 0.2);
 	g_lpSceneBox = new SceneBox(vec3f(-10,-10,-16), vec3f(10,10,16));
-	g_lpSceneBox->setShaderEffectProgram(g_uiShader);
+	g_lpSceneBox->setShaderEffectProgram(TheShaderManager::Instance().get("phong"));
 
 	//DAnsiStr strFPModel = ExtractFilePath(GetExePath());
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/flatdisk.scene";
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/testDisc3.scene";
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/CylinderWithHoles.scene";
 	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/peanut.scene";
-
 	//Process BlobTree, Produce TetMesh
-	g_lpBlobRender = new GPUPoly();
-	if(!g_lpBlobRender->readModel(g_appSettings.strBlobFilePath.c_str())) {
-		LogErrorArg1("Unable to read Blob file at: %s", g_appSettings.strBlobFilePath.c_str());
-		SAFE_DELETE(g_lpBlobRender);
-		exit(-1);
+	DAnsiStr strFileExt = ExtractFileExt(DAnsiStr(g_appSettings.strModelFilePath.c_str()));
+
+	//Mesh
+	U32 ctVertices, ctElements;
+	vector<U32> elements;
+	vector<float> vertices;
+
+	if(strFileExt == DAnsiStr("obj")) {
+		Mesh* lpMesh = new Mesh(g_appSettings.strModelFilePath.c_str());
+		lpMesh->fitToBBox(AABB(vec3f(0,0,0), vec3f(8, 8, 8)));
+		g_lpFastRBF = new FastRBF(lpMesh);
 	}
-	g_lpBlobRender->runPolygonizer(g_appSettings.cellsize);
-	g_lpDrawNormals = g_lpBlobRender->prepareMeshBufferForDrawingNormals();
-	g_lpFastRBF = new FastRBF(g_lpBlobRender);
+	else
+	{
+		GPUPoly* lpBlobRender = new GPUPoly();
+		if(!lpBlobRender->readModel(g_appSettings.strModelFilePath.c_str())) {
+			LogErrorArg1("Unable to read Blob file at: %s", g_appSettings.strModelFilePath.c_str());
+			SAFE_DELETE(lpBlobRender);
+			exit(-1);
+		}
+		lpBlobRender->runPolygonizer(g_appSettings.cellsize);
+		g_lpFastRBF = new FastRBF(lpBlobRender);
+
+		//Read Back Polygonized Mesh
+		if(!lpBlobRender->readBackMesh(ctVertices, vertices, ctElements, elements))
+			LogError("Unable to read mesh from RBF in the format of V3T3");
+		PS::DEBUG::PrintArrayF(&vertices[0], 200);
+
+		SAFE_DELETE(lpBlobRender);
+	}
+
+	//Prepares MeshBuffer for drawing normals
+	g_lpDrawNormals = g_lpFastRBF->prepareMeshBufferNormals();
+
 
 	{
-		//Read Back Polygonized Mesh
-		U32 ctVertices, ctElements;
-		vector<U32> elements;
-		vector<float> vertices;
-		g_lpBlobRender->readBackMesh(ctVertices, vertices, ctElements, elements);
 
 		//Produce Quality Tetrahedral Mesh
 		TetGenExporter::tesselate(ctVertices, &vertices[0], ctElements, &elements[0], "IsoSurfMeshIn", "TetMeshOut");

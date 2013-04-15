@@ -23,11 +23,21 @@ public:
     Vec2() {}
     Vec2(T x_, T y_):x(x_), y(y_) {}
     Vec2(const Vec2& rhs):x(rhs.x), y(rhs.y) {}
-    Vec2(T *lpValues)
-    {
-        x = lpValues[0];
-        y = lpValues[1];
+    Vec2(const T* pValues) {
+        load(pValues);
     }
+
+    //Load and Store
+    void load(const T* pValues) {
+        x = pValues[0];
+        y = pValues[1];
+    }
+
+    void store(const T* pValues) {
+        pValues[0] = x;
+        pValues[1] = y;
+    }
+
 
     //Public this functions
     inline void normalize();
@@ -46,6 +56,9 @@ public:
     static T distance(const Vec2& a, const Vec2& b);
     static Vec2 minP(const Vec2& a, const Vec2& b);
     static Vec2 maxP(const Vec2& a, const Vec2& b);
+    static Vec2 mul(const Vec2& a, const Vec2& b);
+    static Vec2 div(const Vec2& a, const Vec2& b);
+
 
 
     //Operators
@@ -177,6 +190,23 @@ Vec2<T> Vec2<T>::maxP(const Vec2& a, const Vec2& b)
     return result;
 }
 
+template<typename T>
+Vec2<T> Vec2<T>::mul(const Vec2& a, const Vec2& b) {
+    Vec2<T> result;
+    result.x = a.x * b.x;
+    result.y = a.y * b.y;
+    return result;
+}
+
+template<typename T>
+Vec2<T> Vec2<T>::div(const Vec2& a, const Vec2& b) {
+    Vec2<T> result;
+    result.x = a.x / b.x;
+    result.y = a.y / b.y;
+    return result;
+}
+
+
 typedef Vec2<double> vec2d;
 typedef Vec2<float> vec2f;
 typedef Vec2<psreal> vec2;
@@ -203,11 +233,21 @@ public:
     Vec3(T a_):x(a_), y(a_), z(a_) {}
     Vec3(T x_, T y_, T z_):x(x_), y(y_), z(z_) {}
     Vec3(const Vec3& rhs):x(rhs.x), y(rhs.y), z(rhs.z) {}
-    Vec3(const T *lpValues)
-    {
-        this->x = lpValues[0];
-        this->y = lpValues[1];
-        this->z = lpValues[2];
+    Vec3(const T* pValues) {
+        load(pValues);
+    }
+
+    //Load and Store
+    void load(const T* pValues) {
+        x = pValues[0];
+        y = pValues[1];
+        z = pValues[2];
+    }
+
+    void store(T* pValues) {
+        pValues[0] = x;
+        pValues[1] = y;
+        pValues[2] = z;
     }
 
     //Public this functions
@@ -228,6 +268,8 @@ public:
     static T distance(const Vec3& a, const Vec3& b);
     static Vec3 minP(const Vec3& a, const Vec3& b);
     static Vec3 maxP(const Vec3& a, const Vec3& b);
+    static Vec3 mul(const Vec3& a, const Vec3& b);
+    static Vec3 div(const Vec3& a, const Vec3& b);
 
     //Operators
     inline Vec3& operator=(const Vec3& rhs);
@@ -382,6 +424,25 @@ Vec3<T> Vec3<T>::maxP(const Vec3& a, const Vec3& b)
     return result;
 }
 
+template<typename T>
+Vec3<T> Vec3<T>::mul(const Vec3& a, const Vec3& b) {
+    Vec3<T> result;
+    result.x = a.x * b.x;
+    result.y = a.y * b.y;
+    result.z = a.z * b.z;
+    return result;
+}
+
+template<typename T>
+Vec3<T> Vec3<T>::div(const Vec3& a, const Vec3& b) {
+    Vec3<T> result;
+    result.x = a.x / b.x;
+    result.y = a.y / b.y;
+    result.z = a.z / b.z;
+    return result;
+}
+
+
 typedef Vec3<double> vec3d;
 typedef Vec3<float> vec3f;
 typedef Vec3<psreal> vec3;
@@ -410,14 +471,25 @@ public:
     Vec4(const Vec2<T>& vl2, const Vec2<T>& vr2):x(vl2.x), y(vl2.y), z(vr2.x), w(vr2.y) {}
     Vec4(const Vec3<T>& v3, T w_):x(v3.x), y(v3.y), z(v3.z), w(w_) {}
     Vec4(const Vec4& rhs):x(rhs.x), y(rhs.y), z(rhs.z), w(rhs.w) {}
-    Vec4(const T* lpValues)
-    {
-        assert(lpValues);
-        x = lpValues[0];
-        y = lpValues[1];
-        z = lpValues[2];
-        w = lpValues[3];
+    Vec4(const T* pValues) {
+        load(pValues);
     }
+
+    //Load and Store
+    void load(const T* pValues) {
+        x = pValues[0];
+        y = pValues[1];
+        z = pValues[2];
+        w = pValues[3];
+    }
+
+    void store(T* pValues) {
+        pValues[0] = x;
+        pValues[1] = y;
+        pValues[2] = z;
+        pValues[3] = w;
+    }
+
 
     /*!
       * Get the xyz part of the 4D vector
@@ -431,6 +503,11 @@ public:
       * The dot product of two 4D vectors
       */
     static T dot(const Vec4<T>& a, const Vec4<T>& b);
+    static Vec4 minP(const Vec4& a, const Vec4& b);
+    static Vec4 maxP(const Vec4& a, const Vec4& b);
+    static Vec4 mul(const Vec4& a, const Vec4& b);
+    static Vec4 div(const Vec4& a, const Vec4& b);
+
 
     //Operators
     inline Vec4& operator=(const Vec4& rhs);
@@ -482,6 +559,47 @@ T Vec4<T>::dot(const Vec4<T>& a, const Vec4<T>& b)
 {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
+
+template<typename T>
+Vec4<T> Vec4<T>::minP(const Vec4& a, const Vec4& b) {
+    Vec4<T> result;
+    result.x = MATHMIN(a.x, b.x);
+    result.y = MATHMIN(a.y, b.y);
+    result.z = MATHMIN(a.z, b.z);
+    result.w = MATHMIN(a.w, b.w);
+    return result;
+}
+
+template<typename T>
+Vec4<T> Vec4<T>::maxP(const Vec4& a, const Vec4& b) {
+    Vec4<T> result;
+    result.x = MATHMAX(a.x, b.x);
+    result.y = MATHMAX(a.y, b.y);
+    result.z = MATHMAX(a.z, b.z);
+    result.w = MATHMAX(a.w, b.w);
+    return result;
+}
+
+template<typename T>
+Vec4<T> Vec4<T>::mul(const Vec4& a, const Vec4& b) {
+    Vec4<T> result;
+    result.x = a.x * b.x;
+    result.y = a.y * b.y;
+    result.z = a.z * b.z;
+    result.w = a.w * b.w;
+    return result;
+}
+
+template<typename T>
+Vec4<T> Vec4<T>::div(const Vec4& a, const Vec4& b) {
+    Vec4<T> result;
+    result.x = a.x / b.x;
+    result.y = a.y / b.y;
+    result.z = a.z / b.z;
+    result.w = a.w / b.w;
+    return result;
+}
+
 
 template<typename T>
 Vec4<T>& Vec4<T>::operator=(const Vec4<T>& rhs)

@@ -32,7 +32,7 @@ namespace PS{
 
 		CTString();
 		CTString(const CTString& src);
-		CTString(const Type src[], size_t srcSize = 0);
+        CTString(const Type src[], int srcSize = 0);
 		virtual ~CTString();
 
 		__inline Type nullChar() const
@@ -43,7 +43,7 @@ namespace PS{
 				return (wchar_t)NULL_WCHAR;
 		}
 			
-		__inline size_t unitSize() const
+        __inline int unitSize() const
 		{
 			return sizeof(Type);
 		}
@@ -53,15 +53,15 @@ namespace PS{
 			return (sizeof(Type) == sizeof(char));
 		}
 
-		virtual size_t getInputLength(const Type src[]) const
+        virtual int getInputLength(const Type src[]) const
 		{
 			return static_cast<int>(src[0]) + 1;
 		}
 
-		void resize(size_t n);
-		void reserve(size_t n);
-		size_t length() const {return m_length;}
-		size_t capacity() const {return m_allocated - m_length - 1;}
+        void resize(int n);
+        void reserve(int n);
+        int length() const {return m_length;}
+        int capacity() const {return m_allocated - m_length - 1;}
 
 
 		int replaceChars(Type query, Type rhs);		
@@ -69,7 +69,7 @@ namespace PS{
 		void reset();
 		void init();
 		void zero_sequence();
-		bool isPos(size_t pos) const {return (pos >= 0 && pos < m_length);}
+        bool isPos(int pos) const {return (pos >= 0 && pos < m_length);}
 		bool isNullTerminated() const	{ return (m_sequence[m_length] == nullChar());}
 		bool empty() const { return (m_length == 0);}
 		//====================================================		
@@ -79,14 +79,14 @@ namespace PS{
 		Type* c_str() const {return m_sequence;}
 
 		//Other functions
-		bool lfindstr(const CTString& src, size_t &pos) const;
-		bool rfindstr(const CTString& src, size_t &pos) const;
-		bool lfind(Type ch, size_t &pos) const;
-		bool rfind(Type ch, size_t &pos) const;		
+        bool lfindstr(const CTString& src, int &pos) const;
+        bool rfindstr(const CTString& src, int &pos) const;
+        bool lfind(Type ch, int &pos) const;
+        bool rfind(Type ch, int &pos) const;
 		bool isEqual(const CTString& src) const
 		{
 			if(m_length != src.m_length) return false;
-			for(size_t i = 0; i<m_length; i++)
+            for(int i = 0; i<m_length; i++)
 				if(m_sequence[i] != src.m_sequence[i])
 					return false;
 			return true;
@@ -97,25 +97,25 @@ namespace PS{
 
 
 		//Useful functions for string manipulation
-		CTString substrT(size_t offset, size_t count = -1) const;
+        CTString substrT(int offset, int count = -1) const;
 		CTString& toUpper();
 		CTString& toLower();
 		
 
 		//Handy Copy and append functions
 		void copyFrom(const CTString& src);
-		void copyFromT(const Type src[], size_t srcSize = 0);
+        void copyFromT(const Type src[], int srcSize = 0);
 		void copyFromT(const Type ch);
 		//====================================================				
 		void appendFrom(const CTString& src);
-		void appendFromT(const Type src[], size_t srcSize = 0);	
+        void appendFromT(const Type src[], int srcSize = 0);
 		void appendFromT(const Type ch);
 		//====================================================		
 		//Operators
 		template<typename U>
 		friend std::ostream& operator <<(std::ostream& outs, const CTString& src);
 
-		Type operator [](size_t pos) const;
+        Type operator [](int pos) const;
 
 		void operator =(const CTString& src);
 		void operator =(const Type src[]);
@@ -142,8 +142,8 @@ namespace PS{
 
 	protected:
 		Type* m_sequence;
-		size_t m_length;
-		size_t m_allocated;
+        int m_length;
+        int m_allocated;
 	};
 
 
@@ -169,7 +169,7 @@ namespace PS{
 	}
 
 	template<class Type>			
-	CTString<Type>::CTString(const Type src[], size_t srcSize)
+    CTString<Type>::CTString(const Type src[], int srcSize)
 	{
 		init();
 		copyFromT(src, srcSize);
@@ -207,7 +207,7 @@ namespace PS{
 	}
 
 	template<class Type>
-	void CTString<Type>::resize(size_t n)
+    void CTString<Type>::resize(int n)
 	{
 		if(n <= m_length)
 			m_length = n;
@@ -236,7 +236,7 @@ namespace PS{
 	}
 	
 	template<class Type>
-	void CTString<Type>::copyFromT(const Type src[], size_t srcSize)
+    void CTString<Type>::copyFromT(const Type src[], int srcSize)
 	{
 		if((src != NULL)&&(srcSize == 0))
 			srcSize = getInputLength(src);
@@ -282,7 +282,7 @@ namespace PS{
 
 	//======================================================================================
 	template<class Type>
-	void CTString<Type>::appendFromT(const Type src[], size_t srcSize)
+    void CTString<Type>::appendFromT(const Type src[], int srcSize)
 	{
 		if((src != NULL)&&(srcSize == 0))
 			srcSize = getInputLength(src);
@@ -315,7 +315,7 @@ namespace PS{
 	int CTString<Type>::replaceChars(Type query, Type rhs)
 	{
 		int ctFound = 0;
-		for (size_t i=0; i < m_length; i++)
+        for (int i=0; i < m_length; i++)
 		{
 			if(m_sequence[i] == query)
 			{
@@ -327,7 +327,7 @@ namespace PS{
 	}
 	//======================================================================================
 	template<class Type>
-	void CTString<Type>::reserve(size_t n)
+    void CTString<Type>::reserve(int n)
 	{
 		if ( n <= m_allocated )
 			return;
@@ -374,7 +374,7 @@ namespace PS{
 	template<class Type>
 	CTString<Type>& CTString<Type>::toUpper()
 	{
-		for (size_t i=0; i < m_length; i++)
+        for (int i=0; i < m_length; i++)
 			m_sequence[i] = toupper((Type)m_sequence[i]);
 		return *this;				
 	}
@@ -382,16 +382,16 @@ namespace PS{
 	template<class Type>
 	CTString<Type>& CTString<Type>::toLower()
 	{
-		for (size_t i=0; i < m_length; i++)
+        for (int i=0; i < m_length; i++)
 			m_sequence[i] = tolower((Type)m_sequence[i]);
 		return *this;			
 	}
 
 	template<class Type>
-	bool CTString<Type>::lfind(Type ch, size_t &pos) const
+    bool CTString<Type>::lfind(Type ch, int &pos) const
 	{
 		if(m_length == 0) return false;
-		for (size_t i=0; i < m_length; i++)
+        for (int i=0; i < m_length; i++)
 		{
 			if(m_sequence[i] == ch)
 			{
@@ -403,7 +403,7 @@ namespace PS{
 	}
 
 	template<class Type>
-	bool CTString<Type>::rfind(Type ch, size_t &pos) const
+    bool CTString<Type>::rfind(Type ch, int &pos) const
 	{
 		if(m_length == 0) return false;
 		for (int i=(int)m_length-1; i >=0; i--)
@@ -418,19 +418,19 @@ namespace PS{
 	}
 
 	template<class Type>
-	bool CTString<Type>::lfindstr(const CTString& src, size_t &pos) const
+    bool CTString<Type>::lfindstr(const CTString& src, int &pos) const
 	{
 		pos = -1;
 		if(m_length == 0) return false;
-		size_t szQuery = src.length();
+        int szQuery = src.length();
 
 		if(szQuery > m_length) return false;
 
 		bool bMatched;
-		for(size_t i=0; i <= (m_length - szQuery); i++)
+        for(int i=0; i <= (m_length - szQuery); i++)
 		{
 			bMatched = true;
-			for(size_t j=0; j < szQuery; j++)
+            for(int j=0; j < szQuery; j++)
 			{
 				if(m_sequence[i + j] != src[j])
 				{
@@ -450,19 +450,19 @@ namespace PS{
 	}
 
 	template<class Type>
-	bool CTString<Type>::rfindstr(const CTString& src, size_t &pos) const
+    bool CTString<Type>::rfindstr(const CTString& src, int &pos) const
 	{
 		pos = -1;
 		if(m_length == 0) return false;
-		size_t szQuery = src.length();
+        int szQuery = src.length();
 
 		if(szQuery > m_length) return false;
 
 		bool bMatched;
-		for(size_t i=m_length - szQuery; i >= 0; i--)
+        for(int i=m_length - szQuery; i >= 0; i--)
 		{
 			bMatched = true;
-			for(size_t j=0; j < szQuery; j++)
+            for(int j=0; j < szQuery; j++)
 			{
 				if(m_sequence[i + j] != src[j])
 				{
@@ -482,13 +482,13 @@ namespace PS{
 	}
 
 	template<class Type>
-	CTString<Type> CTString<Type>::substrT(size_t offset, size_t count) const
+    CTString<Type> CTString<Type>::substrT(int offset, int count) const
 	{
 		CTString output;
 		if(m_length == 0) return output;
 		if(!isPos(offset)) return output;
 
-		if(count == size_t(-1))
+        if(count == int(-1))
 			count = m_length - offset;		
 		
 		if(!isPos(offset+count-1)) 
@@ -500,8 +500,8 @@ namespace PS{
 
 
 		Type *buffer = new Type[count+1];
-		size_t idx = 0;
-		for (size_t i=offset; i < offset + count; i++)
+        int idx = 0;
+        for (int i=offset; i < offset + count; i++)
 		{
 			buffer[idx] = m_sequence[i];
 			idx++;
@@ -517,7 +517,7 @@ namespace PS{
 	std::ostream& operator <<(std::ostream& outs, const CTString<Type>& src)
 	{
 		outs << src.m_length;
-		for (size_t i = 0; i < src.m_length; i++)
+        for (int i = 0; i < src.m_length; i++)
 		{
 			outs << static_cast<Type>(src.m_sequence[i]);
 		}
@@ -526,7 +526,7 @@ namespace PS{
 	}
 
 	template<class Type>
-	Type CTString<Type>::operator [](size_t pos) const
+    Type CTString<Type>::operator [](int pos) const
 	{
 		if(isPos(pos))
 			return m_sequence[pos];
@@ -556,14 +556,14 @@ namespace PS{
 	template<class Type>
 	void CTString<Type>::operator +=(const Type src[])
 	{
-		size_t len = getInputLength(src);
+        int len = getInputLength(src);
 		this->appendFromT(src, len);
 	}
 
 	template<class Type>
 	void CTString<Type>::operator +=(Type src[])
 	{
-		size_t len = getInputLength(src);
+        int len = getInputLength(src);
 		this->appendFromT(src, len);
 	}
 
@@ -584,7 +584,7 @@ namespace PS{
 	template<class Type>
 	CTString<Type>& CTString<Type>::operator +(const Type src[])
 	{
-		size_t len = getInputLength(src);
+        int len = getInputLength(src);
 		this->appendFromT(src, len);
 		return (*this);
 	}
@@ -592,7 +592,7 @@ namespace PS{
 	template<class Type>	
 	CTString<Type>& CTString<Type>::operator +(Type src[])
 	{
-		size_t len = getInputLength(src);
+        int len = getInputLength(src);
 		this->appendFromT(src, len);
 		return (*this);
 	}
@@ -610,7 +610,7 @@ namespace PS{
 	{
 		if(a.m_length != b.m_length) return false;
 
-		for (size_t i=0; i<a.m_length; i++)
+        for (int i=0; i<a.m_length; i++)
 		{
 			if(a.m_sequence[i] != b.m_sequence[i])
 				return false;
@@ -646,12 +646,12 @@ namespace PS{
 
 	std::istream& getLine(std::istream& ins, CTString& dst)
 	{
-		size_t len = 0;
+        int len = 0;
 		ins >> len;
 
 		int val;
 		wchar_t* chrBuffer = new wchar_t[len];
-		for (size_t i=0;i < len; i++)
+        for (int i=0;i < len; i++)
 		{
 			ins >> val;
 			chrBuffer[i] = static_cast<wchar_t>(val);

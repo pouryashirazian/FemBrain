@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include "PS_ShaderGLSL.h"
+#include "GL/glew.h"
 #include "../PS_Base/PS_FileDirectory.h"
 #include "../PS_Base/PS_ErrorManager.h"
 
@@ -364,7 +365,7 @@ bool GLShaderProgram::analyze()
         //attribute mediump vec4 myUV;
         //uniform mediump mat4 myMVPMatrix;
         //USAGE + PRECISION + TYPE + NAME
-        size_t pos;
+        int pos;
 
         while(strLine.length() > 0)
         {

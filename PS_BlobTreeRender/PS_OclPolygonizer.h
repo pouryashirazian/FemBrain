@@ -83,6 +83,20 @@ using namespace PS::FUNCTIONALMATH;
 //Defines an empty index to jump out of branch
 #define NULL_BLOB 0xFFFF
 
+#define ERR_GPUPOLY_KERNEL_NOT_BUILT -1
+#define ERR_GPUPOLY_BUFFER_NOT_WRITTEN -2
+#define ERR_GPUPOLY_BUFFER_NOT_READ -3
+#define ERR_GPUPOLY_TRITABLE_NOT_READ -4
+#define ERR_GPUPOLY_VERTEXTABLE_NOT_READ -5
+#define ERR_GPUPOLY_FIELDSTABLE		-6
+#define ERR_NO_CROSSED_CELLS 		-7
+#define ERR_INVALID_INPUT_PARAM 	-8
+
+
+#define MAX_VERTICES_COUNT_PER_CELL		15
+#define MAX_TRIANGLES_COUNT_PER_CELL	5
+
+
 
 namespace PS{
 namespace HPC{
@@ -118,7 +132,7 @@ public:
 	int runTetrahedralizer();
 
 	//Draws the model AABB
-	void getModelAABB(vec3f& lo, vec3f& hi);
+	AABB bbox() const {return m_bbox;}
 	void drawBBox();
 
 	//Buffer to draw normals
@@ -128,14 +142,14 @@ public:
 	void drawNormals();
 
 	//Read-back Mesh
-	bool readBackMesh(U32& ctVertices, vector<float>& vertices,
-						U32& ctFaceElements, vector<U32>& elements);
+	bool readBackMesh(U32& ctVertices, vector<float>& verticesXYZ,
+						U32& ctFaceElements, vector<U32>& elements) const;
 
 	//Reads normals
-	bool readBackNormals(U32& ctVertices, vector<float>& vertices, vector<float>& normals);
+	bool readBackNormals(U32& ctVertices, vector<float>& verticesXYZ, vector<float>& normals) const;
 
 	//Read voxel grid vertex fields
-	bool readBackVoxelGridSamples(vec4u& dim, vector<float>& arrXYZF);
+	bool readBackVoxelGridSamples(vec4u& dim, vector<float>& arrXYZF) const;
 
 	/*
 	 * Computes fieldvalues for an array of points. The fourth component will be assigned
@@ -151,6 +165,8 @@ public:
 	 * @return true if displacements applied successfully.
 	 */
 	bool applyFemDisplacements(U32 dof, double* displacements);
+
+	ComputeDevice* computeDevice() const {return m_lpGPU;}
 private:
 	struct NODE {
 		U32 index;
@@ -302,8 +318,7 @@ private:
 	float PS_SIMD_ALIGN(m_arrOps[PS_SIMD_PADSIZE(MAX_TREE_NODES*DATASIZE_OPERATOR)]);
 
 	//AABB
-	svec3f m_bboxLo;
-	svec3f m_bboxHi;
+	AABB m_bbox;
 
 	//Count of primitives and ops
 	U32 m_ctPrims;

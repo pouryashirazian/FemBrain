@@ -1,6 +1,5 @@
 #include "PS_MathBase.h"
 #include <malloc.h>
-#include <stdint.h>
 
 #ifndef PS_L1_CACHE_LINE_SIZE
 	#define PS_L1_CACHE_LINE_SIZE 64
@@ -25,16 +24,16 @@ inline void *AllocAligned(U32 size)
 {
 #if defined(PS_OS_WINDOWS)
     return _aligned_malloc(size, PS_L1_CACHE_LINE_SIZE);
-#elif defined (PS_OS_OPENBSD) || defined(PS_OS_MAC)
+#elif defined (PS_OS_OPENBSD) || defined(PS_OS_APPLE)
     // Allocate excess memory to ensure an aligned pointer can be returned
     void *mem = malloc(size + (PS_L1_CACHE_LINE_SIZE-1) + sizeof(void*));
     char *amem = ((char*)mem) + sizeof(void*);
-#ifdef PS_ENVIRONMENT64
-    	amem += PS_L1_CACHE_LINE_SIZE - (reinterpret_cast<uint64_t>(amem) &
-    									(PS_L1_CACHE_LINE_SIZE - 1));
+#if (PS_POINTER_SIZE == 8)
+    amem += PS_L1_CACHE_LINE_SIZE - (reinterpret_cast<uint64_t>(amem) &
+    								(PS_L1_CACHE_LINE_SIZE - 1));
 #else
-    	amem += PS_L1_CACHE_LINE_SIZE - (reinterpret_cast<uint32_t>(amem) &
-                         	 	 	 	 (PS_L1_CACHE_LINE_SIZE - 1));
+    amem += PS_L1_CACHE_LINE_SIZE - (reinterpret_cast<uint32_t>(amem) &
+                                       (PS_L1_CACHE_LINE_SIZE - 1));
 #endif
     ((void**)amem)[-1] = mem;
     return amem;

@@ -2,9 +2,8 @@
 #ifndef MATHHELPER_H
 #define MATHHELPER_H
 
-#include <math.h>
 #include <limits>
-#include <float.h>
+#include <math.h>
 #include <stdlib.h>
 #include <assert.h>
 
@@ -29,24 +28,6 @@
     #include <cfloat>
 #endif
 
-// Check windows
-#if _WIN32 || _WIN64
-#if _WIN64
-	#define PS_ENVIRONMENT64
-#else
-	#define PS_ENVIRONMENT32
-#endif
-#endif
-
-// Check GCC
-#if __GNUC__
-#if __x86_64__ || __ppc64__
-	#define PS_ENVIRONMENT64
-#else
-	#define PS_ENVIRONMENT32
-#endif
-#endif
-
 #define PS_PLUS_INFINITY FLT_MAX
 #define PS_MINUS_INFINITY -1.0f*FLT_MAX
 
@@ -59,11 +40,13 @@
     #define SAFE_DELETE_ARRAY(p) { if( (p) ) {delete [] (p); (p) = NULL;}}
 #endif
 
+#define PS_UNUSED(arg) (void)arg;
+
 #ifndef COMFORT_TYPES
 #define COMFORT_TYPES
 
 typedef unsigned char		U8;
-typedef unsigned short	U16;
+typedef unsigned short		U16;
 typedef unsigned int		U32;
 typedef			 char		I8;
 typedef			 short		I16;
@@ -74,7 +57,7 @@ typedef unsigned __int64	U64;
 typedef	__int64				I64;
 #else
 typedef unsigned long long	U64;
-typedef	 long long			I64;
+typedef	long long			I64;
 #endif
 
 typedef unsigned char	u_char;
@@ -120,11 +103,6 @@ const float EPSILON  = 0.0001f;
 #define ZERO_CLAMP(x)	((((x) > 0 && ((x) < EPSILON)) || ((x) < 0 && ((x) > -EPSILON)))?0.0f:(x) )
 
 //////////////////////////////////////////////////////////////////////////
-inline bool IsPow2(U32 x)
-{
-    return ((x&(x-1))==0);
-}
-
 inline int Log2f(float x)
 {
     unsigned int ix = (unsigned int&)x;
@@ -133,7 +111,7 @@ inline int Log2f(float x)
     return log2;
 }
 
-inline int Log2i(U32 x)
+inline int Log2i(unsigned int x)
 {
     return Log2f((float)x);
 }

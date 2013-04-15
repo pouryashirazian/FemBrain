@@ -10,19 +10,109 @@
 #include "PS_Mesh.h"
 #include "../PS_Base/PS_FileDirectory.h"
 #include "../PS_Base/PS_ErrorManager.h"
-
+#include <algorithm>
 
 using namespace PS::FILESTRINGUTILS;
 
 namespace PS{
 namespace MESH{
 
+MeshMaterial::MeshMaterial() {
+    m_isSerializeable = true;
+}
+
+MeshMaterial::MeshMaterial(const char* chrFilePath) {
+    m_isSerializeable = true;
+    this->read(chrFilePath);
+}
+
+MeshMaterial::~MeshMaterial() {
+
+}
+
+bool MeshMaterial::read(const char *chrFilePath) {
+    std::vector<DAnsiStr> content;
+    if(!ReadTextFile(chrFilePath, content))
+        return false;
+
+    //Process content line by line
+    DAnsiStr strLine;
+    std::vector<DAnsiStr> words;
+    for(U32 i=0; i<content.size(); i++)
+    {
+        strLine = content[i];
+        if(strLine.firstChar() == '#')
+            continue;
+        if(strLine.decompose(' ', words) == 0)
+            continue;
+
+        int ctWords = (int)words.size();
+
+        if((words[0] == "newmtl")&&(ctWords == 2))
+        {
+            this->strMTLName = string(words[1].cptr());
+        }
+        else if((words[0] == "Ns")&&(ctWords == 2))
+        {
+            this->shininess = static_cast<float>(atof(words[1].ptr()));
+        }
+        else if((words[0] == "Ka")&&(ctWords == 4))
+        {
+            this->ambient.x = static_cast<float>(atof(words[1].ptr()));
+            this->ambient.y = static_cast<float>(atof(words[2].ptr()));
+            this->ambient.z = static_cast<float>(atof(words[3].ptr()));
+        }
+        else if((words[0] == "Kd")&&(ctWords == 4))
+        {
+            this->diffused.x = static_cast<float>(atof(words[1].ptr()));
+            this->diffused.y = static_cast<float>(atof(words[2].ptr()));
+            this->diffused.z = static_cast<float>(atof(words[3].ptr()));
+        }
+        else if((words[0] == "Ks")&&(ctWords == 4))
+        {
+            this->specular.x = static_cast<float>(atof(words[1].ptr()));
+            this->specular.y = static_cast<float>(atof(words[2].ptr()));
+            this->specular.z = static_cast<float>(atof(words[3].ptr()));
+        }
+        else if((words[0] == "Ni")&&(ctWords == 2))
+        {
+            this->refractIndex = static_cast<float>(atof(words[1].ptr()));
+        }
+        else if((words[0] == "d")&&(ctWords == 2))
+        {
+            //d factor for transparency
+            this->trans = static_cast<float>(atof(words[1].ptr()));
+        }
+        else if((words[0] == "illum")&&(ctWords == 2))
+        {
+            this->illuminationModel = static_cast<int>(atoi(words[1].ptr()));
+        }
+        else if((words[0] == "map_Kd")&&(ctWords == 2))
+        {
+            this->strTexName = string(words[1].cptr());
+        }
+    }
+    content.resize(0);
+    return true;
+
+}
+
+bool MeshMaterial::write(const char *chrFilePath) {
+
+}
+
+
+
+
+
 MeshNode::MeshNode()
 {
-	szUnitFace = 3;
-	szUnitTexCoord = 2;
-	szUnitVertex   = 3;
-	lpMaterial = NULL;
+    init();
+}
+
+MeshNode::MeshNode(const string &name) {
+    init();
+    strNodeName = name;
 }
 
 MeshNode::~MeshNode()
@@ -31,6 +121,14 @@ MeshNode::~MeshNode()
 	arrTexCoords.resize(0);
 	arrNormals.resize(0);
 	arrVertices.resize(0);
+}
+
+void MeshNode::init() {
+    strNodeName = "UNTITLED";
+    szUnitFace = 3;
+    szUnitTexCoord = 2;
+    szUnitVertex   = 3;
+    lpMaterial = NULL;
 }
 
 int MeshNode::add(const vec3f& v, ArrayType dest, int count)
@@ -114,6 +212,45 @@ int MeshNode::countFaceIndexErrors() const
 	return ctErrors;
 }
 
+void MeshNode::computeVertexNormalsFromFaces() {
+    if(szUnitFace != 3)
+        return;
+
+    //Per each vertex we need to compute all the neighboring faces
+    vec3u32 face;
+    vec3f v[3];
+    vec3f n[3];
+    vec3f nf;
+    U32 ctFaces = countFaces();
+    arrNormals.resize(arrVertices.size());
+    std::fill(arrNormals.begin(), arrNormals.end(), 0.0f);
+    for(U32 i=0; i<ctFaces; i++) {
+        face.load(&arrIndices[i*3]);
+        v[0] = getVertex(face.x);
+        v[1] = getVertex(face.y);
+        v[2] = getVertex(face.z);
+
+        //cross(b-a, c-a)
+        //Face Normal
+        nf = vec3f::cross(v[1] - v[0], v[2] - v[0]);
+        n[0] = getNormal(face.x) + nf;
+        n[1] = getNormal(face.y) + nf;
+        n[2] = getNormal(face.z) + nf;
+
+        n[0].store(&arrNormals[face.x*3]);
+        n[1].store(&arrNormals[face.y*3]);
+        n[2].store(&arrNormals[face.z*3]);
+    }
+
+    //Normalize all normals
+    U32 ctVertices = this->countVertices();
+    for(U32 i=0; i<ctVertices; i++) {
+        nf = getNormal(i);
+        nf.normalize();
+        nf.store(&arrNormals[i*3]);
+    }
+}
+
 vec3f MeshNode::getAsVec3(int index, ArrayType dest) const
 {
 	vec3f output;
@@ -141,49 +278,25 @@ vec3f MeshNode::getAsVec3(int index, ArrayType dest) const
 
 vec3f MeshNode::getVertex(int idxVertex) const
 {
-	vec3f output;
-	U32 idxFloatArray = idxVertex * szUnitVertex;
-	assert(idxFloatArray >= 0 && idxFloatArray <= (arrVertices.size() - szUnitVertex));
-	output.x = arrVertices[idxFloatArray + 0];
-	output.y = arrVertices[idxFloatArray + 1];
-	output.z = arrVertices[idxFloatArray + 2];
-	return output;
+    //assert(szUnitVertex == 3);
+    return vec3f(&arrVertices[idxVertex*szUnitVertex]);
 }
 
 vec3f MeshNode::getNormal(int idxVertex) const
 {
-	vec3f output;
-	U32 idxFloatArray = idxVertex * szUnitVertex;
-	assert(idxFloatArray >= 0 && idxFloatArray <= (arrNormals.size() - szUnitVertex));
-	output.x = arrNormals[idxFloatArray + 0];
-	output.y = arrNormals[idxFloatArray + 1];
-	output.z = arrNormals[idxFloatArray + 2];
-	return output;
+    return vec3f(&arrNormals[idxVertex*3]);
 }
 
 vec2f MeshNode::getTexCoord2(int idxVertex) const
 {
-	assert(szUnitTexCoord == 2);
-
-	vec2f output;
-	U32 idxFloatArray = idxVertex * szUnitTexCoord;
-	assert(idxFloatArray >= 0 && idxFloatArray <= (arrTexCoords.size() - szUnitTexCoord));
-	output.x = arrTexCoords[idxFloatArray + 0];
-	output.y = arrTexCoords[idxFloatArray + 1];
-	return output;
+    //assert(szUnitTexCoord == 2);
+    return vec2f(&arrTexCoords[idxVertex * szUnitTexCoord]);
 }
 
 vec3f MeshNode::getTexCoord3(int idxVertex) const
 {
-	assert(szUnitTexCoord == 3);
-
-	vec3f output;
-	U32 idxFloatArray = idxVertex * szUnitTexCoord;
-	assert(idxFloatArray >= 0 && idxFloatArray <= (arrTexCoords.size() - szUnitTexCoord));
-	output.x = arrTexCoords[idxFloatArray + 0];
-	output.y = arrTexCoords[idxFloatArray + 1];
-	output.z = arrTexCoords[idxFloatArray + 2];
-	return output;
+    //assert(szUnitTexCoord == 2);
+    return vec3f(&arrTexCoords[idxVertex * szUnitTexCoord]);
 }
 
 AABB MeshNode::computeBoundingBox() const
@@ -212,6 +325,61 @@ AABB MeshNode::computeBoundingBox() const
 	return oct;
 }
 
+void MeshNode::move(const vec3f& d) {
+    U32 count = arrVertices.size() / 3;
+    for(U32 i=0; i<count; i++) {
+        float* pValues = &arrVertices[i * 3];
+        vec3f v = vec3f(pValues) + d;
+        v.store(pValues);
+    }
+}
+
+void MeshNode::scale(const vec3f& s) {
+    U32 count = arrVertices.size() / 3;
+    for(U32 i=0; i<count; i++) {
+        float* pValues = &arrVertices[i * 3];
+        vec3f v = vec3f(pValues);
+        v.x *= s.x;
+        v.y *= s.y;
+        v.z *= s.z;
+        v.store(pValues);
+    }
+}
+
+void MeshNode::rotate(const quat& q) {
+    quat qInv = q.inverted();
+    U32 count = arrVertices.size() / 3;
+    for(U32 i=0; i<count; i++) {
+        float* pValues = &arrVertices[i * 3];
+        vec3f v = vec3f(pValues);
+        v = q.transform(qInv, v);
+        v.store(pValues);
+    }
+}
+
+
+void MeshNode::fitToBBox(const AABB& box) {
+
+    vec3f e = this->computeBoundingBox().extent();    
+    bool isDegenerate = ((e.x < EPSILON)||(e.y < EPSILON)||(e.z < EPSILON));
+
+
+    //To keep the aspect ratio contant scale down the model to min BBOX
+    if(!isDegenerate) {
+        vec3f s = vec3f::div(box.extent(), e);
+        float sMin = MATHMIN(MATHMIN(s.x, s.y), s.z);
+        scale(vec3f(sMin));
+    }
+
+    AABB nb = computeBoundingBox();
+    move(box.lower() - nb.lower());
+
+    //Compare boxes now
+    nb = computeBoundingBox();
+}
+
+
+
 /*
 void CMeshNode::add(obj_vector* v, ArrayType where)
 {
@@ -238,9 +406,13 @@ void CMeshNode::add(obj_vector* v, ArrayType where)
 }
 */
 /////////////////////////////////////////////////////////////////////////
+Mesh::Mesh() {
+
+}
+
 Mesh::Mesh(const char* chrFileName)
 {
-	assert(load(chrFileName));
+    load(chrFileName);
 }
 
 Mesh::~Mesh()
@@ -268,7 +440,7 @@ MeshNode*	Mesh::getNode(int idx) const
 		return NULL;
 }
 
-int Mesh::getNodeCount() const
+int Mesh::countNodes() const
 {
 	return (int)m_nodes.size();
 }
@@ -276,8 +448,10 @@ int Mesh::getNodeCount() const
 
 void Mesh::addMeshMaterial(MeshMaterial* lpMaterial)
 {
-	if(lpMaterial != NULL)
+    if(lpMaterial != NULL) {
 		m_materials.push_back(lpMaterial);
+        m_mapMaterial.insert(std::pair<string, MeshMaterial*>(string(lpMaterial->name()), lpMaterial));
+    }
 }
 
 MeshMaterial* Mesh::getMaterial(int idx) const
@@ -288,32 +462,34 @@ MeshMaterial* Mesh::getMaterial(int idx) const
 		return NULL;
 }
 
-MeshMaterial* Mesh::getMaterial(const DAnsiStr& strName) const
+MeshMaterial* Mesh::getMaterial(const string& strName) const
 {
-	for(size_t i=0; i<m_materials.size(); i++)
-	{
-		if(m_materials[i]->strMTLName == strName)
-			return m_materials[i];
-	}
-	return NULL;
+    std::map<string, MeshMaterial*>::const_iterator it;
+    it = m_mapMaterial.find(strName);
+    if(it != m_mapMaterial.end())
+        return it->second;
+    else
+        return NULL;
 }
 
 bool Mesh::load(const char* chrFileName)
 {
-	m_strFilePath = DAnsiStr(chrFileName);
-
-	DAnsiStr strExt = ExtractFileExt(m_strFilePath);
-	if(strExt == "obj")
-		return loadObjGlobalVertexNormal(m_strFilePath.ptr());
+    m_strFilePath = string(chrFileName);
+    DAnsiStr strExt = ExtractFileExt(DAnsiStr(m_strFilePath.c_str()));
+    bool bres = false;
+    if(strExt == "obj") {
+        bres = loadObjGlobalVertexNormal(m_strFilePath.c_str());
+        computeMissingNormals();
+    }
 	else
 		ReportError("Invalid file format.");
-	return false;
+    return bres;
 }
 
 AABB Mesh::computeBoundingBox() const
 {
 	AABB box;
-	if(this->getNodeCount() == 0)
+    if(this->countNodes() == 0)
 		return box;
 
 	box = m_nodes[0]->computeBoundingBox();
@@ -322,105 +498,38 @@ AABB Mesh::computeBoundingBox() const
 	return box;
 }
 
-bool Mesh::readFileContent(const char* chrFileName, std::vector<DAnsiStr>& content)
-{
-	ifstream ifs(chrFileName, ios::in);
-	if(!ifs.is_open())
-		return false;
-
-	DAnsiStr strLine;
-	char buffer[2048];
-
-	while( !ifs.eof())
-	{
-		ifs.getline(buffer, 2048);
-		//ifs >> strLine;
-		strLine.copyFromT(buffer);
-		strLine.trim();
-		strLine.removeStartEndSpaces();
-		content.push_back(strLine);
-	}
-	ifs.close();
-
-	return true;
+void Mesh::computeMissingNormals() {
+    for(int i=0; i<this->countNodes(); i++) {
+        MeshNode* aNode = this->getNode(i);
+        if(aNode->countVertices() > 0 && aNode->countNormals() == 0)
+            aNode->computeVertexNormalsFromFaces();
+    }
 }
 
-bool Mesh::loadMTL(const char* chrFileName)
-{
-	std::vector<DAnsiStr> content;
-	if(!readFileContent(chrFileName, content))
-		return false;
+void Mesh::move(const vec3f &d) {
+    for(int i=0; i<this->countNodes(); i++)
+        this->getNode(i)->move(d);
+}
 
-	//Process content line by line
-	DAnsiStr strLine;
-	std::vector<DAnsiStr> words;
-	MeshMaterial* aMtrl = NULL;
-	for(size_t i=0; i<content.size(); i++)
-	{
-		strLine = content[i];
-		if(strLine.firstChar() == '#')
-			continue;
-		if(strLine.decompose(' ', words) == 0)
-			continue;
+void Mesh::scale(const vec3f& s) {
+    for(int i=0; i<this->countNodes(); i++)
+        this->getNode(i)->scale(s);
+}
 
-		int ctWords = (int)words.size();
+void Mesh::rotate(const quat& q) {
+    for(int i=0; i<this->countNodes(); i++)
+        this->getNode(i)->rotate(q);
+}
 
-		if((words[0] == "newmtl")&&(ctWords == 2))
-		{
-			aMtrl = new MeshMaterial();
-			aMtrl->strMTLName = words[1];
-			m_materials.push_back(aMtrl);
-		}
-		else if((words[0] == "Ns")&&(aMtrl)&&(ctWords == 2))
-		{
-			aMtrl->shininess = static_cast<float>(atof(words[1].ptr()));
-		}
-		else if((words[0] == "Ka")&&(aMtrl)&&(ctWords == 4))
-		{
-			aMtrl->ambient.x = static_cast<float>(atof(words[1].ptr()));
-			aMtrl->ambient.y = static_cast<float>(atof(words[2].ptr()));
-			aMtrl->ambient.z = static_cast<float>(atof(words[3].ptr()));
-		}
-		else if((words[0] == "Kd")&&(aMtrl)&&(ctWords == 4))
-		{
-			aMtrl->diffused.x = static_cast<float>(atof(words[1].ptr()));
-			aMtrl->diffused.y = static_cast<float>(atof(words[2].ptr()));
-			aMtrl->diffused.z = static_cast<float>(atof(words[3].ptr()));
-		}
-		else if((words[0] == "Ks")&&(aMtrl)&&(ctWords == 4))
-		{
-			aMtrl->specular.x = static_cast<float>(atof(words[1].ptr()));
-			aMtrl->specular.y = static_cast<float>(atof(words[2].ptr()));
-			aMtrl->specular.z = static_cast<float>(atof(words[3].ptr()));
-		}
-		else if((words[0] == "Ni")&&(aMtrl)&&(ctWords == 2))
-		{
-			aMtrl->refractIndex = static_cast<float>(atof(words[1].ptr()));
-		}
-		else if((words[0] == "d")&&(aMtrl)&&(ctWords == 2))
-		{
-			//d factor for transparency
-			aMtrl->trans = static_cast<float>(atof(words[1].ptr()));
-		}
-		else if((words[0] == "illum")&&(aMtrl)&&(ctWords == 2))
-		{
-			aMtrl->illuminationModel = static_cast<int>(atoi(words[1].ptr()));
-		}
-		else if((words[0] == "map_Kd")&&(aMtrl)&&(ctWords == 2))
-		{
-			aMtrl->strTexName = words[1];
-		}
-	}
-
-
-	content.resize(0);
-	return (m_materials.size() > 0);
+void Mesh::fitToBBox(const AABB& box) {
+    for(int i=0; i<this->countNodes(); i++)
+        this->getNode(i)->fitToBBox(box);
 }
 
 bool Mesh::loadObj(const char* chrFileName)
 {
 	std::vector<DAnsiStr> content;
-	if(!readFileContent(chrFileName, content))
+    if(!ReadTextFile(chrFileName, content))
 		return false;
 
 	//Process content line by line
@@ -445,7 +554,7 @@ bool Mesh::loadObj(const char* chrFileName)
 		{
 			//Create a new mesh node
 			aNode = new MeshNode();
-			aNode->strNodeName = words[1];
+            aNode->strNodeName = string(words[1].ptr());
 			aNode->szUnitFace     = 3;
 			aNode->szUnitTexCoord = 2;
 			aNode->szUnitVertex   = 3;
@@ -457,7 +566,11 @@ bool Mesh::loadObj(const char* chrFileName)
 		{
 			DAnsiStr strFP = DAnsiStr(chrFileName);
 			strFP = ExtractFilePath(strFP) + words[1];
-			loadMTL(strFP.ptr());
+
+            //Load Material
+            MeshMaterial* lpMtrl = new MeshMaterial(strFP.cptr());
+            lpMtrl->setName(string(words[1].cptr()));
+            m_materials.push_back(lpMtrl);
 		}
 		else if((words[0] == "v")&&(aNode)&&(ctWords == 4))
 		{
@@ -493,7 +606,7 @@ bool Mesh::loadObj(const char* chrFileName)
 		}
 		else if((words[0] == "usemtl")&&(aNode)&&(ctWords == 2))
 		{
-			aNode->lpMaterial = getMaterial(words[1]);
+            aNode->lpMaterial = getMaterial(string(words[1].cptr()));
 		}
 		else if((words[0] == "f")&&(aNode)&&(ctWords > 3))
 		{
@@ -537,7 +650,7 @@ bool Mesh::loadObj(const char* chrFileName)
 		if(lpNode->arrVertices.size() != lpNode->arrNormals.size())
 		{
 			DAnsiStr strMsg = printToAStr("MESHNODE[%d] NAME=%s Does Not have equal number of vertices and normals! [V=%d, N=%d]",
-										  i, lpNode->strNodeName.ptr(), lpNode->countVertices(), lpNode->countNormals());
+                                          i, lpNode->getName().c_str(), lpNode->countVertices(), lpNode->countNormals());
 			ReportError(strMsg.ptr());
 		}
 	}
@@ -550,7 +663,7 @@ bool Mesh::loadObj(const char* chrFileName)
 bool Mesh::loadObjGlobalVertexNormal(const char* chrFileName)
 {
 	std::vector<DAnsiStr> content;
-	if(!readFileContent(chrFileName, content))
+    if(!ReadTextFile(chrFileName, content))
 		return false;
 
 	//Process content line by line
@@ -636,32 +749,36 @@ bool Mesh::loadObjGlobalVertexNormal(const char* chrFileName)
 		if((words[0] == "o")&&(ctWords == 2))
 		{
 			//Create a new mesh node
-			aNode = new MeshNode();
-			aNode->strNodeName = words[1];
-			aNode->szUnitFace     = 3;
-			aNode->szUnitTexCoord = 2;
-			aNode->szUnitVertex   = 3;
+            aNode = new MeshNode(string(words[1].cptr()));
 			m_nodes.push_back(aNode);
 		}
 		else if((words[0] == "mtllib")&&(ctWords == 2))
 		{
 			DAnsiStr strFP = DAnsiStr(chrFileName);
 			strFP = ExtractFilePath(strFP) + words[1];
-			bool bloaded = loadMTL(strFP.ptr());
+
+            //Load Material
+            MeshMaterial* lpMtrl = new MeshMaterial(strFP.cptr());
+            lpMtrl->setName(string(words[1].cptr()));
+            m_materials.push_back(lpMtrl);
 		}
 		else if((words[0] == "usemtl")&&(aNode)&&(ctWords == 2))
 		{
-			aNode->lpMaterial = getMaterial(words[1]);
+            aNode->lpMaterial = getMaterial(string(words[1].cptr()));
 		}
-		else if((words[0] == "f")&&(aNode)&&(ctWords > 3))
+        else if((words[0] == "f")&&(ctWords > 3))
 		{
 			int idxVertex[4];
 			int idxTexCoords[4];
 			int idxNormal[4];
-
 			bool bHasTexCoords = false;
 			bool bHasNormals = false;
 			int szUnit = ctWords - 1;
+
+            if(aNode == NULL) {
+                aNode = new MeshNode();
+                m_nodes.push_back(aNode);
+            }
 
 			//Process line of face
 			for(int j=0; j<szUnit; j++)
@@ -744,7 +861,7 @@ bool Mesh::loadObjGlobalVertexNormal(const char* chrFileName)
 		if(lpNode->arrVertices.size() != lpNode->arrNormals.size())
 		{
 			DAnsiStr strMsg = printToAStr("MESHNODE[%d] NAME=%s Does Not have equal number of vertices and normals! [V=%d, N=%d]",
-										  i, lpNode->strNodeName.ptr(), lpNode->countVertices(), lpNode->countNormals());
+                                          i, lpNode->getName().c_str(), lpNode->countVertices(), lpNode->countNormals());
 			ReportError(strMsg.ptr());
 		}
 	}

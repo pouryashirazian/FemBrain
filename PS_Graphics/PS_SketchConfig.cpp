@@ -21,7 +21,7 @@ namespace PS{
 		if(readValue(section, variable, strVal))
 		{
 			float f[2];
-			size_t pos;
+            int pos;
 			int iComp = 0;
 			DAnsiStr strTemp;
 
@@ -67,7 +67,7 @@ namespace PS{
 		if(readValue(section, variable, strVal))
 		{
 			float f[4];
-			size_t pos;
+            int pos;
 			int iComp = 0;
 			DAnsiStr strTemp;
 
@@ -114,7 +114,7 @@ namespace PS{
 		if(readValue(section, variable, strVal))
 		{
 			float f[4];
-			size_t pos;
+            int pos;
 			int iComp = 0;
 			DAnsiStr strTemp;
 

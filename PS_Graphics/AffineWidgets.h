@@ -7,6 +7,7 @@
 #include "PS_Ray.h"
 #include "loki/Singleton.h"
 #include "PS_GLFuncs.h"
+#include "SceneGraph.h"
 
 using namespace Loki;
 using namespace PS;
@@ -29,7 +30,7 @@ struct UITRANSFORM{
 
 typedef SingletonHolder<UITRANSFORM, CreateUsingNew, PhoenixSingleton> TheUITransform;
 
-class AbstractWidget{
+class AbstractWidget : public SceneNode {
 public:    
     AbstractWidget() {
     	m_mtxTranform.identity();

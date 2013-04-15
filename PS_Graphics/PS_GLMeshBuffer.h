@@ -11,9 +11,11 @@
 #include "../PS_Base/PS_MathBase.h"
 #include "PS_Vector.h"
 #include "PS_GLFuncs.h"
+#include "SceneGraph.h"
 #include <vector>
 
 using namespace std;
+using namespace PS;
 using namespace PS::MATH;
 
 /*
@@ -44,7 +46,7 @@ enum ShaderEffectType {setFixedFunction, setCustom};
  * Synopsis: GLMeshBuffer Simplifies drawing geometries using GPU Buffers.
  * Types of buffer objects are: Vertex, Color, TexCoord, Normal and Index
  */
-class GLMeshBuffer{
+class GLMeshBuffer : public SceneNode {
 public:
 	static const U32 INVALID_GLBUFFER = ~0;
 
@@ -77,9 +79,31 @@ public:
 	U32 countTriangles() const {return m_ctFaceElements/3;}
 	U32 countFaceElements() const {return m_ctFaceElements;}
 
+	//Validity
+	bool isFaceBufferValid() const { return m_isValidIndex;}
+	bool isVertexBufferValid(VertexAttribType attribType = vatPosition) const;
+
+	//Steps
+	U32 faceStep() const {return m_stepFace;}
+	U32 vertexAttribStep(VertexAttribType attribType = vatPosition) const;
+
+	//Buffer Objects
+	U32 indexBufferObjectGL() const { return m_iboFaces;}
+	U32 vertexBufferObjectGL(VertexAttribType attribType = vatPosition) const;
+
+
+	//Reads Mesh
+	bool readbackMeshVertexAttribGL(VertexAttribType attrib, U32& count, vector<float>& values) const;
+	bool readbackMeshFaceGL(U32& count, vector<U32>& elements) const;
+
+
 	//Draw
 	virtual void draw();
 
+	//Mesh buffer to draw normals
+    static GLMeshBuffer* PrepareMeshBufferForDrawingNormals(float len, U32 ctVertices, U32 fstep,
+                                                             const vector<float>& arrVertices,
+                                                             const vector<float>& arrNormals);
 protected:
 	//Releases all buffer objects for rendering
 	virtual void cleanup();

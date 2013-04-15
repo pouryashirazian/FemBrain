@@ -21,6 +21,8 @@ SceneBox::~SceneBox() {
 }
 
 void SceneBox::setup(const vec3f& lo, const vec3f& hi) {
+    m_lo = lo;
+    m_hi = hi;
 	float l = lo.x; float r = hi.x;
 	float b = lo.y; float t = hi.y;
 	float n = lo.z; float f = hi.z;

@@ -1,11 +1,16 @@
 //#include "stdafx.h"
 #include "PS_FileDirectory.h"
+#include "PS_MathBase.h"
 #include <fstream>
 
-#ifdef WIN32
+#ifdef PS_OS_MAC
+    #include <mach-o/dyld.h>
+    #include <unistd.h>		/* execve */
+    #include <libgen.h>		/* dirname */
+#elif defined(PS_OS_WINDOWS)
 	#include <io.h>
 	#include "Windows.h"
-#elif defined(__linux__)
+#elif defined(PS_OS_LINUX)
 	#include <sys/types.h>
 	#include <sys/stat.h>
 	#include <dirent.h>
@@ -60,14 +65,40 @@ DAnsiStr GetExePath()
 //==================================================================
 void GetExePath(char *exePath, int szBuffer)
 {
-#ifdef WIN32
+#ifdef PS_OS_MAC
+    uint32_t szExePath = szBuffer;
+    if(_NSGetExecutablePath(exePath, &szExePath) == 0)
+        exePath[szBuffer] = 0;
+    else {
+        exePath[0] = 0;
+        printf("Not enough memory to get exepath. Needs %d\n", szBuffer);
+    }
+/*
+
+    DAnsiStr strInput(exePath, )
+    int index = result.lastIndexOf(QString(".app"));
+    if(index < 0)
+        index = result.length();
+    else
+        result = result.left(index);
+    index = result.lastIndexOf(QString("/"));
+    if(index < 0)
+    {
+        index = result.lastIndexOf(QString("\\"));
+        if(index < 0)
+            index = result.length();
+    }
+
+    result = result.left(index + 1);
+    */
+#elif defined(PS_OS_WINDOWS)
 	WCHAR wszExeName[MAX_PATH + 1];
 	wszExeName[MAX_PATH] = 0;
 	GetModuleFileNameW(NULL, wszExeName, sizeof(wszExeName) - 1);
 	WideCharToMultiByte(CP_ACP, 0, wszExeName, -1, (LPSTR)exePath, szBuffer, NULL, NULL);
-#elif defined(__linux__)
+#elif defined(PS_OS_LINUX)
 	//getcwd only retrieves the current working directory
-	//getcwd(exePath, (size_t)szBuffer);
+    //getcwd(exePath, (int)szBuffer);
 
 	pid_t pid = getpid();
 	DAnsiStr strProcessPath = printToAStr("/proc/%d/exe", pid);
@@ -78,14 +109,12 @@ void GetExePath(char *exePath, int szBuffer)
 		exePath[nCharsWritten] = 0;
 
 	}
-
-
 #endif
 }
 //==================================================================
 DAnsiStr ExtractFileTitleOnly(const DAnsiStr& strFilePath)
 {
-	size_t pos = 0;
+    int pos = 0;
 	DAnsiStr strTemp = ExtractFileName(strFilePath);
 	if(strTemp.lfind('.', pos))
 		strTemp = strTemp.substr(0, pos);
@@ -94,7 +123,7 @@ DAnsiStr ExtractFileTitleOnly(const DAnsiStr& strFilePath)
 //==================================================================
 DAnsiStr ExtractFileName(const DAnsiStr& strPathFileName)
 {
-	size_t npos;
+    int npos;
 
 	DAnsiStr strOutput = strPathFileName;
 	if(strPathFileName.rfind(L'/', npos) || strPathFileName.rfind(L'\\', npos))
@@ -119,7 +148,7 @@ DAnsiStr ExtractOneLevelUp(const DAnsiStr& strFilePath)
 		bHasLastSlash = true;
 	}
 
-	size_t pos = 0;
+    int pos = 0;
 	//Up one level
 	if(strOutput.rfind('/', pos))
 		strOutput = strOutput.substr(0, pos);
@@ -135,7 +164,7 @@ DAnsiStr ExtractOneLevelUp(const DAnsiStr& strFilePath)
 DAnsiStr ChangeFileExt(const DAnsiStr& strFilePath, const DAnsiStr& strExtWithDot)
 {
 	DAnsiStr strOut;
-	size_t npos;
+    int npos;
 	if(strFilePath.rfind('.', npos))
 	{
 		strOut = strFilePath.substr(0, npos);
@@ -153,7 +182,7 @@ DAnsiStr CreateNewFileAtRoot(const char* pExtWithDot)
 	GetExePath(buffer, 1024);
 
 	DAnsiStr strOutput(buffer);
-	size_t posDot;
+    int posDot;
 	if(strOutput.rfind(L'.', posDot))
 	{
 		DAnsiStr temp = strOutput.substr(0, posDot);
@@ -167,7 +196,7 @@ DAnsiStr CreateNewFileAtRoot(const char* pExtWithDot)
 //==================================================================
 DAnsiStr ExtractFilePath(const DAnsiStr& fileName)
 {
-	size_t npos;
+    int npos;
 	DAnsiStr strOutput;
 	if(fileName.rfind(L'/', npos) || fileName.rfind(L'\\', npos))	
 	{
@@ -178,7 +207,7 @@ DAnsiStr ExtractFilePath(const DAnsiStr& fileName)
 //==================================================================
 DAnsiStr ExtractFileExt(const DAnsiStr& strPathFileName)
 {
-	size_t npos;
+    int npos;
 	DAnsiStr strOut;
 	if(strPathFileName.rfind('.', npos))
 	{
@@ -281,6 +310,7 @@ int ListFilesOrDirectories(std::vector<DAnsiStr>& lstOutput, const char* chrPath
 }
 */
 //==================================================================
+/*
 int ListFilesInDir(std::vector<DAnsiStr>& lstFiles, const char* pDir, const char* pExtensions, bool storeWithPath)
 {
 	DAnsiStr strDir;
@@ -328,8 +358,6 @@ int ListFilesInDir(std::vector<DAnsiStr>& lstFiles, const char* pDir, const char
     	}while (FindNextFile(hFind, &ffd) != 0);
 	   FindClose(hFind);
 
-#elif defined(PS_OS_MAC)
-	   return 0;
 #else
 	   DIR *dp;
 	   struct dirent *dirp;
@@ -349,15 +377,15 @@ int ListFilesInDir(std::vector<DAnsiStr>& lstFiles, const char* pDir, const char
 
 	return (int)lstFiles.size();
 }
-
-bool WriteTextFile( DAnsiStr strFN, const std::vector<DAnsiStr>& content )
+*/
+bool WriteTextFile(const DAnsiStr& strFN, const std::vector<DAnsiStr>& content )
 {
 	ofstream ofs(strFN.ptr(), ios::out | ios::trunc);
 	if(!ofs.is_open())
 		return false;
 
 	DAnsiStr strLine;
-	for(size_t i=0; i < content.size(); i++)
+    for(int i=0; i < content.size(); i++)
 	{
 		strLine = content[i];
 		if(strLine.length() > 0)
@@ -370,7 +398,7 @@ bool WriteTextFile( DAnsiStr strFN, const std::vector<DAnsiStr>& content )
 	return true;
 }
 
-bool WriteTextFile( DAnsiStr strFN, const DAnsiStr& strContent )
+bool WriteTextFile(const DAnsiStr& strFN, const DAnsiStr& strContent )
 {
 	ofstream ofs(strFN.ptr(), ios::out | ios::trunc);
 	if(!ofs.is_open())
@@ -382,7 +410,7 @@ bool WriteTextFile( DAnsiStr strFN, const DAnsiStr& strContent )
 	return true;
 }
 
-bool ReadTextFile( DAnsiStr strFN, std::vector<DAnsiStr>& content )
+bool ReadTextFile(const DAnsiStr& strFN, std::vector<DAnsiStr>& content )
 {
 	ifstream ifs(strFN.ptr(), ios::in);
 	if(!ifs.is_open())
@@ -397,6 +425,7 @@ bool ReadTextFile( DAnsiStr strFN, std::vector<DAnsiStr>& content )
 		//ifs >> strLine;
 		strLine.copyFromT(buffer);
 		strLine.trim();
+        strLine.removeStartEndSpaces();
 		content.push_back(strLine);
 	}	
 	ifs.close();
@@ -404,7 +433,7 @@ bool ReadTextFile( DAnsiStr strFN, std::vector<DAnsiStr>& content )
 	return true;
 }
 
-bool ReadTextFile( DAnsiStr strFN, DAnsiStr& strContent )
+bool ReadTextFile(const DAnsiStr& strFN, DAnsiStr& strContent )
 {
 	ifstream ifs(strFN.ptr(), ios::in);
 	if(!ifs.is_open())

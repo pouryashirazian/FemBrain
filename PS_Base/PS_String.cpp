@@ -15,7 +15,7 @@ namespace PS
 	//==================================================================================================
 	int  CAString::decompose(const char delimiter, std::vector<CAString>& lstWords) const
 	{
-		size_t pos = -1;
+        int pos = -1;
 		lstWords.resize(0);
 		CAString strTemp = *this;
 		while(strTemp.lfind(delimiter, pos))
@@ -35,7 +35,7 @@ namespace PS
 		return (int)lstWords.size();
 	}
 
-	bool CAString::lcompare(const char chrBuffer[], size_t bufSize) const
+    bool CAString::lcompare(const char chrBuffer[], int bufSize) const
 	{
 		if((chrBuffer != NULL)&&(bufSize == 0))
 			bufSize = getInputLength(chrBuffer);
@@ -43,9 +43,9 @@ namespace PS
 		if((chrBuffer == NULL) || (bufSize == 0))
 			return -1;
 
-		size_t ctProcessed = 0;
-		size_t ctTotal = MATHMIN(bufSize, m_length);
-		for(size_t i=0; i < ctTotal; i++)
+        int ctProcessed = 0;
+        int ctTotal = MATHMIN(bufSize, m_length);
+        for(int i=0; i < ctTotal; i++)
 		{
 			if(m_sequence[i] != chrBuffer[i])
 			{
@@ -59,7 +59,7 @@ namespace PS
 	}
 
 
-	CAString CAString::substr(size_t offset, size_t count) const
+    CAString CAString::substr(int offset, int count) const
 	{
 		CTString<char> str = substrT(offset, count);
 		CAString strOutput(str.ptr());
@@ -68,14 +68,14 @@ namespace PS
 
 	CAString& CAString::toUpper()
 	{
-		for (size_t i=0; i < m_length; i++)
+        for (int i=0; i < m_length; i++)
 			m_sequence[i] = toupper(m_sequence[i]);	
 		return (*this);
 	}
 
 	CAString& CAString::toLower()
 	{
-		for (size_t i=0; i < m_length; i++)
+        for (int i=0; i < m_length; i++)
 			m_sequence[i] = tolower(m_sequence[i]);	
 		return (*this);
 	}
@@ -86,9 +86,9 @@ namespace PS
 		while(this->lastChar() == ' ')
 			this->resize(m_length - 1);
 		
-		size_t pos = 0;
+        int pos = 0;
 		CAString temp;
-		for (size_t i=0; i < m_length; i++)
+        for (int i=0; i < m_length; i++)
 		{			
 			if(m_sequence[i] != ' ')
 			{
@@ -97,7 +97,7 @@ namespace PS
 			}
 		}
 		
-		for (size_t i=pos; i < m_length; i++)
+        for (int i=pos; i < m_length; i++)
 			temp += m_sequence[i];
 
 		this->copyFrom(temp);
@@ -114,7 +114,7 @@ namespace PS
 			this->resize(m_length - 1);
 
 		char ch;
-		for (size_t i=0; i < m_length; i++)
+        for (int i=0; i < m_length; i++)
 		{
 			 ch = m_sequence[i];
 			 if((ch != '\0')&&(ch != '\n')&&(ch != '\r')&&(ch != '\t'))			 
@@ -138,7 +138,7 @@ namespace PS
 	
 	std::ostream& operator <<(std::ostream& outs, const CAString& src)
 	{		
-		for (size_t i = 0; i < src.m_length; i++)
+        for (int i = 0; i < src.m_length; i++)
 		{
 			outs << (src.m_sequence[i]);
 		}
@@ -264,7 +264,7 @@ namespace PS
 	}
 
 
-	void CAString::appendFromW(const wchar_t src[], size_t srcSize)
+    void CAString::appendFromW(const wchar_t src[], int srcSize)
 	{
 		if(src != NULL && srcSize == 0)
 			srcSize = getInputLengthW(src);
@@ -275,7 +275,7 @@ namespace PS
 			reserve(m_allocated + srcSize + DEFAULT_STRING_SIZE);
 
 		char* pDst = &m_sequence[m_length];
-		size_t ctConverted = 0;
+        int ctConverted = 0;
 #ifdef PS_SECURE_API
 		errno_t err = wcstombs_s(&ctConverted, pDst, m_allocated - m_length, src, srcSize);
 #else
@@ -309,20 +309,20 @@ namespace PS
 	}
 
 
-	size_t CAString::getInputLength(const char src[]) const
+    int CAString::getInputLength(const char src[]) const
 	{
 		if(src == NULL)
 			return 0;
 		return strlen(src);
 	}
 
-	size_t CAString::getInputLengthW(const wchar_t src[]) const
+    int CAString::getInputLengthW(const wchar_t src[]) const
 	{
 		if(src == NULL)
 			return 0;
 	#if defined(__linux__)
 		wchar_t nc = nullChar();
-		size_t i = 0;
+        int i = 0;
 		while(src[i] != nc)	i++;
 		return i;
 	#else
@@ -337,20 +337,20 @@ namespace PS
 		copyFrom(src);
 	}
 
-	CAString::CAString(const wchar_t src[], size_t srcSize /* = 0 */)
+    CAString::CAString(const wchar_t src[], int srcSize /* = 0 */)
 	{		
 		init();
 		copyFromW(src, srcSize);
 	}
 
-	CAString::CAString(const char src[], size_t srcSize)
+    CAString::CAString(const char src[], int srcSize)
 	{	
 		init();
 		copyFromT(src, srcSize);
 	}
 
 
-	void CAString::copyFromW(const wchar_t src[], size_t srcSize)
+    void CAString::copyFromW(const wchar_t src[], int srcSize)
 	{
 		if(src != NULL && srcSize == 0)
 			srcSize = getInputLengthW(src);
@@ -368,7 +368,7 @@ namespace PS
 
 		int res = 0;
 #ifdef PS_SECURE_API
-		size_t ctConverted = 0;
+        int ctConverted = 0;
 		res = wcstombs_s(&ctConverted, m_sequence, m_allocated, src, m_allocated);
 #else
 		res = wcstombs(m_sequence, src, m_allocated);
@@ -383,7 +383,7 @@ namespace PS
 	//=========================================================================================================
 	//Now WideString implementations
 	//=========================================================================================================
-	CWString CWString::substr(size_t offset, size_t count) const
+    CWString CWString::substr(int offset, int count) const
 	{
 		CTString<wchar_t> str = substrT(offset, count);
 		CWString strOutput(str.ptr());
@@ -397,7 +397,7 @@ namespace PS
 		str.toUpper();
 		this->copyFromA(str.cptr(), str.length());
 #else
-		for (size_t i=0; i < m_length; i++)
+        for (int i=0; i < m_length; i++)
 			m_sequence[i] = towupper(m_sequence[i]);
 #endif
 		return (*this);
@@ -410,7 +410,7 @@ namespace PS
 		str.toLower();
 		this->copyFromA(str.cptr(), str.length());
 #else
-		for (size_t i=0; i < m_length; i++)
+        for (int i=0; i < m_length; i++)
 			m_sequence[i] = towlower(m_sequence[i]);
 #endif
 		return (*this);
@@ -432,7 +432,7 @@ namespace PS
 		strWrite.copyFromW(src.ptr(), src.length());
 		outs << strWrite;
 		/*
-		for (size_t i = 0; i < strWrite.length(); i++)
+        for (int i = 0; i < strWrite.length(); i++)
 		{
 			outs << (strWrite[i]);
 		}		
@@ -460,7 +460,7 @@ namespace PS
 	}
 
 
-	void CWString::appendFromA(const char src[], size_t srcSize)
+    void CWString::appendFromA(const char src[], int srcSize)
 	{
 		if(src != NULL && srcSize == 0)
 			srcSize = strlen(src);
@@ -472,7 +472,7 @@ namespace PS
 
 		wchar_t* pDst = static_cast<wchar_t*>(&m_sequence[m_length]);
 #ifdef PS_SECURE_API
-		size_t ctConverted;
+        int ctConverted;
 		errno_t err = mbstowcs_s(&ctConverted, pDst, m_allocated - m_length, src, srcSize);
 #else
 		mbstowcs(pDst, src, srcSize);
@@ -613,25 +613,25 @@ namespace PS
 		copyFrom(src);
 	}
 
-	CWString::CWString(const char src[], size_t srcSize /* = 0 */)
+    CWString::CWString(const char src[], int srcSize /* = 0 */)
 	{
 		init();
 		copyFromA(src, srcSize);
 	}
 
-	CWString::CWString(const wchar_t src[], size_t srcSize /* = 0 */)
+    CWString::CWString(const wchar_t src[], int srcSize /* = 0 */)
 	{
 		init();
 		copyFromT(src, srcSize);
 	}
 
-	size_t CWString::getInputLength(const wchar_t src[]) const
+    int CWString::getInputLength(const wchar_t src[]) const
 	{
 		if(src == NULL)
 			return 0;
 	#if defined(__linux__)
 		wchar_t nc = nullChar();
-		size_t i = 0;
+        int i = 0;
 		while(src[i] != nc)	i++;
 		return i;
 	#else
@@ -640,7 +640,7 @@ namespace PS
 	}
 
 
-	void CWString::copyFromA(const char src[], size_t srcSize)
+    void CWString::copyFromA(const char src[], int srcSize)
 	{
 		if(src != NULL && srcSize == 0)
 			srcSize = strlen(src);
@@ -656,7 +656,7 @@ namespace PS
 		this->zero_sequence();
 
 #ifdef PS_SECURE_API
-		size_t ctConverted;
+        int ctConverted;
 		errno_t err = mbstowcs_s(&ctConverted, (wchar_t*)m_sequence, m_allocated, src, srcSize);
 		if(err == 0)
 			m_length = srcSize;

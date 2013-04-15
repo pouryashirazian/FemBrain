@@ -1,0 +1,20 @@
+[BLOBNODE 0]
+IsOperator=0
+AffineScale=(1,1,1)
+AffineRotate=(0,0,0,1)
+AffineTranslate=(0,0,0)
+MtrlAmbient=(0, 1, 0, 1)
+MtrlDiffused=(0, 0.6, 0, 1)
+MtrlSpecular=(1,1,1,1)
+MtrlShininess=32
+PrimitiveType=POINT
+position=(0,0,0)
+
+[Global]
+FileVersion=6
+NumLayers=1
+CurrentLayer=1
+CountPrimitives=1
+CountOperators=0
+Depth=1
+RootIDs=(0)

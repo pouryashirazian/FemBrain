@@ -7,8 +7,9 @@
 
 #include "PS_GLMeshBuffer.h"
 #include "GL/glew.h"
+#include "PS_DebugUtils.h"
 
-GLMeshBuffer::GLMeshBuffer()
+GLMeshBuffer::GLMeshBuffer():SceneNode()
 {
 	m_vboColor = m_vboNormal = m_vboTexCoord = m_vboVertex = m_iboFaces = INVALID_GLBUFFER;
 	m_isValidColor = m_isValidIndex = m_isValidNormal = m_isValidTexCoord = m_isValidVertex = false;
@@ -152,6 +153,105 @@ void GLMeshBuffer::setShaderEffectProgram(U32 glEffect)
 	}
 }
 
+bool GLMeshBuffer::readbackMeshVertexAttribGL(VertexAttribType attrib, U32& count, vector<float>& values) const {
+	U32 vbo = 0;
+	U32 szRead = 0;
+	count = 0;
+	if(attrib == vatPosition) {
+		vbo = m_vboVertex;
+		szRead = m_ctVertices * m_stepVertex;
+	}
+	else if(attrib == vatNormal) {
+		vbo = m_vboNormal;
+		szRead = m_ctVertices * 3;
+	}
+	else if(attrib == vatColor) {
+		vbo = m_vboColor;
+		szRead = m_ctVertices * m_stepColor;
+	}
+	else if(attrib == vatTexCoord) {
+		vbo = m_vboTexCoord;
+		szRead = m_ctVertices * m_stepTexCoord;
+	}
+	else
+		return false;
+
+
+	glBindBuffer( GL_ARRAY_BUFFER, vbo);
+	float* lpBuffer = (float *) glMapBuffer( GL_ARRAY_BUFFER, GL_READ_ONLY );
+	if(lpBuffer == NULL) {
+		return false;
+	}
+
+	values.assign(lpBuffer, lpBuffer + szRead);
+	glUnmapBuffer( GL_ARRAY_BUFFER );
+	count = m_ctVertices;
+
+	//PS::DEBUG::PrintArrayF(&values[0], 180);
+	return true;
+}
+
+bool GLMeshBuffer::isVertexBufferValid(VertexAttribType attribType) const {
+	switch(attribType) {
+	case(vatPosition):
+		return m_isValidVertex;
+	case(vatNormal):
+		return m_isValidNormal;
+	case(vatColor):
+		return m_isValidColor;
+	case(vatTexCoord):
+		return m_isValidTexCoord;
+	default:
+		return m_isValidVertex;
+	}
+}
+
+//Steps
+U32 GLMeshBuffer::vertexAttribStep(VertexAttribType attribType) const {
+	switch(attribType) {
+	case(vatPosition):
+		return m_stepVertex;
+	case(vatNormal):
+		return 3;
+	case(vatColor):
+		return m_stepColor;
+	case(vatTexCoord):
+		return m_stepTexCoord;
+	default:
+		return m_stepVertex;
+	}
+
+}
+
+//Buffer Objects
+U32 GLMeshBuffer::vertexBufferObjectGL(VertexAttribType attribType) const {
+	switch(attribType) {
+	case(vatPosition):
+		return m_vboVertex;
+	case(vatNormal):
+		return m_vboNormal;
+	case(vatColor):
+		return m_vboColor;
+	case(vatTexCoord):
+		return m_vboTexCoord;
+	default:
+		return m_vboVertex;
+	}
+}
+
+
+bool GLMeshBuffer::readbackMeshFaceGL(U32& count, vector<U32>& elements) const {
+
+	glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, m_iboFaces);
+	U32* lpBuffer = (U32 *) glMapBuffer( GL_ELEMENT_ARRAY_BUFFER, GL_READ_ONLY );
+	elements.assign(lpBuffer, lpBuffer + (m_ctFaceElements * m_stepFace));
+	glUnmapBuffer( GL_ELEMENT_ARRAY_BUFFER );
+	count = m_ctFaceElements;
+
+
+	return true;
+}
+
 
 void GLMeshBuffer::draw()
 {
@@ -223,3 +323,68 @@ void GLMeshBuffer::draw()
 	if(m_effectType == setCustom && m_uShaderEffectProgram != INVALID_GLBUFFER)
 		glUseProgram(0);
 }
+
+/*
+GLMeshBuffer* GLMeshBuffer::prepareMeshBufferNormals(float len) const {
+	if (!m_isValidVertex || !m_isValidNormal)
+		return NULL;
+
+	U32 ctVertices;
+	vector<float> vertices;
+	vector<float> normals;
+	readbackMeshVertexAttrib(vatPosition, ctVertices, vertices);
+	readbackMeshVertexAttrib(vatNormal, ctVertices, normals);
+
+	vector<float> allvertices;
+	allvertices.resize(ctVertices * 3 * 2);
+	for (U32 i = 0; i < ctVertices; i++) {
+		vec3f ptStart = vec3f(&vertices[i * 3]);
+		vec3f ptEnd = ptStart + vec3f(&normals[i * 3]) * len;
+		allvertices[i * 6] = ptStart.x;
+		allvertices[i * 6 + 1] = ptStart.y;
+		allvertices[i * 6 + 2] = ptStart.z;
+		allvertices[i * 6 + 3] = ptEnd.x;
+		allvertices[i * 6 + 4] = ptEnd.y;
+		allvertices[i * 6 + 5] = ptEnd.z;
+	}
+
+	//Create scene node
+	GLMeshBuffer* lpDrawNormal = new GLMeshBuffer();
+	lpDrawNormal->setupPerVertexColor(vec4f(0, 0, 1, 1), ctVertices * 2, 4);
+	lpDrawNormal->setupVertexAttribs(allvertices, 3, vatPosition);
+	lpDrawNormal->setFaceMode(ftLines);
+
+	return lpDrawNormal;
+}
+*/
+
+GLMeshBuffer* GLMeshBuffer::PrepareMeshBufferForDrawingNormals(float len, U32 ctVertices, U32 fstep,
+                                                               const vector<float>& arrVertices,
+                                                               const vector<float>& arrNormals) {
+    if(arrVertices.size() == 0 || arrNormals.size() == 0)
+        return NULL;
+
+    vector<float> allvertices;
+    allvertices.resize(ctVertices* 3 * 2);
+    for(U32 i=0; i < ctVertices; i++) {
+        vec3f ptStart = vec3f(&arrVertices[i * fstep]);
+        vec3f ptEnd = ptStart + vec3f(&arrNormals[i*3]) * len;
+        allvertices[i*6] = ptStart.x;
+        allvertices[i*6 + 1] = ptStart.y;
+        allvertices[i*6 + 2] = ptStart.z;
+        allvertices[i*6 + 3] = ptEnd.x;
+        allvertices[i*6 + 4] = ptEnd.y;
+        allvertices[i*6 + 5] = ptEnd.z;
+    }
+
+    //Create scene node
+    GLMeshBuffer* lpDrawNormal = new GLMeshBuffer();
+    lpDrawNormal->setupPerVertexColor(vec4f(0,0,1,1), ctVertices*2, 4);
+    lpDrawNormal->setupVertexAttribs(allvertices, 3, vatPosition);
+    lpDrawNormal->setFaceMode(ftLines);
+
+    return lpDrawNormal;
+}
+
+
+

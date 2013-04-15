@@ -38,17 +38,15 @@ namespace PS{
 		DAnsiStr ChangeFileExt(const DAnsiStr& strFilePath, const DAnsiStr& strExtWithDot);
 
 
-
-
-		//int ListFilesOrDirectories(std::vector<DAnsiStr>& lstOutput, const char* chrPath, const char* chrExt, bool bDirOnly);
+        //int ListFilesOrDirectories(std::vector<DAnsiStr>& lstOutput, const char* chrPath, const char* chrExt, bool bDirOnly);
 		int ListFilesInDir(std::vector<DAnsiStr>& lstFiles, const char* pDir, const char* pExtensions, bool storeWithPath);
 		//int ListFilesInDir(DVec<DAnsiStr>& lstFiles, const char* pDir, const char* pExtensions, bool storeWithPath);
 
 
-		bool WriteTextFile(DAnsiStr strFN, const std::vector<DAnsiStr>& content);
-		bool WriteTextFile(DAnsiStr strFN, const DAnsiStr& strContent );
+        bool WriteTextFile(const DAnsiStr& strFN, const std::vector<DAnsiStr>& content);
+        bool WriteTextFile(const DAnsiStr& strFN, const DAnsiStr& strContent );
 
-		bool ReadTextFile(DAnsiStr strFN, std::vector<DAnsiStr>& content);
-		bool ReadTextFile(DAnsiStr strFN, DAnsiStr& content);
+        bool ReadTextFile(const DAnsiStr& strFN, std::vector<DAnsiStr>& content);
+        bool ReadTextFile(const DAnsiStr& strFN, DAnsiStr& content);
 	}
 }

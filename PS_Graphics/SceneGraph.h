@@ -8,17 +8,34 @@
 #ifndef SCENEGRAPH_H_
 #define SCENEGRAPH_H_
 
-
+#include <string>
+#include "loki/Singleton.h"
 #include "loki/Functor.h"
-#include "PS_GLMeshBuffer.h"
-#include "PS_Matrix.h"
-#include "PS_Vector.h"
 #include "PS_CopyStack.h"
-#include "PS_ShaderGLSL.h"
+#include "AssetManager.h"
+#include "ShaderManager.h"
 #include "PS_Mesh.h"
+#include "PS_ShaderGLSL.h"
+#include "SceneNodeTransform.h"
+#include "PS_ArcBallCamera.h"
+#include "PS_Box.h"
 
+using namespace std;
 using namespace PS;
 using namespace PS::MATH;
+
+/*!
+ * \brief Defines a 1,2,3 dimensional texture to be applied on the scene node for rendering.
+ * provides mechanisms for reading and writing to/from png files using lodepng lib.
+ */
+class EffectTexture{
+public:
+    EffectTexture() {}
+    virtual ~EffectTexture() {}
+private:
+    vec2i m_dim;
+    U32 m_uiTexture;
+};
 
 /*!
  * The entire animation scene is modeled in a giant scene graph structure.
@@ -29,19 +46,11 @@ using namespace PS::MATH;
  */
 class SceneNodeEffect{
 public:
-	SceneNodeEffect() {}
-	virtual ~SceneNodeEffect() {}
-	typedef enum EffectType {etMaterial, etTexture, etCustomShader};
+    SceneNodeEffect() {}
+    virtual ~SceneNodeEffect() {}
+    enum EffectType {etMaterial, etTexture, etCustomShader};
 
-	//Define a material to be applied on the model
-	class EffectTexture{
-	public:
-		EffectTexture() {}
-		virtual ~EffectTexture() {}
-	private:
-		vec2i m_dim;
-		U32 m_uiTexture;
-	};
+
 
 	EffectType getEffectType() const {return m_effectType;}
 private:
@@ -50,38 +59,104 @@ private:
 	PS::MESH::MeshMaterial* m_lpMaterial;
 };
 
-//Defines Base Functionality of a SceneNode
-class SceneNode{
+
+/*!
+ * \brief The SceneNode class is an element in the scenegraph can have
+ * effect and transformation associated with.
+ */
+class SceneNode {
 public:
 	SceneNode();
 	virtual ~SceneNode();
 
-	virtual void draw() = 0;
-	mat44f& transformation() {return m_transform;}
-private:
-	mat44f m_transform;
-	vector<SceneNodeEffect*> m_vEffects;
+    //Pure virtual function for all kids to override
+	virtual void draw() = 0;    
+
+    //Computes the bounding box of the model
+    virtual AABB bbox() const {
+        return AABB();
+    }
+
+    //Advances animation using the timer value
+    virtual void animate(U64 timer) {
+        PS_UNUSED(timer);
+    }
+
+
+    //TODO: Method for marshalling this node in a compact data-structure
+    //The compact structure will serve as input to high performance rendering
+    //Algorithms such as: Ray-tracing
+    void marshal() {}
+
+    //Name for hashing and fetching of the nodes
+    string name() const {return m_name;}
+    void setName(const string& name) {m_name = name;}
+
+    //Visibility
+    bool isVisible() const {return m_bVisible;}
+    void setVisible(bool visible) {m_bVisible = visible;}
+
+    //Effect to be managed by asset and shadermanager collections
+    SceneNodeEffect* effect() const {return m_lpEffect;}
+    void setEffect(SceneNodeEffect* lpEffect) { m_lpEffect = lpEffect;}
+
+    //Transformation
+    SceneNodeTransform* transformation() const { return m_lpTransform;}
+
+    //TODO: IO to be able to read and write scene nodes to disk in very fast binary format
+    bool read() {return false;}
+    bool write() {return false;}
+protected:
+    string m_name;
+    bool m_bVisible;
+    //bool m_bAnimated;
+    SceneNodeEffect* m_lpEffect;
+    SceneNodeTransform* m_lpTransform;
 };
 
 /*!
  * Scene Graph
  */
-class SceneGraph{
+class SceneGraph {
 public:
 	SceneGraph();
 	virtual ~SceneGraph();
 
-	void draw() const;
+    //Draws the entire scenegraph for traversing through the list of
+    //nodes and calling individual draw methods
+    void draw();
+    void drawBBoxes();
+    void animate(U64 timer);
 
+    //Nodes
+    void add(SceneNode* aNode);
+    void addSceneBox(const AABB& box);
+    void addGroundMatrix(int rows, int cols);
+    //void addAffineWidget();
+
+    //Matrix Stacks
 	CopyStack<mat44f>& stkProjection() {return m_stkProjection;}
 	CopyStack<mat44f>& stkModelView() {return m_stkModelView;}
-
 	mat44f modelviewprojection() const;
+
+    //Camera
+    ArcBallCamera& camera() { return m_camera;}
+
+    //Timing and Profiling services
+
+    //Object Selection
+
+    //Surfaces
+
+    //Save and Load view settings
 private:
 	CopyStack<mat44f> m_stkProjection;
 	CopyStack<mat44f> m_stkModelView;
 	std::vector<SceneNode*> m_vSceneNodes;
+    ArcBallCamera m_camera;
 };
 
+//Singleton Access to scene graph
+typedef SingletonHolder<SceneGraph, CreateUsingNew, PhoenixSingleton> TheSceneGraph;
 
 #endif /* SCENEGRAPH_H_ */

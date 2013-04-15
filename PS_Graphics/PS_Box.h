@@ -56,11 +56,17 @@ public:
     	m_upper = mtx.map(hi).getVec3();
     }
 
-
+    //dimensions
     vec3f lower() const {return this->m_lower;}
     vec3f upper() const {return this->m_upper;}
+    vec3f extent() const { return (m_upper - m_lower);}
+    vec3f center() const { return (m_upper + m_lower) * 0.5f;}
 
-
+    AABB operator=(const AABB& other) {
+    	m_lower = other.m_lower;
+    	m_upper = other.m_upper;
+    	return (*this);
+    }
 private:
 	vec3 m_lower;
 	vec3 m_upper;

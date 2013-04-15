@@ -3,7 +3,6 @@
 #define CGLSHADER_H
 
 #include "../PS_Base/PS_String.h"
-#include "GL/glew.h"
 #include <vector>
 
 #define GL_SUCCESS		   1
@@ -60,9 +59,9 @@ public:
     DAnsiStr getFragmentShaderFilePath() const {return m_strFragmentShaderFile;}
     void	 setFragmentShaderFilePath(const DAnsiStr& strFN) {m_strFragmentShaderFile = strFN;}
 
-    GLuint getShaderProgram() const { return m_uiProgramObject;}
-    GLuint getVertexShader() const { return m_uiVertexShader;}
-    GLuint getFragmentShader() const { return m_uiFragShader;}
+    U32 getShaderProgram() const { return m_uiProgramObject;}
+    U32 getVertexShader() const { return m_uiVertexShader;}
+    U32 getFragmentShader() const { return m_uiFragShader;}
 
     //Status
     bool isRunning() const {return m_bIsRunning;}
@@ -97,8 +96,8 @@ public:
     static bool IsGLExtensionSupported(const char *extension);
 
 
-    bool loadBinaryProgram(const char* Filename, GLuint &ProgramObjectID);
-    bool saveBinaryProgram(const char* Filename, GLuint &ProgramObjectID);
+    bool loadBinaryProgram(const char* Filename, U32 &ProgramObjectID);
+    bool saveBinaryProgram(const char* Filename, U32 &ProgramObjectID);
 
 
     /*
@@ -122,9 +121,9 @@ private:
 
     DAnsiStr m_strVertexShaderCode;
     DAnsiStr m_strFragmentShaderCode;
-    GLuint   m_uiProgramObject;
-    GLuint   m_uiVertexShader;
-    GLuint   m_uiFragShader;
+    U32   m_uiProgramObject;
+    U32   m_uiVertexShader;
+    U32   m_uiFragShader;
 
 
     bool   m_bIsRunning;
