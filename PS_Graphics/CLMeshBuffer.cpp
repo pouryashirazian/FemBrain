@@ -80,6 +80,9 @@ bool CLMeshBuffer::CopyMeshBufferCL(ComputeDevice* lpDevice,
 
 	int ctCompleted = 0;
 
+	//Copy AABB
+	lpDest->setBBox(lpSource->bbox());
+
 	//1.Vertex and other attribs
 	U32 ctVertices, fstep;
 	vector<float> values;

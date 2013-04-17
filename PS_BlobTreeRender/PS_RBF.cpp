@@ -193,13 +193,35 @@ bool FastRBF::randomizeInterpolationNodes() {
 	return true;
 }
 
+bool FastRBF::copyVertexBufferToRestPos() {
+
+	if(m_ctVertices == 0)
+		return false;
+
+	U32 szVertexBuffer = m_ctVertices * m_stepVertex * sizeof(float);
+	m_inoutMemRestPos = m_lpGPU->createMemBuffer(szVertexBuffer, ComputeDevice::memReadWrite);
+
+	//Get memory handle to gl vertex
+	cl_mem inMemMeshVertex = m_lpGPU->createMemBufferFromGL(m_vboVertex, ComputeDevice::memReadOnly);
+
+	m_lpGPU->enqueueAcquireGLObject(1, &inMemMeshVertex);
+	m_lpGPU->enqueueCopyBuffer(inMemMeshVertex, m_inoutMemRestPos, 0, 0, szVertexBuffer);
+	m_lpGPU->enqueueReleaseGLObject(1, &inMemMeshVertex);
+
+	clReleaseMemObject(inMemMeshVertex);
+
+	return true;
+}
+
 bool FastRBF::setupFromImplicit(GPUPoly* lpGPUPoly) {
 	if(!lpGPUPoly)
 		return false;
 	//Setup mesh
 	this->cleanup();
-//	CLMeshBuffer::CopyMeshBufferCL(lpGPUPoly->computeDevice(), lpGPUPoly, this);
 	CLMeshBuffer::CopyMeshBufferCL(m_lpGPU, lpGPUPoly, this);
+
+	//Copy vertex buffer to rest pos
+	copyVertexBufferToRestPos();
 
 	//Read-back vertices and normals
 	U32 ctVertices;
@@ -582,10 +604,6 @@ bool FastRBF::readbackMeshV3T3(U32& ctVertices, vector<float>& vertices,
 	if(istep != 3)
 		return false;
 	return true;
-}
-
-void FastRBF::drawBBox() {
-	DrawAABB(m_bbox.lower(), m_bbox.upper(), vec3f(0,0,1), 1.0f);
 }
 
 bool FastRBF::intersects(const vector<vec3f>& vertices,

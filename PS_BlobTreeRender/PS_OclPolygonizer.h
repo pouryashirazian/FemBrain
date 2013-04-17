@@ -131,10 +131,6 @@ public:
 	//Run tetrahedralization process
 	int runTetrahedralizer();
 
-	//Draws the model AABB
-	AABB bbox() const {return m_bbox;}
-	void drawBBox();
-
 	//Buffer to draw normals
 	GLMeshBuffer* prepareMeshBufferForDrawingNormals(float len = 0.3f);
 
@@ -316,9 +312,6 @@ private:
 
 	//Operators Data
 	float PS_SIMD_ALIGN(m_arrOps[PS_SIMD_PADSIZE(MAX_TREE_NODES*DATASIZE_OPERATOR)]);
-
-	//AABB
-	AABB m_bbox;
 
 	//Count of primitives and ops
 	U32 m_ctPrims;

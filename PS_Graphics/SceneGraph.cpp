@@ -16,6 +16,12 @@ SceneNode::~SceneNode() {
 
 }
 
+void SceneNode::drawBBox() const
+{
+	DrawAABB(m_bbox.lower(), m_bbox.upper(), vec3f(0,0,1), 1.0f);
+}
+
+
 ////////////////////////////////////////////////////////
 SceneGraph::SceneGraph(){
 	m_stkModelView.top().identity();
@@ -39,10 +45,27 @@ void SceneGraph::addSceneBox(const AABB& box) {
     this->add(lpBox);
 }
 
-void SceneGraph::addGroundMatrix(int rows, int cols) {
-    GroundMatrix* lpMatrix = new GroundMatrix(rows, cols);
+void SceneGraph::addGroundMatrix(int rows, int cols, float step) {
+    GroundMatrix* lpMatrix = new GroundMatrix(rows, cols, step);
     lpMatrix->setName("GroundMatrix");
     this->add(lpMatrix);
+}
+
+SceneNode* SceneGraph::get(const char* name) const {
+	for(U32 i=0; i<m_vSceneNodes.size(); i++) {
+		if(m_vSceneNodes[i]->name() == string(name)) {
+			return m_vSceneNodes[i];
+		}
+	}
+	return NULL;
+}
+
+SceneNode* SceneGraph::last() const {
+	U32 ctNodes = m_vSceneNodes.size();
+	if(ctNodes > 0)
+		return m_vSceneNodes[ctNodes-1];
+	else
+		return NULL;
 }
 
 void SceneGraph::draw()

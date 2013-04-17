@@ -137,9 +137,7 @@ protected:
 	int m_stepColor;
 	int m_stepTexCoord;
 	int m_stepFace;
-
 	int m_faceMode;
-
 };
 
 

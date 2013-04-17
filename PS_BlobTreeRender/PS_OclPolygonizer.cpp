@@ -464,10 +464,6 @@ namespace HPC{
 		ofs.close();
 	}
 
-	void GPUPoly::drawBBox()
-	{
-		DrawAABB(m_bbox.lower(), m_bbox.upper(), vec3f(0,0,1), 1.0f);
-	}
 
 	GLMeshBuffer* GPUPoly::prepareMeshBufferForDrawingNormals(float len) {
 		if(!m_isValidVertex || !m_isValidNormal)

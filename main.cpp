@@ -28,6 +28,9 @@
 #include "PS_Graphics/SceneBox.h"
 #include "PS_Graphics/MeshRenderer.h"
 #include "PS_Graphics/PS_DebugUtils.h"
+#include "PS_Graphics/SceneGraph.h"
+#include "PS_Graphics/CLMeshBuffer.h"
+
 
 
 #include "PS_Deformable/PS_Deformable.h"
@@ -143,9 +146,11 @@ std::map<int, vec3d> g_hashVertices;
 //Visual Cues
 AvatarCube* g_lpAvatarCube = NULL;
 AbstractWidget*	g_lpAffineWidget = NULL;
-GroundMatrix* g_lpGroundMatrix = NULL;
-SceneBox* g_lpSceneBox = NULL;
+GLMeshBuffer* g_lpGroundMatrix = NULL;
+GLMeshBuffer* g_lpSceneBox = NULL;
 GLMeshBuffer* g_lpDrawNormals = NULL;
+GLMeshBuffer* g_lpDrawMesh = NULL;
+
 
 //SimulationObjects
 PS::ArcBallCamera 	g_arcBallCam;
@@ -155,8 +160,6 @@ Deformable* 		g_lpDeformable = NULL;
 
 //Info Lines
 std::vector<std::string> g_infoLines;
-
-GLSurface* g_lpSurface = NULL;
 AppSettings g_appSettings;
 
 
@@ -239,6 +242,9 @@ void Draw()
 	//Draw Deformable Mesh
 	if(g_lpDeformable && g_appSettings.bDrawTetMesh)
 		g_lpDeformable->draw();
+
+//	if(g_lpDrawMesh)
+//		g_lpDrawMesh->draw();
 
 	if(g_lpFastRBF && (g_appSettings.drawIsoSurface != disNone)) {
 		g_lpFastRBF->setWireFrameMode(g_appSettings.drawIsoSurface == disWireFrame);
@@ -351,6 +357,7 @@ void Draw()
 			g_infoLines[INDEX_MESH_INFO] = string(chrMsg);
 		}
 		*/
+		/*
 		if(g_lpFastRBF && g_lpDeformable) {
 			sprintf(chrMsg, "MESH CELLSIZE:%.3f, ISOSURF: V# %d, TRI# %d, VOLUME: V# %d, TET# %d",
 					g_appSettings.cellsize,
@@ -360,6 +367,7 @@ void Draw()
 					g_lpDeformable->getTetMesh()->getNumElements());
 			g_infoLines[INDEX_MESH_INFO] = string(chrMsg);
 		}
+		*/
 
 	}
 
@@ -700,12 +708,9 @@ void Close()
 	cout << "Cleanup Memory objects" << endl;
 
 	SAFE_DELETE(g_lpDrawNormals);
-	SAFE_DELETE(g_lpSurface);
 	SAFE_DELETE(g_lpFastRBF);
 	SAFE_DELETE(g_lpDeformable);
 	SAFE_DELETE(g_lpAvatarCube);
-	SAFE_DELETE(g_lpGroundMatrix);
-	SAFE_DELETE(g_lpSceneBox);
 }
 
 string QueryOGL(GLenum name)
@@ -734,6 +739,7 @@ string GetGPUInfo()
 	LogInfoArg1("GPU VENDOR: %s", strVendorName.c_str());
 	LogInfoArg1("GPU RENDERER: %s", strRenderer.c_str());
 	LogInfoArg1("GPU VERSION: %s", strVersion.c_str());
+	LogInfoArg1("GLSL Version: %s", QueryOGL(GL_SHADING_LANGUAGE_VERSION).c_str());
 
 
 	if(strcmp(strVendorName.c_str(), "Intel") == 0)
@@ -1145,8 +1151,10 @@ int main(int argc, char* argv[])
 		exit(0);
 
 	//Ground and Room
-	g_lpGroundMatrix = new GroundMatrix(32, 32, 0.2);
-	g_lpSceneBox = new SceneBox(vec3f(-10,-10,-16), vec3f(10,10,16));
+	TheSceneGraph::Instance().addGroundMatrix(32, 32, 0.2f);
+	g_lpGroundMatrix = reinterpret_cast<GLMeshBuffer*>(TheSceneGraph::Instance().last());
+	TheSceneGraph::Instance().addSceneBox(AABB(vec3f(-10,-10,-16), vec3f(10,10,16)));
+	g_lpSceneBox = reinterpret_cast<GLMeshBuffer*>(TheSceneGraph::Instance().last());
 	g_lpSceneBox->setShaderEffectProgram(TheShaderManager::Instance().get("phong"));
 
 	//DAnsiStr strFPModel = ExtractFilePath(GetExePath());
@@ -1181,13 +1189,10 @@ int main(int argc, char* argv[])
 		//Read Back Polygonized Mesh
 		if(!lpBlobRender->readBackMesh(ctVertices, vertices, ctElements, elements))
 			LogError("Unable to read mesh from RBF in the format of V3T3");
-		PS::DEBUG::PrintArrayF(&vertices[0], 200);
+		g_lpDrawNormals = lpBlobRender->prepareMeshBufferForDrawingNormals(0.3);
 
 		SAFE_DELETE(lpBlobRender);
 	}
-
-	//Prepares MeshBuffer for drawing normals
-	g_lpDrawNormals = g_lpFastRBF->prepareMeshBufferNormals();
 
 
 	{

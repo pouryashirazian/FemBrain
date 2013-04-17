@@ -71,10 +71,12 @@ public:
 
     //Pure virtual function for all kids to override
 	virtual void draw() = 0;    
+	virtual void drawBBox() const;
 
     //Computes the bounding box of the model
+	void setBBox(const AABB& box) { m_bbox = box;}
     virtual AABB bbox() const {
-        return AABB();
+        return m_bbox;
     }
 
     //Advances animation using the timer value
@@ -107,6 +109,11 @@ public:
     bool read() {return false;}
     bool write() {return false;}
 protected:
+	//Each scene node should have its associated bounding box.
+    //For selection, Hidden Surface Culling and Ray-tracing
+	AABB m_bbox;
+
+	//Attribs
     string m_name;
     bool m_bVisible;
     //bool m_bAnimated;
@@ -131,7 +138,12 @@ public:
     //Nodes
     void add(SceneNode* aNode);
     void addSceneBox(const AABB& box);
-    void addGroundMatrix(int rows, int cols);
+    void addGroundMatrix(int rows, int cols, float step = 1.0f);
+    U32 count() const {return m_vSceneNodes.size();}
+    SceneNode* get(U32 index) const {return m_vSceneNodes[index];}
+    SceneNode* get(const char* name) const;
+    SceneNode* last() const;
+
     //void addAffineWidget();
 
     //Matrix Stacks

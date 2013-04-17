@@ -98,11 +98,10 @@ public:
 	//Create Normals
 	bool readbackMeshV3T3(U32& ctVertices, vector<float>& vertices, U32& ctElements, vector<U32>& elements);
 	GLMeshBuffer* prepareMeshBufferNormals();
-
-	void drawBBox();
-	AABB aabb() const {return m_bbox;}
 private:
-	AABB m_bbox;
+	bool copyVertexBufferToRestPos();
+
+private:
 	U32 m_ctCenters;
 	U32 m_ctTotalInterpolationNodes;
 	vector<float> m_interpolationNodes;
