@@ -120,7 +120,7 @@ inline svec3f vscale3f(float a, const svec3f& b)
 inline float vdist3f(const svec3f& a, const svec3f& b)
 {
 	svec3f d = vsub3f(a, b);
-	return FastSqrt(vdot3f(d, d));
+	return sqrtf(vdot3f(d, d));
 }
 
 inline float vdistSquared3f(const svec3f& a, const svec3f& b)
@@ -190,7 +190,7 @@ inline void vsetElement3f(svec3f& a, int dim, float val)
 inline float vlength3f(const svec3f& a)
 {
 	float d = a.x * a.x + a.y * a.y + a.z * a.z;
-	return FastSqrt(d);
+	return sqrtf(d);
 }
 
 inline float vlengthSquared3f(const svec3f& a)
@@ -200,7 +200,7 @@ inline float vlengthSquared3f(const svec3f& a)
 
 inline float vnormalize3f(svec3f& a)
 {	
-	float d = FastSqrt(a.x * a.x + a.y * a.y + a.z * a.z);
+	float d = sqrtf(a.x * a.x + a.y * a.y + a.z * a.z);
 	if ( d > 0 )
 	{
 		float r = 1.0f / d;

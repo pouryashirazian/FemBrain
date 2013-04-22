@@ -1180,18 +1180,18 @@ namespace HPC{
 		return 1;
 	}
 
-	bool GPUPoly::readBackMesh(U32& ctVertices, vector<float>& verticesXYZ,
-								  U32& ctFaceElements, vector<U32>& elements) const {
+	bool GPUPoly::readbackMeshV3T3(U32& ctVertices, vector<float>& vertices,
+								  U32& ctTriangles, vector<U32>& elements) const {
 		if(!m_isValidIndex)
 			return false;
 
 		ctVertices = m_ctVertices;
-		ctFaceElements = m_ctFaceElements;
+		ctTriangles = m_ctFaceElements / 3;
 
 		//Vertices
 		vector<float> homogenousVertices;
 		homogenousVertices.resize(m_ctVertices * 4);
-		verticesXYZ.resize(m_ctVertices * 3);
+		vertices.resize(m_ctVertices * 3);
 		elements.resize(m_ctFaceElements);
 
 		//Vertices
@@ -1208,9 +1208,9 @@ namespace HPC{
 
 		//Copy from homogenous coordinate system
 		for(U32 i=0; i<m_ctVertices; i++) {
-			verticesXYZ[i*3] = homogenousVertices[i*4];
-			verticesXYZ[i*3 + 1] = homogenousVertices[i*4 + 1];
-			verticesXYZ[i*3 + 2] = homogenousVertices[i*4 + 2];
+			vertices[i*3] = homogenousVertices[i*4];
+			vertices[i*3 + 1] = homogenousVertices[i*4 + 1];
+			vertices[i*3 + 2] = homogenousVertices[i*4 + 2];
 		}
 
 

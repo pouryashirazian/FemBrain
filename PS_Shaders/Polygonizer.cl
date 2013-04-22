@@ -134,7 +134,7 @@ enum CellCorners {LBN, LBF, LTN, LTF, RBN, RBF, RTN, RTF};
 
 //Types
 enum PrimitiveType {primPoint, primLine, primCylinder, primDisc, primRing, primCube, 
-					primTriangle, primQuadricPoint, primNULL, primInstance};
+					primTriangle, primQuadricPoint, primNULL, primInstance, primRBF};
 					
 enum OperatorType {opUnion, opIntersect, opDif, opSmoothDif, opBlend, opRicciBlend, 
 				   opGradientBlend, opFastQuadricPointSet, opCache, opWarpTwist, 

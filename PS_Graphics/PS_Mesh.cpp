@@ -7,11 +7,13 @@
 
 #include <assert.h>
 #include <fstream>
+#include <algorithm>
 #include "PS_Mesh.h"
 #include "../PS_Base/PS_FileDirectory.h"
 #include "../PS_Base/PS_ErrorManager.h"
-#include <algorithm>
+#include "../PS_Base/PS_Logger.h"
 
+using namespace PS;
 using namespace PS::FILESTRINGUTILS;
 
 namespace PS{
@@ -23,14 +25,14 @@ MeshMaterial::MeshMaterial() {
 
 MeshMaterial::MeshMaterial(const char* chrFilePath) {
     m_isSerializeable = true;
-    this->read(chrFilePath);
+    this->load(chrFilePath);
 }
 
 MeshMaterial::~MeshMaterial() {
 
 }
 
-bool MeshMaterial::read(const char *chrFilePath) {
+bool MeshMaterial::load(const char *chrFilePath) {
     std::vector<DAnsiStr> content;
     if(!ReadTextFile(chrFilePath, content))
         return false;
@@ -97,8 +99,28 @@ bool MeshMaterial::read(const char *chrFilePath) {
 
 }
 
-bool MeshMaterial::write(const char *chrFilePath) {
+bool MeshMaterial::store(const char *chrFilePath) {
+	std::vector<DAnsiStr> vContent;
 
+	if(strMTLName.length() > 0)
+		vContent.push_back(printToAStr("# PS::MESH Material File: %s", strMTLName.c_str()));
+	else
+		vContent.push_back(DAnsiStr("# PS::MESH Material File"));
+	vContent.push_back("# Material Count: 1");
+	vContent.push_back("newmtl");
+	vContent.push_back(printToAStr("Ns %f", shininess));
+	vContent.push_back(printToAStr("Ka %f %f %f", ambient.x, ambient.y, ambient.z));
+	vContent.push_back(printToAStr("Kd %f %f %f", diffused.x, diffused.y, diffused.z));
+	vContent.push_back(printToAStr("Ks %f %f %f", specular.x, specular.y, specular.z));
+
+	vContent.push_back(printToAStr("Ni %f", refractIndex));
+	vContent.push_back(printToAStr("d %f", trans));
+	vContent.push_back(printToAStr("illum %d", illuminationModel));
+
+	if(strTexName.length() > 0)
+		vContent.push_back(printToAStr("map_Kd %s", strTexName.c_str()));
+
+	return WriteTextFile(DAnsiStr(chrFilePath), vContent);
 }
 
 
@@ -131,32 +153,80 @@ void MeshNode::init() {
     lpMaterial = NULL;
 }
 
-int MeshNode::add(const vec3f& v, ArrayType dest, int count)
+bool MeshNode::readbackMeshV3T3(U32& ctVertices, vector<float>& vertices,
+									U32& ctTriangles, vector<U32>& elements) {
+	if(szUnitVertex != 3 || szUnitFace != 3)
+		return false;
+
+	ctVertices = this->countVertices();
+	ctTriangles = this->countFaces();
+
+	vertices.assign(this->arrVertices.begin(), this->arrVertices.end());
+	elements.assign(this->arrIndices.begin(), this->arrIndices.end());
+	return true;
+}
+
+
+int MeshNode::add(const vec3f& v, VertexAttribType vat, int step)
 {
-	if(count > 3 || count < 0)
+	if(step > 3 || step < 0)
 		return -1;
 
 	int idxAdded = -1;
-	if(dest == atVertex)
+	switch(vat) {
+	case(vatPosition):
 	{
-		for(int i=0; i<count; i++)
+		for(int i=0; i<step; i++)
 			arrVertices.push_back(v.e[i]);
 		idxAdded = (int)this->countVertices() - 1;
 	}
-	else if(dest == atNormal)
+	break;
+
+	case(vatNormal):
 	{
-		for(int i=0; i<count; i++)
+		for(int i=0; i<step; i++)
 			arrNormals.push_back(v.e[i]);
 		idxAdded = (int)this->countNormals() - 1;
 	}
-	else if(dest == atTexture)
+	break;
+
+	case(vatTexCoord):
 	{
-		for(int i=0; i<count; i++)
+		for(int i=0; i<step; i++)
 			arrTexCoords.push_back(v.e[i]);
 		idxAdded = (int)this->countTexCoords() - 1;
 	}
+	break;
+
+	default: {
+		LogError("Unhandled Vertex Attrib Type");
+	}
+
+	}
 
 	return idxAdded;
+}
+
+void MeshNode::add(const vector<float>& arrAttribs, VertexAttribType vat, int step) {
+	switch(vat) {
+	case(vatPosition): {
+		szUnitVertex = step;
+		arrVertices.assign(arrAttribs.begin(), arrAttribs.end());
+	}
+	break;
+
+	case(vatTexCoord): {
+		szUnitTexCoord = step;
+		arrTexCoords.assign(arrAttribs.begin(), arrAttribs.end());
+	}
+	break;
+
+
+	case(vatNormal): {
+		arrNormals.assign(arrAttribs.begin(), arrAttribs.end());
+	}
+	break;
+	}
 }
 
 int MeshNode::addVertex(const vec3f& v)
@@ -196,6 +266,11 @@ int MeshNode::addTexCoord3(const vec3f& t)
 void MeshNode::addFaceIndex(U32 index)
 {
 	arrIndices.push_back(index);
+}
+
+void MeshNode::addFaceIndices(const vector<U32>& arrFaces, int unitFace) {
+	szUnitFace = unitFace;
+	arrIndices.assign(arrFaces.begin(), arrFaces.end());
 }
 
 int MeshNode::countFaceIndexErrors() const
@@ -251,30 +326,6 @@ void MeshNode::computeVertexNormalsFromFaces() {
     }
 }
 
-vec3f MeshNode::getAsVec3(int index, ArrayType dest) const
-{
-	vec3f output;
-	if(dest == atVertex)
-	{
-		U32 idxFloat = index * szUnitVertex;
-		assert(idxFloat >= 0 && idxFloat <= (arrVertices.size() - szUnitVertex));
-		output = vec3f(&arrVertices[idxFloat]);
-	}
-	else if(dest == atNormal)
-	{
-		U32 idxFloat = index * szUnitVertex;
-		assert(idxFloat >= 0 && idxFloat <= arrNormals.size() - 3);
-		output = vec3f(&arrNormals[idxFloat]);
-	}
-	else if(dest == atTexture)
-	{
-		U32 idxFloat = index * szUnitTexCoord;
-		assert(idxFloat >= 0 && idxFloat <= arrTexCoords.size() - szUnitTexCoord);
-		output = vec3f(&arrTexCoords[idxFloat]);
-	}
-
-	return output;
-}
 
 vec3f MeshNode::getVertex(int idxVertex) const
 {
@@ -323,6 +374,33 @@ AABB MeshNode::computeBoundingBox() const
 
 	oct.set(lo, hi);
 	return oct;
+}
+
+void MeshNode::getVertexAttrib(U32& count, vector<float>& arrAttribs, VertexAttribType vat) const {
+	switch(vat) {
+	case(vatPosition): {
+		count = countVertices();
+		arrAttribs.assign(arrVertices.begin(), arrVertices.end());
+	}
+	break;
+
+	case(vatTexCoord): {
+		count = countTexCoords();
+		arrAttribs.assign(arrTexCoords.begin(), arrTexCoords.end());
+	}
+	break;
+
+	case(vatNormal): {
+		count = countVertices();
+		arrAttribs.assign(arrNormals.begin(), arrNormals.end());
+	}
+	break;
+	}
+}
+
+void MeshNode::getFaces(U32& count, vector<U32>& faces) const {
+	count = countFaces();
+	faces.assign(arrIndices.begin(), arrIndices.end());
 }
 
 void MeshNode::move(const vec3f& d) {
@@ -440,12 +518,6 @@ MeshNode*	Mesh::getNode(int idx) const
 		return NULL;
 }
 
-int Mesh::countNodes() const
-{
-	return (int)m_nodes.size();
-}
-
-
 void Mesh::addMeshMaterial(MeshMaterial* lpMaterial)
 {
     if(lpMaterial != NULL) {
@@ -472,9 +544,9 @@ MeshMaterial* Mesh::getMaterial(const string& strName) const
         return NULL;
 }
 
-bool Mesh::load(const char* chrFileName)
+bool Mesh::load(const char* chrFilePath)
 {
-    m_strFilePath = string(chrFileName);
+    m_strFilePath = string(chrFilePath);
     DAnsiStr strExt = ExtractFileExt(DAnsiStr(m_strFilePath.c_str()));
     bool bres = false;
     if(strExt == "obj") {
@@ -484,6 +556,110 @@ bool Mesh::load(const char* chrFileName)
 	else
 		ReportError("Invalid file format.");
     return bres;
+}
+
+bool Mesh::store(const char* chrFilePath) {
+	ofstream fp;
+	fp.open(chrFilePath);
+
+
+	//Store All Materials
+	DAnsiStr strFilePath = ExtractFilePath(DAnsiStr(chrFilePath));
+	DAnsiStr strMtlPath = strFilePath;
+	for(U32 i=0; i<countMaterials(); i++) {
+
+		if(getMaterial(i)->name().length() > 0)
+			strMtlPath += DAnsiStr(getMaterial(i)->name().c_str()) + ".mtl";
+		else
+			strMtlPath += printToAStr("mtlnode%d.mtl", i+1);
+
+		getMaterial(i)->store(strMtlPath.cptr());
+	}
+
+
+
+	//Face indices are at index 1
+	MeshNode* lpNode = NULL;
+	for(U32 iNode=0; iNode < countNodes(); iNode++) {
+		lpNode = getNode(iNode);
+
+		if(lpNode == NULL)
+			continue;
+
+		//Write All vertices
+		fp << "# Generated by PS::MESH\n";
+		fp << "# Number of vertices: " << lpNode->countVertices() << endl;
+		fp << "# Number of texture coordinates: " << lpNode->countTexCoords() << endl;
+		fp << "# Number of normals: " << lpNode->countNormals() << endl;
+		fp << "# Number of faces: " << lpNode->countFaces() << endl;
+		fp << "# Group " << iNode+1 << " of " << countNodes() << endl;
+
+		//Vertices
+		U32 ctVertices;
+		U32 szUnitVertex = lpNode->getUnitVertex();
+		vector<float> attribs;
+		lpNode->getVertexAttrib(ctVertices, attribs, vatPosition);
+		for(U32 i=0; i < ctVertices; i++) {
+			fp << "v";
+			for(U32 j=0; j<szUnitVertex; j++) {
+				fp << " " << attribs[i * szUnitVertex + j];
+			}
+
+			fp << endl;
+		}
+
+		//Normals
+		for(U32 i=0; i < lpNode->countVertices(); i++) {
+
+			vec3f n = lpNode->getNormal(i);
+			fp << "vn " << n.x << " " << n.y << " " << n.z << endl;
+		}
+
+		//TexCoords
+		if(lpNode->getUnitTexCoord() == 2) {
+			for(U32 i=0; i < lpNode->countTexCoords(); i++) {
+				vec2f t = lpNode->getTexCoord2(i);
+				fp << "vt " << t.x << " " << t.y << endl;
+			}
+		}
+		else if(lpNode->getUnitTexCoord() == 3) {
+			for(U32 i=0; i < lpNode->countTexCoords(); i++) {
+				vec3f t = lpNode->getTexCoord3(i);
+				fp << "vt " << t.x << " " << t.y << " " << t.z << endl;
+			}
+		}
+		else
+			LogErrorArg1("Unsupported texcoords found in MeshGroup: %d", iNode);
+
+		//Faces
+		U32 ctFaces = 0;
+		vector<U32> arrIndices;
+		lpNode->getFaces(ctFaces, arrIndices);
+		if(lpNode->getUnitFace() == 3) {
+			vec3u32 f;
+			vec3u32 inc(1);
+			for(U32 i=0; i<ctFaces; i++) {
+				f.load(&arrIndices[i * 3]);
+				f = f + inc;
+				fp << "f " << f.x << " " << f.y << " " << f.z << endl;
+			}
+		}
+		else if(lpNode->getUnitFace() == 4) {
+			vec4u32 f;
+			vec4u32 inc(1);
+			for(U32 i=0; i<ctFaces; i++) {
+				f.load(&arrIndices[i * 4]);
+				f = f + inc;
+				fp << "f " << f.x << " " << f.y << " " << f.z << " " << f.w << endl;
+			}
+		}
+
+	}
+
+
+
+	fp.close();
+	return true;
 }
 
 AABB Mesh::computeBoundingBox() const
@@ -507,22 +683,22 @@ void Mesh::computeMissingNormals() {
 }
 
 void Mesh::move(const vec3f &d) {
-    for(int i=0; i<this->countNodes(); i++)
+    for(U32 i=0; i<this->countNodes(); i++)
         this->getNode(i)->move(d);
 }
 
 void Mesh::scale(const vec3f& s) {
-    for(int i=0; i<this->countNodes(); i++)
+    for(U32 i=0; i<this->countNodes(); i++)
         this->getNode(i)->scale(s);
 }
 
 void Mesh::rotate(const quat& q) {
-    for(int i=0; i<this->countNodes(); i++)
+    for(U32 i=0; i<this->countNodes(); i++)
         this->getNode(i)->rotate(q);
 }
 
 void Mesh::fitToBBox(const AABB& box) {
-    for(int i=0; i<this->countNodes(); i++)
+    for(U32 i=0; i<this->countNodes(); i++)
         this->getNode(i)->fitToBBox(box);
 }
 
@@ -578,7 +754,7 @@ bool Mesh::loadObj(const char* chrFileName)
 			v.x = static_cast<float>(atof(words[1].ptr()));
 			v.y = static_cast<float>(atof(words[2].ptr()));
 			v.z = static_cast<float>(atof(words[3].ptr()));
-			aNode->add(v, MeshNode::atVertex, 3);
+			aNode->add(v, vatPosition, 3);
 
 			//Added Vertex
 			ctVertices++;
@@ -589,7 +765,7 @@ bool Mesh::loadObj(const char* chrFileName)
 			v.x = static_cast<float>(atof(words[1].ptr()));
 			v.y = static_cast<float>(atof(words[2].ptr()));
 			v.z = static_cast<float>(atof(words[3].ptr()));
-			aNode->add(v, MeshNode::atNormal, 3);
+			aNode->add(v, vatNormal, 3);
 		}
 		else if((words[0] == "vt")&&(aNode))
 		{
@@ -703,7 +879,7 @@ bool Mesh::loadObjGlobalVertexNormal(const char* chrFileName)
 			v.x = static_cast<float>(atof(words[1].ptr()));
 			v.y = static_cast<float>(atof(words[2].ptr()));
 			v.z = static_cast<float>(atof(words[3].ptr()));
-			lpGlobalNode->add(v, MeshNode::atVertex, 3);
+			lpGlobalNode->add(v, vatPosition, 3);
 			arrProcessed[i] = true;
 		}
 		else if((words[0] == "vn")&&(lpGlobalNode)&&(ctWords == 4))
@@ -712,7 +888,7 @@ bool Mesh::loadObjGlobalVertexNormal(const char* chrFileName)
 			v.x = static_cast<float>(atof(words[1].ptr()));
 			v.y = static_cast<float>(atof(words[2].ptr()));
 			v.z = static_cast<float>(atof(words[3].ptr()));
-			lpGlobalNode->add(v, MeshNode::atNormal, 3);
+			lpGlobalNode->add(v, vatNormal, 3);
 			arrProcessed[i] = true;
 		}
 		else if((words[0] == "vt")&&(lpGlobalNode))

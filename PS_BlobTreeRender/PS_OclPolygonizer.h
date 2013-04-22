@@ -138,8 +138,8 @@ public:
 	void drawNormals();
 
 	//Read-back Mesh
-	bool readBackMesh(U32& ctVertices, vector<float>& verticesXYZ,
-						U32& ctFaceElements, vector<U32>& elements) const;
+	bool readbackMeshV3T3(U32& ctVertices, vector<float>& vertices,
+						U32& ctTriangles, vector<U32>& elements) const;
 
 	//Reads normals
 	bool readBackNormals(U32& ctVertices, vector<float>& verticesXYZ, vector<float>& normals) const;

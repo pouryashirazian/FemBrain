@@ -19,13 +19,10 @@
 
 #include "PS_Graphics/ShaderManager.h"
 #include "PS_Graphics/PS_ArcBallCamera.h"
-#include "PS_Graphics/PS_GLSurface.h"
 #include "PS_Graphics/PS_SketchConfig.h"
 #include "PS_Graphics/AffineWidgets.h"
 #include "PS_Graphics/PS_Vector.h"
 #include "PS_Graphics/OclRayTracer.h"
-#include "PS_Graphics/GroundMartrix.h"
-#include "PS_Graphics/SceneBox.h"
 #include "PS_Graphics/MeshRenderer.h"
 #include "PS_Graphics/PS_DebugUtils.h"
 #include "PS_Graphics/SceneGraph.h"
@@ -154,7 +151,6 @@ GLMeshBuffer* g_lpDrawMesh = NULL;
 
 //SimulationObjects
 PS::ArcBallCamera 	g_arcBallCam;
-PS::HPC::GPUPoly* 	g_lpBlobRender = NULL;
 PS::HPC::FastRBF*	g_lpFastRBF = NULL;
 Deformable* 		g_lpDeformable = NULL;
 
@@ -243,9 +239,6 @@ void Draw()
 	if(g_lpDeformable && g_appSettings.bDrawTetMesh)
 		g_lpDeformable->draw();
 
-//	if(g_lpDrawMesh)
-//		g_lpDrawMesh->draw();
-
 	if(g_lpFastRBF && (g_appSettings.drawIsoSurface != disNone)) {
 		g_lpFastRBF->setWireFrameMode(g_appSettings.drawIsoSurface == disWireFrame);
 
@@ -256,31 +249,13 @@ void Draw()
 				g_lpDrawNormals->draw();
 		}
 
+		//Draw Collision
+		g_lpFastRBF->drawCollision();
+
 		glEnable(GL_LIGHTING);
 			g_lpFastRBF->draw();
 		glDisable(GL_LIGHTING);
 	}
-
-	//Draw Polygonizer output
-	/*
-	if(g_lpBlobRender && (g_appSettings.drawIsoSurface != disNone))
-	{
-		g_lpBlobRender->setWireFrameMode(g_appSettings.drawIsoSurface == disWireFrame);
-
-		//Draw AABB and Normals
-		if(g_appSettings.bDrawAABB) {
-			g_lpBlobRender->drawBBox();
-
-			if(g_lpDrawNormals)
-				g_lpDrawNormals->draw();
-		}
-
-		glEnable(GL_LIGHTING);
-			g_lpBlobRender->draw();
-		glDisable(GL_LIGHTING);
-	}
-	*/
-
 
 	//Draw Interaction Avatar
 	if(g_lpAvatarCube)
@@ -346,18 +321,6 @@ void Draw()
 		sprintf(chrMsg, "ANIMATION FRAME# %08llu, LOGS# %08llu, ", g_appSettings.ctAnimFrame, g_appSettings.ctLogsCollected);
 		g_infoLines[INDEX_ANIMATION_INFO] = string(chrMsg);
 
-		/*
-		if(g_lpBlobRender && g_lpDeformable) {
-			sprintf(chrMsg, "MESH CELLSIZE:%.3f, ISOSURF: V# %d, TRI# %d, VOLUME: V# %d, TET# %d",
-					g_appSettings.cellsize,
-					g_lpBlobRender->countVertices(),
-					g_lpBlobRender->countTriangles(),
-					g_lpDeformable->getTetMesh()->getNumVertices(),
-					g_lpDeformable->getTetMesh()->getNumElements());
-			g_infoLines[INDEX_MESH_INFO] = string(chrMsg);
-		}
-		*/
-		/*
 		if(g_lpFastRBF && g_lpDeformable) {
 			sprintf(chrMsg, "MESH CELLSIZE:%.3f, ISOSURF: V# %d, TRI# %d, VOLUME: V# %d, TET# %d",
 					g_appSettings.cellsize,
@@ -367,8 +330,6 @@ void Draw()
 					g_lpDeformable->getTetMesh()->getNumElements());
 			g_infoLines[INDEX_MESH_INFO] = string(chrMsg);
 		}
-		*/
-
 	}
 
 	//Write Model Info
@@ -481,6 +442,12 @@ void MousePress(int button, int state, int x, int y)
 	glutPostRedisplay();
 }
 
+//
+//bool ComputeCollisionGeometrically() {
+//
+//}
+
+
 /*!
  * Passive Move for mouse
  */
@@ -561,91 +528,91 @@ void MousePassiveMove(int x, int y)
 				//If it does not have the vertex then add it. If we have it then the original vertex is used.
 				if(g_hashVertices.find(arrIndices[i]) == g_hashVertices.end())
 					g_hashVertices.insert(std::pair<int, vec3d>(arrIndices[i], arrVertices[i]));
-				//else
-					//g_hashVertices[arrIndices[i]] = arrVertices[i];
 			}
 		}
 
+		//Avatar Box
 		AABB aabbAvatar(vec3(lower.x, lower.y, lower.z), vec3(upper.x, upper.y, upper.z));
-		//Collided Now
-		if(g_lpDeformable->aabb().intersect(aabbAvatar))
-		{
-			printf("INTERSECTS\n");
 
-			//Detect Collision Face
-			//Check against six faces of Avatar to find the intersection
-			//Previously Detected Face? If no then detect now
-			if(g_appSettings.idxCollisionFace < 0)
-			{
-				//g_appSettings.hapticForceCoeff = DEFAULT_FORCE_COEFF;
-				double minDot = GetMaxLimit<double>();
-				int idxMin = 0;
-
-				//Iterate over vertices in collision
-				for(map<int, vec3d>::iterator it = g_hashVertices.begin(); it != g_hashVertices.end(); ++it)
-				{
-					vec3d p = it->second;
-					for(int j=0; j<6; j++)
-					{
-						double dot = vec3d::dot(s[j] - p, n[j]);
-						if(dot < minDot)
-						{
-							minDot = dot;
-							idxMin = j;
-						}
-
-						g_appSettings.idxCollisionFace = idxMin;
-						g_appSettings.initialCollisionFaceModelDist = minDot;
-					}
-				}
-			}
-			else
-			{
-				double minDot = GetMaxLimit<double>();
-				int idxFace = g_appSettings.idxCollisionFace;
-				//Iterate over vertices in collision
-				for(map<int, vec3d>::iterator it = g_hashVertices.begin(); it != g_hashVertices.end(); ++it)
-				{
-					double dot = vec3d::dot(s[idxFace] - it->second, n[idxFace]);
-					if(dot < minDot)
-					{
-						minDot = dot;
-						g_appSettings.currentCollisionFaceModelDist = minDot;
-					}
-				}
-			}
+		//Compute Collision using RBF Interpolation Function
+		if(g_lpFastRBF->intersects(aabbAvatar)) {
+			printf("FASTRBF: AVATAR collided with model\n");
 
 
-			//Compute Displacement
-			vector<vec3d> arrForces;
-			vector<int> arrIndices;
-			int idxFace = g_appSettings.idxCollisionFace;
-			for(std::map<int, vec3d>::iterator it = g_hashVertices.begin(); it != g_hashVertices.end(); ++it)
-			{
-				vec3d v = it->second;
-/*
-				if(g_appSettings.currentCollisionFaceModelDist > g_appSettings.initialCollisionFaceModelDist)
-					g_appSettings.hapticForceCoeff -= 1000;
-				else
-					g_appSettings.hapticForceCoeff += 1000;
-*/
-
-				//1000000
-				double dot = vec3d::dot(s[idxFace] - v, n[idxFace]) * g_appSettings.hapticForceCoeff;
-				//double dot = vec3d::dot(s[idxFace] - v, n[idxFace]);
-				string arrFaces [] = {"LEFT", "RIGHT", "BOTTOM", "TOP", "NEAR", "FAR"};
-				printf("Face[%d] = %s, dot = %.4f, VERTEX USED: [%.4f, %.4f, %.4f], COEFF: %.2f \n",
-						idxFace, arrFaces[idxFace].c_str(), dot, v.x, v.y, v.z, g_appSettings.hapticForceCoeff);
-				arrForces.push_back(n[idxFace] * dot);
-				arrIndices.push_back(it->first);
-			}
-
-			//Apply displacements/forces to the model
-			g_lpDeformable->hapticSetCurrentForces(arrIndices, arrForces);
 
 		}
-		else
+
+
+		//Compute Collision Geometrically
+		if(!g_lpDeformable->aabb().intersect(aabbAvatar) || (g_hashVertices.size() == 0)) {
 			g_appSettings.idxCollisionFace = -1;
+			return;
+		}
+		printf("Collision Detected Geometrically.\n");
+
+		//Detect Collision Face
+		//Check against six faces of Avatar to find the intersection
+		//Previously Detected Face? If no then detect now
+		if (g_appSettings.idxCollisionFace < 0) {
+			//g_appSettings.hapticForceCoeff = DEFAULT_FORCE_COEFF;
+			double minDot = GetMaxLimit<double>();
+			int idxMin = 0;
+
+			//Iterate over vertices in collision
+			for (map<int, vec3d>::iterator it = g_hashVertices.begin();
+					it != g_hashVertices.end(); ++it) {
+				vec3d p = it->second;
+				for (int j = 0; j < 6; j++) {
+					double dot = vec3d::dot(s[j] - p, n[j]);
+					if (dot < minDot) {
+						minDot = dot;
+						idxMin = j;
+					}
+
+					g_appSettings.idxCollisionFace = idxMin;
+					g_appSettings.initialCollisionFaceModelDist = minDot;
+				}
+			}
+		} else {
+			double minDot = GetMaxLimit<double>();
+			int idxFace = g_appSettings.idxCollisionFace;
+			//Iterate over vertices in collision
+			for (map<int, vec3d>::iterator it = g_hashVertices.begin();
+					it != g_hashVertices.end(); ++it) {
+				double dot = vec3d::dot(s[idxFace] - it->second, n[idxFace]);
+				if (dot < minDot) {
+					minDot = dot;
+					g_appSettings.currentCollisionFaceModelDist = minDot;
+				}
+			}
+		}
+
+		//Compute Displacement
+		vector<vec3d> arrForces;
+		vector<int> arrIndices;
+		int idxFace = g_appSettings.idxCollisionFace;
+		for (std::map<int, vec3d>::iterator it = g_hashVertices.begin();
+				it != g_hashVertices.end(); ++it) {
+			vec3d v = it->second;
+
+			//1000000
+			double dot = vec3d::dot(s[idxFace] - v, n[idxFace])
+					* g_appSettings.hapticForceCoeff;
+			//double dot = vec3d::dot(s[idxFace] - v, n[idxFace]);
+			string arrFaces[] = { "LEFT", "RIGHT", "BOTTOM", "TOP", "NEAR",
+					"FAR" };
+			printf(
+					"Face[%d] = %s, dot = %.4f, VERTEX USED: [%.4f, %.4f, %.4f], COEFF: %.2f \n",
+					idxFace, arrFaces[idxFace].c_str(), dot, v.x, v.y, v.z,
+					g_appSettings.hapticForceCoeff);
+			arrForces.push_back(n[idxFace] * dot);
+			arrIndices.push_back(it->first);
+		}
+
+		//Apply displacements/forces to the model
+		g_lpDeformable->hapticSetCurrentForces(arrIndices, arrForces);
+
+
 		glutPostRedisplay();
 	}
 }
@@ -692,8 +659,6 @@ void MouseWheel(int button, int dir, int x, int y)
 }
 
 void ApplyDeformations(U32 dof, double* displacements) {
-//	if(g_lpBlobRender)
-//		g_lpBlobRender->applyFemDisplacements(dof, displacements);
 	if(g_lpFastRBF)
 		g_lpFastRBF->applyFemDisplacements(dof, displacements);
 }
@@ -760,15 +725,15 @@ void NormalKey(unsigned char key, int x, int y)
 	switch(key)
 	{
 	case('+'):{
-		g_appSettings.cellsize += 0.01;
-		LogInfoArg1("Changed cellsize to: %.2f", g_appSettings.cellsize);
-		g_lpBlobRender->runPolygonizer(g_appSettings.cellsize);
+//		g_appSettings.cellsize += 0.01;
+//		LogInfoArg1("Changed cellsize to: %.2f", g_appSettings.cellsize);
+//		g_lpBlobRender->runPolygonizer(g_appSettings.cellsize);
 		break;
 	}
 	case('-'):{
-		g_appSettings.cellsize -= 0.01;
-		LogInfoArg1("Changed cellsize to: %.2f", g_appSettings.cellsize);
-		g_lpBlobRender->runPolygonizer(g_appSettings.cellsize);
+//		g_appSettings.cellsize -= 0.01;
+//		LogInfoArg1("Changed cellsize to: %.2f", g_appSettings.cellsize);
+//		g_lpBlobRender->runPolygonizer(g_appSettings.cellsize);
 		break;
 	}
 	case('g'):{
@@ -1157,37 +1122,47 @@ int main(int argc, char* argv[])
 	g_lpSceneBox = reinterpret_cast<GLMeshBuffer*>(TheSceneGraph::Instance().last());
 	g_lpSceneBox->setShaderEffectProgram(TheShaderManager::Instance().get("phong"));
 
-	//DAnsiStr strFPModel = ExtractFilePath(GetExePath());
-	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/flatdisk.scene";
-	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/testDisc3.scene";
-	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/CylinderWithHoles.scene";
-	//strFPModel = ExtractOneLevelUp(strFPModel) + "AA_Models/peanut.scene";
-	//Process BlobTree, Produce TetMesh
 	DAnsiStr strFileExt = ExtractFileExt(DAnsiStr(g_appSettings.strModelFilePath.c_str()));
-
 	//Mesh
-	U32 ctVertices, ctElements;
-	vector<U32> elements;
+	U32 ctVertices = 0;
+	U32 ctTriangles = 0;
 	vector<float> vertices;
+	vector<U32> elements;
 
 	if(strFileExt == DAnsiStr("obj")) {
+		LogInfoArg1("Loading input mesh from obj file at: %s", g_appSettings.strModelFilePath.c_str());
 		Mesh* lpMesh = new Mesh(g_appSettings.strModelFilePath.c_str());
 		lpMesh->fitToBBox(AABB(vec3f(0,0,0), vec3f(8, 8, 8)));
 		g_lpFastRBF = new FastRBF(lpMesh);
+
+		//Readback mesh
+		MeshNode* lpNode = lpMesh->getNode(0);
+		if(lpNode != NULL)
+			lpNode->readbackMeshV3T3(ctVertices, vertices, ctTriangles, elements);
+		g_lpDrawNormals = 0;
+
+		SAFE_DELETE(lpMesh);
 	}
 	else
 	{
+		LogInfoArg1("Loading input BlobTree file at: %s", g_appSettings.strModelFilePath.c_str());
 		GPUPoly* lpBlobRender = new GPUPoly();
 		if(!lpBlobRender->readModel(g_appSettings.strModelFilePath.c_str())) {
 			LogErrorArg1("Unable to read Blob file at: %s", g_appSettings.strModelFilePath.c_str());
 			SAFE_DELETE(lpBlobRender);
 			exit(-1);
 		}
+
+		LogInfoArg1("Polygonizing BlobTree file with cellsize: %.2f", g_appSettings.cellsize);
 		lpBlobRender->runPolygonizer(g_appSettings.cellsize);
+
+		//Save Mesh
+		CLMeshBuffer::StoreAsObjMesh("CubeStored.obj", lpBlobRender->computeDevice(), lpBlobRender);
+
 		g_lpFastRBF = new FastRBF(lpBlobRender);
 
 		//Read Back Polygonized Mesh
-		if(!lpBlobRender->readBackMesh(ctVertices, vertices, ctElements, elements))
+		if(!lpBlobRender->readbackMeshV3T3(ctVertices, vertices, ctTriangles, elements))
 			LogError("Unable to read mesh from RBF in the format of V3T3");
 		g_lpDrawNormals = lpBlobRender->prepareMeshBufferForDrawingNormals(0.3);
 
@@ -1198,7 +1173,7 @@ int main(int argc, char* argv[])
 	{
 
 		//Produce Quality Tetrahedral Mesh
-		TetGenExporter::tesselate(ctVertices, &vertices[0], ctElements, &elements[0], "IsoSurfMeshIn", "TetMeshOut");
+		TetGenExporter::tesselate(ctVertices, &vertices[0], ctTriangles, &elements[0], "IsoSurfMeshIn", "TetMeshOut");
 
 		//Export a veg file for the Fem Engine
 		VegWriter::WriteVegFile("TetMeshOut.node");

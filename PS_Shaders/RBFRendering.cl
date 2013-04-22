@@ -70,3 +70,19 @@ __kernel void ApplyVertexDeformations(U32 ctVertices,
 	
 	arrOutMeshVertex[idX] = arrInRestPos[idX] + arrInDeformation[idX];
 }
+
+//Compute Fields for radial basis functions
+__kernel void ComputeRBFPrimFieldArray(U32 ctCenters, 
+									  __global float4* arrInterpolationNodesLambda,
+									  U32 ctVertices,
+									  __global float4* arrInOutVertexFields) {
+	int idX = get_global_id(0);
+	if(idX >= ctVertices)
+		return;
+
+	float field = 0.0f;
+	for(int i=0; i < ctCenters; i++)
+		field += arrInterpolationNodesLambda[i].w * distance(arrInterpolationNodesLambda[i].xyz, arrInOutVertexFields[idX].xyz);
+	
+	arrInOutVertexFields[idX].w = field;
+}

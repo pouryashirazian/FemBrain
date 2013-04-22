@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "../PS_Base/PS_String.h"
+#include "PS_GLMeshBuffer.h"
 #include "AssetManager.h"
 #include "PS_Vector.h"
 #include "PS_Quaternion.h"
@@ -35,8 +36,8 @@ public:
     MeshMaterial(const char* chrFilePath);
     virtual ~MeshMaterial();
 
-    bool read(const char *chrFilePath);
-    bool write(const char *chrFilePath);
+    bool load(const char *chrFilePath);
+    bool store(const char *chrFilePath);
 public:
     string strMTLName;
     string strTexName;
@@ -65,8 +66,10 @@ public:
 	virtual ~MeshNode();
 
     void init();
-	enum ArrayType {atVertex, atNormal, atTexture, atFaceIndex, atNone};
-	enum FaceType {ftTriangle = 3, ftQuad = 4};
+
+	//Readback mesh
+	bool readbackMeshV3T3(U32& ctVertices, vector<float>& vertices,
+							 U32& ctTriangles, vector<U32>& elements);
 
 	/*!
 	 * Adds a vec3f v to the destination buffer dest.
@@ -74,12 +77,15 @@ public:
 	 * not the position in the float array. The position in the float array can be computed as
 	 * index x szUnitVertex
 	 */
-	int add(const vec3f& v, ArrayType dest = atVertex, int count = 3);
+	int add(const vec3f& v, VertexAttribType vat = vatPosition, int step = 3);
+	void add(const vector<float>& arrAttribs, VertexAttribType vat = vatPosition, int step = 3);
+
 	int addVertex(const vec3f& v);
 	int addNormal(const vec3f& n);
 	int addTexCoord2(const vec2f& t);
 	int addTexCoord3(const vec3f& t);
 	void addFaceIndex(U32 index);
+	void addFaceIndices(const vector<U32>& arrFaces, int unitFace);
 
 
 	/*!
@@ -96,21 +102,20 @@ public:
 
 
 	//Statistics
-	size_t countVertices() const {return arrVertices.size() / (size_t)szUnitVertex;}
-	size_t countNormals() const {return arrNormals.size() / 3;}
-	size_t countFaces() const {return arrIndices.size() / (size_t)szUnitFace;}
-	size_t countTexCoords() const {return arrTexCoords.size() / (size_t)szUnitTexCoord;}
+	U32 countVertices() const {return arrVertices.size() / (U32)szUnitVertex;}
+	U32 countNormals() const {return arrNormals.size() / 3;}
+	U32 countFaces() const {return arrIndices.size() / (U32)szUnitFace;}
+	U32 countTexCoords() const {return arrTexCoords.size() / (U32)szUnitTexCoord;}
 
 	/*!
 	 * returns unit vertex memory stride in bytes
 	 */
-	size_t getVertexStride() const {return szUnitVertex * sizeof(float);}
-	size_t getNormalStride() const {return 3 * sizeof(float);}
-	size_t getFaceStride() const {return szUnitFace * sizeof(U32);}
+	U32 getVertexStride() const {return szUnitVertex * sizeof(float);}
+	U32 getNormalStride() const {return 3 * sizeof(float);}
+	U32 getFaceStride() const {return szUnitFace * sizeof(U32);}
 
 
 	//Access Vertex, Normal
-	vec3f getAsVec3(int index, ArrayType dest = atVertex) const;
 	vec3f getVertex(int idxVertex) const;
 	vec3f getNormal(int idxVertex) const;
 	vec2f getTexCoord2(int idxVertex) const;
@@ -137,10 +142,8 @@ public:
     void setUnitFace(U8 s) {szUnitFace = s;}
 
     //Mesh parts
-    vector<float> vertices() const {return arrVertices;}
-    vector<float> normals() const {return arrNormals;}
-    vector<float> texcoords() const {return arrTexCoords;}
-    vector<U32> indices() const {return arrIndices;}
+    void getVertexAttrib(U32& count, vector<float>& arrAttribs, VertexAttribType vat) const;
+    void getFaces(U32& count, vector<U32>& faces) const;
 
     /*!
      * Move the entire mesh to a new location
@@ -173,17 +176,20 @@ public:
 	Mesh(const char* chrFileName);
 	virtual ~Mesh();
 
-	bool load(const char* chrFileName);
+	//IO
+	bool load(const char* chrFilePath);
+	bool store(const char* chrFilePath);
 
 	//Mesh Nodes
 	void addNode(MeshNode* lpMeshNode);
 	MeshNode*	getNode(int idx) const;
-    int countNodes() const;
+    U32 countNodes() const {return m_nodes.size();}
 
 	//Mesh Materials
 	void addMeshMaterial(MeshMaterial* lpMaterial);
 	MeshMaterial* getMaterial(int idx) const;
     MeshMaterial* getMaterial(const string& strName) const;
+    U32 countMaterials() const { return m_materials.size();}
 
     //Get the AABB for the entire mesh
 	AABB computeBoundingBox() const;

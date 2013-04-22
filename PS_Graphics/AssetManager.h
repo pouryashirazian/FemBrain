@@ -23,8 +23,8 @@ public:
 
     //Serialize to disk
     bool isSerializeable() const {return m_isSerializeable;}
-    virtual bool read(const char* chrFilePath);
-    virtual bool write(const char* chrFilePath);
+    virtual bool load(const char* chrFilePath);
+    virtual bool store(const char* chrFilePath);
 protected:
     bool m_isSerializeable;
     U64 m_tsAccessed;

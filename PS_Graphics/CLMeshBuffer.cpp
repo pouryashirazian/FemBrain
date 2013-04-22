@@ -6,6 +6,10 @@
  */
 #include "CLMeshBuffer.h"
 #include "PS_DebugUtils.h"
+#include "PS_Mesh.h"
+
+using namespace PS;
+using namespace PS::MESH;
 namespace PS {
 namespace HPC {
 
@@ -110,6 +114,54 @@ bool CLMeshBuffer::CopyMeshBufferCL(ComputeDevice* lpDevice,
 
 	return (ctCompleted > 0);
 }
+
+bool CLMeshBuffer::StoreAsObjMesh(const char* chrFilePath,
+										ComputeDevice* lpDevice,
+										const GLMeshBuffer* lpBuffer) {
+	if(lpDevice == NULL || lpBuffer == NULL)
+		return false;
+
+	int ctCompleted = 0;
+
+	Mesh* lpMesh = new Mesh();
+	MeshNode* lpNode = new MeshNode();
+
+	//1.Vertex and other attribs
+	U32 ctVertices, fstep;
+	vector<float> values;
+	VertexAttribType attribs[] = {vatPosition, vatColor, vatNormal, vatTexCoord};
+	int ctAttribs = sizeof(attribs) / sizeof(attribs[0]);
+	for(int i=0; i<ctAttribs; i++) {
+		if(lpBuffer->isVertexBufferValid(attribs[i])) {
+			//Readback the attributes
+			if(ReadbackMeshVertexAttribCL(lpDevice, lpBuffer, attribs[i], ctVertices, fstep, values)) {
+
+				//Add attribs to meshnode
+				lpNode->add(values, attribs[i], fstep);
+				ctCompleted ++;
+			}
+		}
+	}
+
+
+	//Readback indices
+	U32 ctIndices, istep;
+	vector<U32> elements;
+	if(ReadbackMeshFaceCL(lpDevice, lpBuffer, ctIndices, istep, elements)) {
+
+		lpNode->addFaceIndices(elements, lpBuffer->faceStep());
+		ctCompleted ++;
+	}
+
+	//Add Mesh Node and save to file
+	lpMesh->addNode(lpNode);
+	lpMesh->store(chrFilePath);
+
+	return (ctCompleted > 0);
+
+
+}
+
 
 GLMeshBuffer* CLMeshBuffer::PrepareMeshBufferNormals(ComputeDevice* lpDevice, GLMeshBuffer* lpBuffer, float len)
 {

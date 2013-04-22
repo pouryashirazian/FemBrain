@@ -467,6 +467,7 @@ class Vec4{
 public:
     //Constructors
     Vec4() {}
+    Vec4(T a_):x(a_), y(a_), z(a_), w(a_) {}
     Vec4(T x_, T y_, T z_, T w_ = 1.0f):x(x_), y(y_), z(z_), w(w_) {}
     Vec4(const Vec2<T>& vl2, const Vec2<T>& vr2):x(vl2.x), y(vl2.y), z(vr2.x), w(vr2.y) {}
     Vec4(const Vec3<T>& v3, T w_):x(v3.x), y(v3.y), z(v3.z), w(w_) {}

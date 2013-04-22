@@ -94,6 +94,9 @@ int FastRBF::init() {
 	m_lpKernelApplyDeformations = lpProgramPoly->addKernel("ApplyVertexDeformations");
 	m_lpGPU->getKernelWorkgroupSize(m_lpKernelApplyDeformations);
 
+	m_lpKernelComputeFieldArray = lpProgramPoly->addKernel("ComputeRBFPrimFieldArray");
+	m_lpGPU->getKernelWorkgroupSize(m_lpKernelComputeFieldArray);
+
 //	m_lpKernelComputeFieldArray = lpProgramPoly->addKernel("ComputeFieldArray");
 //	m_lpGPU->getKernelWorkgroupSize(m_lpKernelComputeFieldArray);
 
@@ -151,6 +154,7 @@ int FastRBF::init() {
 	return 1;
 }
 
+//Polygonize RBF Function to create the mesh
 int FastRBF::polygonize(float cellsize) {
 
 	return -1;
@@ -207,6 +211,7 @@ bool FastRBF::copyVertexBufferToRestPos() {
 	m_lpGPU->enqueueAcquireGLObject(1, &inMemMeshVertex);
 	m_lpGPU->enqueueCopyBuffer(inMemMeshVertex, m_inoutMemRestPos, 0, 0, szVertexBuffer);
 	m_lpGPU->enqueueReleaseGLObject(1, &inMemMeshVertex);
+	m_lpGPU->finishAllCommands();
 
 	clReleaseMemObject(inMemMeshVertex);
 
@@ -503,7 +508,7 @@ bool FastRBF::testWithVoxelGridSamples(GPUPoly* lpGPUPoly) {
 
 
 float FastRBF::fieldRBF(const vec3f& v, float iso) const{
-	if(m_ctTotalInterpolationNodes == 0)
+	if(m_ctCenters == 0)
 		return 0.0f;
 
 	float sum = 0.0f;
@@ -577,6 +582,15 @@ bool FastRBF::applyFemDisplacements(U32 dof, double* displacements) {
 	return true;
 }
 
+bool FastRBF::computeFieldArray() {
+//	__kernel void ComputeRBFField(U32 ctCenters,
+//								  __global float4* arrInterpolationNodesLambda,
+//								  U32 ctVertices,
+//								  __global float4* arrInOutVertexFields)
+
+	return false;
+}
+
 GLMeshBuffer* FastRBF::prepareMeshBufferNormals() {
 	return CLMeshBuffer::PrepareMeshBufferNormals(m_lpGPU, this, m_offSurfaceLen);
 }
@@ -629,18 +643,25 @@ bool FastRBF::intersects(const vector<vec3f>& vertices,
 }
 
 //bool intersects(const vector<vec3f>& v, const vector<bool>& crossed) const;
-bool FastRBF::intersects(const AABB& box) const {
+bool FastRBF::intersects(const AABB& box) {
 
-	vec3f v = box.lower();
+	//Return immediately if the two bounding boxes doesnot collide
+	if(!m_bbox.intersect(box))
+		return false;
+
+	m_collision.resize(0);
+	m_penetration.resize(0);
 	vec3f dims = box.extent();
 	float penetration;
 	for(int i=0; i<8; i++) {
-
-		v = v + vec3f::mul(vec3f((i & 0x04) >> 2, (i & 0x02) >> 1, i & 0x01), dims);
-		if(intersects(v, penetration))
-			return true;
+		vec3f v = box.lower() + vec3f::mul(vec3f((i & 0x04) >> 2, (i & 0x02) >> 1, i & 0x01), dims);
+		if(intersects(v, penetration)) {
+			m_collision.push_back(v);
+			m_penetration.push_back(penetration);
+		}
 	}
-	return false;
+
+	return (m_collision.size() > 0);
 }
 
 bool FastRBF::intersects(const vec3f& v, float& penetration) const {
@@ -656,7 +677,17 @@ bool FastRBF::intersects(const vec3f& v, float& penetration) const {
 		return false;
 }
 
+void FastRBF::drawCollision() const {
 
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+	glColor3f(1.0f, 0.0f, 0.0f);
+	glBegin(GL_POINTS);
+	for(U32 i=0; i<m_collision.size(); i++)
+		glVertex3fv(&m_collision[i].e[0]);
+	glEnd();
+	glPopAttrib();
+
+}
 }
 }
 

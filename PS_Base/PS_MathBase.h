@@ -105,7 +105,7 @@ const float EPSILON  = 0.0001f;
 //////////////////////////////////////////////////////////////////////////
 inline int Log2f(float x)
 {
-    unsigned int ix = (unsigned int&)x;
+    unsigned int ix = static_cast<unsigned int>(x);
     unsigned int exp = (ix >> 23) & 0xFF;
     int log2 = int(exp) - 127;
     return log2;
@@ -229,6 +229,7 @@ T GetMinLimit(void)
 }
 
 //Fast SquareRoot Found on internet http://www.codemaestro.com/reviews/9
+/*
 inline float FastSqrt(float number)
 {
     long i;
@@ -237,7 +238,7 @@ inline float FastSqrt(float number)
 
     x = number * 0.5F;
     y  = number;
-    i  = * ( long * ) &y;
+    i  = * (reinterpret_cast<long *>(&y));
     i  = 0x5f3759df - ( i >> 1 );
     y  = * ( float * ) &i;
     y  = y * ( f - ( x * y * y ) );
@@ -254,6 +255,7 @@ inline float FastInvSqrt(float x)
     x = x*(1.5f-xhalf*x*x); // Newton step, repeating increases accuracy
     return x;
 }
+*/
 
 template <typename T>
 inline T RandRangeT(T nMin, T nMax)

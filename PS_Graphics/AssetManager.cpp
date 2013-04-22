@@ -8,11 +8,11 @@ Asset::~Asset() {
 
 }
 
-bool Asset::read(const char *chrFilePath) {
+bool Asset::load(const char *chrFilePath) {
     return false;
 }
 
-bool Asset::write(const char *chrFilePath) {
+bool Asset::store(const char *chrFilePath) {
     return false;
 }
 

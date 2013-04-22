@@ -66,7 +66,7 @@ public:
 					  int& idxMaxPenetrated) const;
 	bool intersects(const vec3f& v, float& penetration) const;
 	//bool intersects(const vector<vec3f>& v, const vector<bool>& crossed) const;
-	bool intersects(const AABB& box) const;
+	bool intersects(const AABB& box);
 
 
 	//Shuffle interpolation nodes
@@ -94,14 +94,21 @@ public:
 	 * Displaces vertices based on computed deformations
 	 */
 	bool applyFemDisplacements(U32 dof, double* displacements);
+	bool computeFieldArray();
 
 	//Create Normals
 	bool readbackMeshV3T3(U32& ctVertices, vector<float>& vertices, U32& ctElements, vector<U32>& elements);
 	GLMeshBuffer* prepareMeshBufferNormals();
+
+
+	void drawCollision() const;
 private:
 	bool copyVertexBufferToRestPos();
 
 private:
+	vector<vec3f> m_collision;
+	vector<float> m_penetration;
+
 	U32 m_ctCenters;
 	U32 m_ctTotalInterpolationNodes;
 	vector<float> m_interpolationNodes;
@@ -114,6 +121,7 @@ private:
     SumScan* m_lpOclSumScan;
 	ComputeDevice* m_lpGPU;
 	ComputeKernel* m_lpKernelApplyDeformations;
+	ComputeKernel* m_lpKernelComputeFieldArray;
 
 	//Reusable vars
 	cl_mem m_inMemVertexCountTable;

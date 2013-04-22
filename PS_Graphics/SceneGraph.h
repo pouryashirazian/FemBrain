@@ -14,7 +14,6 @@
 #include "PS_CopyStack.h"
 #include "AssetManager.h"
 #include "ShaderManager.h"
-#include "PS_Mesh.h"
 #include "PS_ShaderGLSL.h"
 #include "SceneNodeTransform.h"
 #include "PS_ArcBallCamera.h"
@@ -23,6 +22,8 @@
 using namespace std;
 using namespace PS;
 using namespace PS::MATH;
+
+//class PS::MESH::MeshMaterial;
 
 /*!
  * \brief Defines a 1,2,3 dimensional texture to be applied on the scene node for rendering.
@@ -56,7 +57,7 @@ public:
 private:
 	EffectType m_effectType;
 	PS::SHADER::GLShaderProgram* m_lpShader;
-	PS::MESH::MeshMaterial* m_lpMaterial;
+	//PS::MESH::MeshMaterial* m_lpMaterial;
 };
 
 

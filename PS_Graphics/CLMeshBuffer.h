@@ -48,6 +48,12 @@ public:
 									 const GLMeshBuffer* lpSource,
 									 GLMeshBuffer* lpDest);
 
+	/*!
+	 * Store as obj mesh
+	 */
+	static bool StoreAsObjMesh(const char* chrFilePath,
+								ComputeDevice* lpDevice,
+								const GLMeshBuffer* lpBuffer);
 
 	/*!
 	 * Prepares Mesh Buffer for drawing normals

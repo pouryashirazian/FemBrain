@@ -4,6 +4,8 @@
 #include "PS_Matrix.h"
 #include "PS_Vector.h"
 
+using namespace PS::MATH;
+
 /*!
  * class representing transformation nodes in the scene graph.
  * This will decrease memory foot print since a pointer will determine

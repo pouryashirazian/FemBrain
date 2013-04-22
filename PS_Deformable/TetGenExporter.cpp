@@ -17,7 +17,7 @@ TetGenExporter::~TetGenExporter() {
 }
 
 int TetGenExporter::tesselate(U32 ctVertices, float* arrVertices,
-								  U32 ctFaceElements, U32* arrElements,
+								  U32 ctTriangles, U32* arrElements,
 								  const char* chrInputTitle,
 								  const char* chrOutputTitle)
 {
@@ -33,7 +33,6 @@ int TetGenExporter::tesselate(U32 ctVertices, float* arrVertices,
 	for(U32 i=0; i < ctVertices*3; i++)
 		in.pointlist[i] = arrVertices[i];
 
-	U32 ctTriangles = ctFaceElements / 3;
 	in.numberoffacets = ctTriangles;
 	in.facetlist = new tetgenio::facet[in.numberoffacets];
 	in.facetmarkerlist = new int[in.numberoffacets];
