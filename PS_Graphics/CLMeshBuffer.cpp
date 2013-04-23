@@ -137,7 +137,7 @@ bool CLMeshBuffer::StoreAsObjMesh(const char* chrFilePath,
 			if(ReadbackMeshVertexAttribCL(lpDevice, lpBuffer, attribs[i], ctVertices, fstep, values)) {
 
 				//Add attribs to meshnode
-				lpNode->add(values, attribs[i], fstep);
+				lpNode->setVertexAttrib(values, attribs[i], fstep);
 				ctCompleted ++;
 			}
 		}
@@ -149,7 +149,7 @@ bool CLMeshBuffer::StoreAsObjMesh(const char* chrFilePath,
 	vector<U32> elements;
 	if(ReadbackMeshFaceCL(lpDevice, lpBuffer, ctIndices, istep, elements)) {
 
-		lpNode->addFaceIndices(elements, lpBuffer->faceStep());
+		lpNode->setFaceIndices(elements, lpBuffer->faceStep());
 		ctCompleted ++;
 	}
 

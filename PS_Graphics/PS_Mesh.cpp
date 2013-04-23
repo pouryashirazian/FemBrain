@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <fstream>
 #include <algorithm>
+#include <map>
 #include "PS_Mesh.h"
 #include "../PS_Base/PS_FileDirectory.h"
 #include "../PS_Base/PS_ErrorManager.h"
@@ -23,9 +24,9 @@ MeshMaterial::MeshMaterial() {
     m_isSerializeable = true;
 }
 
-MeshMaterial::MeshMaterial(const char* chrFilePath) {
+MeshMaterial::MeshMaterial(const string& name) {
     m_isSerializeable = true;
-    this->load(chrFilePath);
+    strMTLName = name;
 }
 
 MeshMaterial::~MeshMaterial() {
@@ -134,35 +135,72 @@ MeshNode::MeshNode()
 
 MeshNode::MeshNode(const string &name) {
     init();
-    strNodeName = name;
+    m_strNodeName = name;
+}
+
+MeshNode::MeshNode(const MeshNode* lpNode) {
+	m_arrVertices.assign(lpNode->m_arrVertices.begin(), lpNode->m_arrVertices.end());
+	m_arrNormals.assign(lpNode->m_arrNormals.begin(), lpNode->m_arrNormals.end());
+	m_arrColors.assign(lpNode->m_arrColors.begin(), lpNode->m_arrColors.end());
+	m_arrTexCoords.assign(lpNode->m_arrTexCoords.begin(), lpNode->m_arrTexCoords.end());
+	m_arrIndices.assign(lpNode->m_arrIndices.begin(), lpNode->m_arrIndices.end());
+
+	m_strNodeName = lpNode->m_strNodeName;
+	m_szUnitVertex = lpNode->m_szUnitVertex;
+	m_szUnitColor = lpNode->m_szUnitColor;
+	m_szUnitTexCoord = lpNode->m_szUnitTexCoord;
+	m_szUnitFace = lpNode->m_szUnitFace;
+	m_lpMaterial = lpNode->m_lpMaterial;
 }
 
 MeshNode::~MeshNode()
 {
-	arrIndices.resize(0);
-	arrTexCoords.resize(0);
-	arrNormals.resize(0);
-	arrVertices.resize(0);
+	m_arrIndices.resize(0);
+	m_arrTexCoords.resize(0);
+	m_arrNormals.resize(0);
+	m_arrVertices.resize(0);
 }
 
 void MeshNode::init() {
-    strNodeName = "UNTITLED";
-    szUnitFace = 3;
-    szUnitTexCoord = 2;
-    szUnitVertex   = 3;
-    lpMaterial = NULL;
+    m_strNodeName = "UNTITLED";
+    m_szUnitVertex   = 3;
+    m_szUnitColor 	 = 3;
+    m_szUnitTexCoord = 2;
+    m_szUnitFace 	 = 3;
+
+    m_lpMaterial = NULL;
 }
 
 bool MeshNode::readbackMeshV3T3(U32& ctVertices, vector<float>& vertices,
 									U32& ctTriangles, vector<U32>& elements) {
-	if(szUnitVertex != 3 || szUnitFace != 3)
+	if(m_szUnitFace != 3) {
+		LogError("This is not a triangle mesh");
 		return false;
+	}
+
+	if(m_szUnitVertex != 3 && m_szUnitVertex != 4) {
+		LogError("Number of vertices is not 3 nor 4");
+		return false;
+	}
 
 	ctVertices = this->countVertices();
 	ctTriangles = this->countFaces();
+	elements.assign(this->m_arrIndices.begin(), this->m_arrIndices.end());
 
-	vertices.assign(this->arrVertices.begin(), this->arrVertices.end());
-	elements.assign(this->arrIndices.begin(), this->arrIndices.end());
+	if(m_szUnitVertex == 4) {
+		vertices.resize(ctVertices * 3);
+
+		vector<float> arrXYZW;
+		arrXYZW.assign(this->m_arrVertices.begin(), this->m_arrVertices.end());
+		for(U32 i=0; i < ctVertices; i++) {
+			vertices[i * 3] = arrXYZW[i*4];
+			vertices[i * 3 + 1] = arrXYZW[i*4 + 1];
+			vertices[i * 3 + 2] = arrXYZW[i*4 + 2];
+		}
+	}
+	else if(m_szUnitVertex == 3)
+		vertices.assign(this->m_arrVertices.begin(), this->m_arrVertices.end());
+
 	return true;
 }
 
@@ -176,8 +214,9 @@ int MeshNode::add(const vec3f& v, VertexAttribType vat, int step)
 	switch(vat) {
 	case(vatPosition):
 	{
+		m_szUnitVertex = step;
 		for(int i=0; i<step; i++)
-			arrVertices.push_back(v.e[i]);
+			m_arrVertices.push_back(v.e[i]);
 		idxAdded = (int)this->countVertices() - 1;
 	}
 	break;
@@ -185,21 +224,21 @@ int MeshNode::add(const vec3f& v, VertexAttribType vat, int step)
 	case(vatNormal):
 	{
 		for(int i=0; i<step; i++)
-			arrNormals.push_back(v.e[i]);
+			m_arrNormals.push_back(v.e[i]);
 		idxAdded = (int)this->countNormals() - 1;
 	}
 	break;
 
 	case(vatTexCoord):
 	{
+		m_szUnitTexCoord = step;
 		for(int i=0; i<step; i++)
-			arrTexCoords.push_back(v.e[i]);
+			m_arrTexCoords.push_back(v.e[i]);
 		idxAdded = (int)this->countTexCoords() - 1;
 	}
 	break;
 
 	default: {
-		LogError("Unhandled Vertex Attrib Type");
 	}
 
 	}
@@ -207,70 +246,161 @@ int MeshNode::add(const vec3f& v, VertexAttribType vat, int step)
 	return idxAdded;
 }
 
-void MeshNode::add(const vector<float>& arrAttribs, VertexAttribType vat, int step) {
+int MeshNode::add(const vec4f& v, VertexAttribType vat, int step) {
+	if(step > 4 || step < 0)
+		return -1;
+
+	int idxAdded = -1;
+	switch(vat) {
+	case(vatPosition):
+	{
+		m_szUnitVertex = step;
+		for(int i=0; i<step; i++)
+			m_arrVertices.push_back(v.e[i]);
+		idxAdded = (int)this->countVertices() - 1;
+	}
+	break;
+
+	case(vatNormal):
+	{
+		for(int i=0; i<step; i++)
+			m_arrNormals.push_back(v.e[i]);
+		idxAdded = (int)this->countNormals() - 1;
+	}
+	break;
+
+	case(vatTexCoord):
+	{
+		m_szUnitTexCoord = step;
+		for(int i=0; i<step; i++)
+			m_arrTexCoords.push_back(v.e[i]);
+		idxAdded = (int)this->countTexCoords() - 1;
+	}
+	break;
+
+	default: {
+	}
+
+	}
+
+	return idxAdded;
+
+}
+
+int MeshNode::add(const vector<float>& arrValues, VertexAttribType vat, int step) {
+
+	int idxAdded = -1;
+	switch(vat) {
+	case(vatPosition):
+	{
+		m_szUnitVertex = step;
+		for(int i=0; i<step; i++)
+			m_arrVertices.push_back(arrValues[i]);
+		idxAdded = (int)this->countVertices() - 1;
+	}
+	break;
+
+	case(vatNormal):
+	{
+		for(int i=0; i<step; i++)
+			m_arrNormals.push_back(arrValues[i]);
+		idxAdded = (int)this->countNormals() - 1;
+	}
+	break;
+
+	case(vatTexCoord):
+	{
+		m_szUnitTexCoord = step;
+		for(int i=0; i<step; i++)
+			m_arrTexCoords.push_back(arrValues[i]);
+		idxAdded = (int)this->countTexCoords() - 1;
+	}
+	break;
+
+	default: {
+	}
+
+	}
+
+	return idxAdded;
+
+}
+
+void MeshNode::setVertexAttrib(const vector<float>& arrAttribs, VertexAttribType vat, int step) {
 	switch(vat) {
 	case(vatPosition): {
-		szUnitVertex = step;
-		arrVertices.assign(arrAttribs.begin(), arrAttribs.end());
+		m_szUnitVertex = step;
+		m_arrVertices.assign(arrAttribs.begin(), arrAttribs.end());
+	}
+	break;
+
+	case(vatColor): {
+		m_szUnitColor = step;
+		m_arrColors.assign(arrAttribs.begin(), arrAttribs.end());
+	}
+	break;
+
+	case(vatNormal): {
+		m_arrNormals.assign(arrAttribs.begin(), arrAttribs.end());
 	}
 	break;
 
 	case(vatTexCoord): {
-		szUnitTexCoord = step;
-		arrTexCoords.assign(arrAttribs.begin(), arrAttribs.end());
+		m_szUnitTexCoord = step;
+		m_arrTexCoords.assign(arrAttribs.begin(), arrAttribs.end());
 	}
 	break;
 
 
-	case(vatNormal): {
-		arrNormals.assign(arrAttribs.begin(), arrAttribs.end());
+
+	default: {
+
 	}
-	break;
 	}
 }
 
 int MeshNode::addVertex(const vec3f& v)
 {
-	assert(szUnitVertex == 3);
-	arrVertices.push_back(v.x);
-	arrVertices.push_back(v.y);
-	arrVertices.push_back(v.z);
+	assert(m_szUnitVertex == 3);
+	m_arrVertices.push_back(v.x);
+	m_arrVertices.push_back(v.y);
+	m_arrVertices.push_back(v.z);
 	return (int)countVertices() - 1;
 }
 
 int MeshNode::addNormal(const vec3f& n)
 {
-	arrNormals.push_back(n.x);
-	arrNormals.push_back(n.y);
-	arrNormals.push_back(n.z);
+	m_arrNormals.push_back(n.x);
+	m_arrNormals.push_back(n.y);
+	m_arrNormals.push_back(n.z);
 	return (int)countNormals() - 1;
 }
 
 int MeshNode::addTexCoord2(const vec2f& t)
 {
-	assert(szUnitTexCoord == 2);
-	arrTexCoords.push_back(t.x);
-	arrTexCoords.push_back(t.y);
+	assert(m_szUnitTexCoord == 2);
+	m_arrTexCoords.push_back(t.x);
+	m_arrTexCoords.push_back(t.y);
 	return (int)countTexCoords() - 1;
 }
 
 int MeshNode::addTexCoord3(const vec3f& t)
 {
-	assert(szUnitTexCoord == 3);
-	arrTexCoords.push_back(t.x);
-	arrTexCoords.push_back(t.y);
-	arrTexCoords.push_back(t.z);
+	assert(m_szUnitTexCoord == 3);
+	m_arrTexCoords.push_back(t.x);
+	m_arrTexCoords.push_back(t.y);
+	m_arrTexCoords.push_back(t.z);
 	return (int)countTexCoords() - 1;
 }
 
 void MeshNode::addFaceIndex(U32 index)
 {
-	arrIndices.push_back(index);
+	m_arrIndices.push_back(index);
 }
 
-void MeshNode::addFaceIndices(const vector<U32>& arrFaces, int unitFace) {
-	szUnitFace = unitFace;
-	arrIndices.assign(arrFaces.begin(), arrFaces.end());
+void MeshNode::setFaceIndices(const vector<U32>& arrFaces, int unitFace) {
+	m_szUnitFace = unitFace;
+	m_arrIndices.assign(arrFaces.begin(), arrFaces.end());
 }
 
 int MeshNode::countFaceIndexErrors() const
@@ -278,9 +408,9 @@ int MeshNode::countFaceIndexErrors() const
 	size_t ctVertices = countVertices();
 
 	int ctErrors = 0;
-	for(size_t i=0; i<arrIndices.size(); i++)
+	for(size_t i=0; i<m_arrIndices.size(); i++)
 	{
-		if(arrIndices[i] >= ctVertices)
+		if(m_arrIndices[i] >= ctVertices)
 			ctErrors++;
 	}
 
@@ -288,7 +418,7 @@ int MeshNode::countFaceIndexErrors() const
 }
 
 void MeshNode::computeVertexNormalsFromFaces() {
-    if(szUnitFace != 3)
+    if(m_szUnitFace != 3)
         return;
 
     //Per each vertex we need to compute all the neighboring faces
@@ -297,10 +427,10 @@ void MeshNode::computeVertexNormalsFromFaces() {
     vec3f n[3];
     vec3f nf;
     U32 ctFaces = countFaces();
-    arrNormals.resize(arrVertices.size());
-    std::fill(arrNormals.begin(), arrNormals.end(), 0.0f);
+    m_arrNormals.resize(m_arrVertices.size());
+    std::fill(m_arrNormals.begin(), m_arrNormals.end(), 0.0f);
     for(U32 i=0; i<ctFaces; i++) {
-        face.load(&arrIndices[i*3]);
+        face.load(&m_arrIndices[i*3]);
         v[0] = getVertex(face.x);
         v[1] = getVertex(face.y);
         v[2] = getVertex(face.z);
@@ -312,9 +442,9 @@ void MeshNode::computeVertexNormalsFromFaces() {
         n[1] = getNormal(face.y) + nf;
         n[2] = getNormal(face.z) + nf;
 
-        n[0].store(&arrNormals[face.x*3]);
-        n[1].store(&arrNormals[face.y*3]);
-        n[2].store(&arrNormals[face.z*3]);
+        n[0].store(&m_arrNormals[face.x*3]);
+        n[1].store(&m_arrNormals[face.y*3]);
+        n[2].store(&m_arrNormals[face.z*3]);
     }
 
     //Normalize all normals
@@ -322,7 +452,7 @@ void MeshNode::computeVertexNormalsFromFaces() {
     for(U32 i=0; i<ctVertices; i++) {
         nf = getNormal(i);
         nf.normalize();
-        nf.store(&arrNormals[i*3]);
+        nf.store(&m_arrNormals[i*3]);
     }
 }
 
@@ -330,24 +460,24 @@ void MeshNode::computeVertexNormalsFromFaces() {
 vec3f MeshNode::getVertex(int idxVertex) const
 {
     //assert(szUnitVertex == 3);
-    return vec3f(&arrVertices[idxVertex*szUnitVertex]);
+    return vec3f(&m_arrVertices[idxVertex*m_szUnitVertex]);
 }
 
 vec3f MeshNode::getNormal(int idxVertex) const
 {
-    return vec3f(&arrNormals[idxVertex*3]);
+    return vec3f(&m_arrNormals[idxVertex*3]);
 }
 
 vec2f MeshNode::getTexCoord2(int idxVertex) const
 {
     //assert(szUnitTexCoord == 2);
-    return vec2f(&arrTexCoords[idxVertex * szUnitTexCoord]);
+    return vec2f(&m_arrTexCoords[idxVertex * m_szUnitTexCoord]);
 }
 
 vec3f MeshNode::getTexCoord3(int idxVertex) const
 {
     //assert(szUnitTexCoord == 2);
-    return vec3f(&arrTexCoords[idxVertex * szUnitTexCoord]);
+    return vec3f(&m_arrTexCoords[idxVertex * m_szUnitTexCoord]);
 }
 
 AABB MeshNode::computeBoundingBox() const
@@ -380,19 +510,24 @@ void MeshNode::getVertexAttrib(U32& count, vector<float>& arrAttribs, VertexAttr
 	switch(vat) {
 	case(vatPosition): {
 		count = countVertices();
-		arrAttribs.assign(arrVertices.begin(), arrVertices.end());
+		arrAttribs.assign(m_arrVertices.begin(), m_arrVertices.end());
+	}
+	break;
+
+	case(vatColor): {
+		count = countColors();
 	}
 	break;
 
 	case(vatTexCoord): {
 		count = countTexCoords();
-		arrAttribs.assign(arrTexCoords.begin(), arrTexCoords.end());
+		arrAttribs.assign(m_arrTexCoords.begin(), m_arrTexCoords.end());
 	}
 	break;
 
 	case(vatNormal): {
 		count = countVertices();
-		arrAttribs.assign(arrNormals.begin(), arrNormals.end());
+		arrAttribs.assign(m_arrNormals.begin(), m_arrNormals.end());
 	}
 	break;
 	}
@@ -400,22 +535,22 @@ void MeshNode::getVertexAttrib(U32& count, vector<float>& arrAttribs, VertexAttr
 
 void MeshNode::getFaces(U32& count, vector<U32>& faces) const {
 	count = countFaces();
-	faces.assign(arrIndices.begin(), arrIndices.end());
+	faces.assign(m_arrIndices.begin(), m_arrIndices.end());
 }
 
 void MeshNode::move(const vec3f& d) {
-    U32 count = arrVertices.size() / 3;
+    U32 count = m_arrVertices.size() / 3;
     for(U32 i=0; i<count; i++) {
-        float* pValues = &arrVertices[i * 3];
+        float* pValues = &m_arrVertices[i * 3];
         vec3f v = vec3f(pValues) + d;
         v.store(pValues);
     }
 }
 
 void MeshNode::scale(const vec3f& s) {
-    U32 count = arrVertices.size() / 3;
+    U32 count = m_arrVertices.size() / 3;
     for(U32 i=0; i<count; i++) {
-        float* pValues = &arrVertices[i * 3];
+        float* pValues = &m_arrVertices[i * 3];
         vec3f v = vec3f(pValues);
         v.x *= s.x;
         v.y *= s.y;
@@ -426,9 +561,9 @@ void MeshNode::scale(const vec3f& s) {
 
 void MeshNode::rotate(const quat& q) {
     quat qInv = q.inverted();
-    U32 count = arrVertices.size() / 3;
+    U32 count = m_arrVertices.size() / 3;
     for(U32 i=0; i<count; i++) {
-        float* pValues = &arrVertices[i * 3];
+        float* pValues = &m_arrVertices[i * 3];
         vec3f v = vec3f(pValues);
         v = q.transform(qInv, v);
         v.store(pValues);
@@ -518,6 +653,15 @@ MeshNode*	Mesh::getNode(int idx) const
 		return NULL;
 }
 
+MeshNode* Mesh::getNode(const string& name) const {
+	for(U32 i=0; i<m_nodes.size(); i++) {
+		if(m_nodes[i]->getName() == name)
+			return m_nodes[i];
+	}
+
+	return NULL;
+}
+
 void Mesh::addMeshMaterial(MeshMaterial* lpMaterial)
 {
     if(lpMaterial != NULL) {
@@ -550,11 +694,11 @@ bool Mesh::load(const char* chrFilePath)
     DAnsiStr strExt = ExtractFileExt(DAnsiStr(m_strFilePath.c_str()));
     bool bres = false;
     if(strExt == "obj") {
-        bres = loadObjGlobalVertexNormal(m_strFilePath.c_str());
+        bres = loadObj(m_strFilePath.c_str());
         computeMissingNormals();
     }
 	else
-		ReportError("Invalid file format.");
+		LogError("Invalid file format.");
     return bres;
 }
 
@@ -711,204 +855,116 @@ bool Mesh::loadObj(const char* chrFileName)
 	//Process content line by line
 	DAnsiStr strLine;
 	std::vector<DAnsiStr> words;
-	MeshNode* aNode = NULL;
+	std::vector<bool> arrProcessed;
+	arrProcessed.resize(content.size());
+	std::fill(arrProcessed.begin(), arrProcessed.end(), false);
 
-	U32 ctVertices = 0;
-	U32 ctVertexOffset = 0;
-	for(size_t i=0; i<content.size(); i++)
+	//Memory for mesh object
+	vector<float> arrVertices;
+	vector<float> arrNormals;
+	vector<float> arrTexCoords;
+	vector<U32> arrIndices;
+	U32 iFace = 0;
+	U32 ctFaces = 0;
+	U8 faceUnit = 0;
+	U32 ctMeshNodes = 0;
+	U32 ctMaterialNodes = 0;
+
+	U8 arrAttribUnit[vatCount];
+	U32 arrAttribCount[vatCount];
+	U32 idxCurrent[vatCount];
+	for(int i=0; i<vatCount; i++) {
+		arrAttribUnit[i] = 0;
+		arrAttribCount[i] = 0;
+		idxCurrent[i] = 0;
+	}
+
+	//Pre-process once and reserve memory
+	for(U32 i=0; i<content.size(); i++)
 	{
 		strLine = content[i];
 
 		if(strLine.firstChar() == '#')
+		{
+			arrProcessed[i] = true;
 			continue;
+		}
 		if(strLine.decompose(' ', words) == 0)
+		{
+			arrProcessed[i] = true;
 			continue;
+		}
 
 		int ctWords = (int)words.size();
 
-		if((words[0] == "o")&&(ctWords == 2))
+		//Position
+		if(words[0] == "v")
+		{
+			if(arrAttribCount[vatPosition] == 0)
+				arrAttribUnit[vatPosition] = ctWords-1;
+			arrAttribCount[vatPosition] ++;
+		}
+		//Normal
+		else if(words[0] == "vn")
+		{
+			if(arrAttribCount[vatNormal] == 0)
+				arrAttribUnit[vatNormal] = ctWords-1;
+			arrAttribCount[vatNormal] ++;
+		}
+		//TexCoords
+		else if(words[0] == "vt")
+		{
+			if(arrAttribCount[vatTexCoord] == 0)
+				arrAttribUnit[vatTexCoord] = ctWords-1;
+			arrAttribCount[vatTexCoord] ++;
+		}
+		else if(words[0] == "f") {
+			if(ctFaces == 0)
+				faceUnit = ctWords - 1;
+			else if(faceUnit != ctWords -1)
+				LogErrorArg2("Irregular mesh file! Face %d has %d vertices!", ctFaces, ctWords-1);
+
+			ctFaces++;
+		}
+		else if((words[0] == "o")&&(ctWords == 2))
 		{
 			//Create a new mesh node
-			aNode = new MeshNode();
-            aNode->strNodeName = string(words[1].ptr());
-			aNode->szUnitFace     = 3;
-			aNode->szUnitTexCoord = 2;
-			aNode->szUnitVertex   = 3;
-			m_nodes.push_back(aNode);
-
-			ctVertexOffset = ctVertices;
+			MeshNode* aNode = new MeshNode(string(words[1].cptr()));
+			addNode(aNode);
+			ctMeshNodes++;
 		}
 		else if((words[0] == "mtllib")&&(ctWords == 2))
 		{
-			DAnsiStr strFP = DAnsiStr(chrFileName);
-			strFP = ExtractFilePath(strFP) + words[1];
+			DAnsiStr strFP = ExtractFilePath(DAnsiStr(chrFileName)) + words[1];
 
             //Load Material
-            MeshMaterial* lpMtrl = new MeshMaterial(strFP.cptr());
-            lpMtrl->setName(string(words[1].cptr()));
-            m_materials.push_back(lpMtrl);
-		}
-		else if((words[0] == "v")&&(aNode)&&(ctWords == 4))
-		{
-			vec3f v;
-			v.x = static_cast<float>(atof(words[1].ptr()));
-			v.y = static_cast<float>(atof(words[2].ptr()));
-			v.z = static_cast<float>(atof(words[3].ptr()));
-			aNode->add(v, vatPosition, 3);
-
-			//Added Vertex
-			ctVertices++;
-		}
-		else if((words[0] == "vn")&&(aNode)&&(ctWords == 4))
-		{
-			vec3f v;
-			v.x = static_cast<float>(atof(words[1].ptr()));
-			v.y = static_cast<float>(atof(words[2].ptr()));
-			v.z = static_cast<float>(atof(words[3].ptr()));
-			aNode->add(v, vatNormal, 3);
-		}
-		else if((words[0] == "vt")&&(aNode))
-		{
-			if(ctWords - 1 != aNode->szUnitTexCoord)
-				ReportError("Number of TexCoords doesnot match");
-			else
-			{
-				for(int i=1; i<ctWords; i++)
-				{
-					float f = static_cast<float>(atof(words[i].ptr()));
-					aNode->arrTexCoords.push_back(f);
-				}
-			}
-		}
-		else if((words[0] == "usemtl")&&(aNode)&&(ctWords == 2))
-		{
-            aNode->lpMaterial = getMaterial(string(words[1].cptr()));
-		}
-		else if((words[0] == "f")&&(aNode)&&(ctWords > 3))
-		{
-			int szUnit = ctWords - 1;
-			int f[4];
-			for(int i=0; i<szUnit; i++)
-				f[i] = (atoi(words[i + 1].ptr()) - (int)ctVertexOffset) - 1;
-
-			if(szUnit == 3)
-			{
-				aNode->arrIndices.push_back(f[0]);
-				aNode->arrIndices.push_back(f[1]);
-				aNode->arrIndices.push_back(f[2]);
-			}
-			else if(szUnit == 4)
-			{
-				aNode->arrIndices.push_back(f[0]);
-				aNode->arrIndices.push_back(f[1]);
-				aNode->arrIndices.push_back(f[2]);
-
-				aNode->arrIndices.push_back(f[0]);
-				aNode->arrIndices.push_back(f[2]);
-				aNode->arrIndices.push_back(f[3]);
-			}
-
-		}
-		else if((words[0] == "s")&&(ctWords == 2))
-		{
-			if(words[1] == "off")
-			{
-
-			}
+            MeshMaterial* aMtrl = new MeshMaterial(string(words[1].cptr()));
+            aMtrl->load(strFP.cptr());
+            addMeshMaterial(aMtrl);
+            ctMaterialNodes ++;
 		}
 	}
 
+	//Allocate memory
+	arrVertices.resize(arrAttribCount[vatPosition] * arrAttribUnit[vatPosition]);
+	arrNormals.resize(arrAttribCount[vatNormal] * arrAttribUnit[vatNormal]);
+	arrTexCoords.resize(arrAttribCount[vatTexCoord] * arrAttribUnit[vatTexCoord]);
 
-	//Check all nodes for vertex and normal data
-	for(size_t i=0; i<m_nodes.size(); i++)
-	{
-		MeshNode* lpNode = m_nodes[i];
-		if(lpNode->arrVertices.size() != lpNode->arrNormals.size())
-		{
-			DAnsiStr strMsg = printToAStr("MESHNODE[%d] NAME=%s Does Not have equal number of vertices and normals! [V=%d, N=%d]",
-                                          i, lpNode->getName().c_str(), lpNode->countVertices(), lpNode->countNormals());
-			ReportError(strMsg.ptr());
-		}
-	}
-
-	words.resize(0);
-	content.resize(0);
-	return (m_nodes.size() > 0);
-}
-
-bool Mesh::loadObjGlobalVertexNormal(const char* chrFileName)
-{
-	std::vector<DAnsiStr> content;
-    if(!ReadTextFile(chrFileName, content))
-		return false;
-
-	//Process content line by line
-	DAnsiStr strLine;
-	std::vector<DAnsiStr> words;
-	std::vector<bool> arrProcessed;
-	arrProcessed.resize(content.size());
-	for(size_t i=0; i<arrProcessed.size(); i++)
-		arrProcessed[i] = false;
-
-	MeshNode* lpGlobalNode = new MeshNode();
-	lpGlobalNode->szUnitFace = 3;
-	lpGlobalNode->szUnitTexCoord = 2;
-	lpGlobalNode->szUnitVertex = 3;
-
-	//Add all vertices, normals and texcoords to global node
-	for(size_t i=0; i<content.size(); i++)
-	{
-		strLine = content[i];
-
-		if(strLine.firstChar() == '#')
-		{
-			arrProcessed[i] = true;
-			continue;
-		}
-		if(strLine.decompose(' ', words) == 0)
-		{
-			arrProcessed[i] = true;
-			continue;
-		}
-
-		int ctWords = (int)words.size();
-
-		if((words[0] == "v")&&(lpGlobalNode)&&(ctWords == 4))
-		{
-			vec3f v;
-			v.x = static_cast<float>(atof(words[1].ptr()));
-			v.y = static_cast<float>(atof(words[2].ptr()));
-			v.z = static_cast<float>(atof(words[3].ptr()));
-			lpGlobalNode->add(v, vatPosition, 3);
-			arrProcessed[i] = true;
-		}
-		else if((words[0] == "vn")&&(lpGlobalNode)&&(ctWords == 4))
-		{
-			vec3f v;
-			v.x = static_cast<float>(atof(words[1].ptr()));
-			v.y = static_cast<float>(atof(words[2].ptr()));
-			v.z = static_cast<float>(atof(words[3].ptr()));
-			lpGlobalNode->add(v, vatNormal, 3);
-			arrProcessed[i] = true;
-		}
-		else if((words[0] == "vt")&&(lpGlobalNode))
-		{
-			if(ctWords - 1 != lpGlobalNode->szUnitTexCoord)
-				ReportError("Number of TexCoords doesnot match");
-			else
-			{
-				for(int i=1; i<ctWords; i++)
-				{
-					float f = static_cast<float>(atof(words[i].ptr()));
-					lpGlobalNode->arrTexCoords.push_back(f);
-				}
-			}
-		}
-	}
+	//We won't triangulate quad meshes. Might use quad mesh for subdivision or Micropolygon rendering!
+	arrIndices.resize(ctFaces * faceUnit);
 
 	//Now we can process faces and assemble them from the list of vertices normals
-	MeshNode* aNode = NULL;
-	for(size_t i=0; i<content.size(); i++)
+	U32 idxMeshNode = 0;
+	MeshNode* lpCurrentMeshNode = NULL;
+	if(ctMeshNodes > 0)
+		lpCurrentMeshNode = getNode(0);
+	else {
+		lpCurrentMeshNode = new MeshNode();
+		this->addNode(lpCurrentMeshNode);
+	}
+
+	//Process all obj file content
+	for(U32 i=0; i<content.size(); i++)
 	{
 		strLine = content[i];
 
@@ -921,43 +977,62 @@ bool Mesh::loadObjGlobalVertexNormal(const char* chrFileName)
 
 
 		int ctWords = (int)words.size();
+		if(words[0] == "v") {
+			if(arrAttribUnit[vatPosition] == 3) {
+				vec3f v;
+				v.x = static_cast<float>(atof(words[1].ptr()));
+				v.y = static_cast<float>(atof(words[2].ptr()));
+				v.z = static_cast<float>(atof(words[3].ptr()));
 
-		if((words[0] == "o")&&(ctWords == 2))
-		{
-			//Create a new mesh node
-            aNode = new MeshNode(string(words[1].cptr()));
-			m_nodes.push_back(aNode);
-		}
-		else if((words[0] == "mtllib")&&(ctWords == 2))
-		{
-			DAnsiStr strFP = DAnsiStr(chrFileName);
-			strFP = ExtractFilePath(strFP) + words[1];
+				v.store(&arrVertices[idxCurrent[vatPosition] * arrAttribUnit[vatPosition]]);
+			}
+			else if(arrAttribUnit[vatPosition] == 4) {
+				vec4f v;
+				v.x = static_cast<float>(atof(words[1].ptr()));
+				v.y = static_cast<float>(atof(words[2].ptr()));
+				v.z = static_cast<float>(atof(words[3].ptr()));
+				v.w = static_cast<float>(atof(words[4].ptr()));
 
-            //Load Material
-            MeshMaterial* lpMtrl = new MeshMaterial(strFP.cptr());
-            lpMtrl->setName(string(words[1].cptr()));
-            m_materials.push_back(lpMtrl);
+				v.store(&arrVertices[idxCurrent[vatPosition] * arrAttribUnit[vatPosition]]);
+			}
+
+			idxCurrent[vatPosition] ++;
 		}
-		else if((words[0] == "usemtl")&&(aNode)&&(ctWords == 2))
+		else if(words[0] == "vn") {
+
+			vec3f n;
+			n.x = static_cast<float>(atof(words[1].ptr()));
+			n.y = static_cast<float>(atof(words[2].ptr()));
+			n.z = static_cast<float>(atof(words[3].ptr()));
+			n.store(&arrNormals[idxCurrent[vatNormal] * 3]);
+			idxCurrent[vatNormal] ++;
+		}
+		else if(words[0] == "vt") {
+			U32 idxTex = idxCurrent[vatTexCoord] * arrAttribUnit[vatTexCoord];
+			for(int j=0; j<arrAttribUnit[vatTexCoord]; j++)
+				arrTexCoords[idxTex + j] = static_cast<float>(atof(words[j+1].ptr()));
+			idxCurrent[vatTexCoord] ++;
+		}
+		else if((words[0] == "o")&&(ctWords == 2)) {
+
+			if(lpCurrentMeshNode != NULL)
+				lpCurrentMeshNode->setFaceIndices(arrIndices, faceUnit);
+
+			lpCurrentMeshNode = getNode(string(words[1].cptr()));
+			idxMeshNode++;
+		}
+		else if((words[0] == "usemtl")&&(lpCurrentMeshNode)&&(ctWords == 2))
 		{
-            aNode->lpMaterial = getMaterial(string(words[1].cptr()));
+			lpCurrentMeshNode->setMaterial(getMaterial(string(words[1].cptr())));
 		}
         else if((words[0] == "f")&&(ctWords > 3))
 		{
 			int idxVertex[4];
 			int idxTexCoords[4];
 			int idxNormal[4];
-			bool bHasTexCoords = false;
-			bool bHasNormals = false;
-			int szUnit = ctWords - 1;
-
-            if(aNode == NULL) {
-                aNode = new MeshNode();
-                m_nodes.push_back(aNode);
-            }
 
 			//Process line of face
-			for(int j=0; j<szUnit; j++)
+			for(int j=0; j<ctWords-1; j++)
 			{
 				std::vector<DAnsiStr> segments;
 				strLine = words[j + 1];
@@ -971,14 +1046,11 @@ bool Mesh::loadObjGlobalVertexNormal(const char* chrFileName)
 						idxVertex[j] 	= atoi(segments[0].ptr()) - 1;
 						idxTexCoords[j] = atoi(segments[1].ptr()) - 1;
 						idxNormal[j] 	= atoi(segments[2].ptr()) - 1;
-						bHasTexCoords = (lpGlobalNode->arrTexCoords.size() > 0);
-						bHasNormals   = (lpGlobalNode->arrNormals.size() > 0);
 					}
 					else
 					{
 						idxVertex[j] 	= atoi(segments[0].ptr()) - 1;
 						idxNormal[j] 	= atoi(segments[1].ptr()) - 1;
-						bHasNormals = (lpGlobalNode->arrNormals.size() > 0);
 					}
 				}
 				else
@@ -987,38 +1059,13 @@ bool Mesh::loadObjGlobalVertexNormal(const char* chrFileName)
 					idxNormal[j] = idxVertex[j];
 				}
 
-				vec3f v = lpGlobalNode->getVertex(idxVertex[j]);
-				idxVertex[j] = aNode->addVertex(v);
-				if(bHasNormals)
-				{
-					vec3f n = lpGlobalNode->getNormal(idxNormal[j]);
-					idxNormal[j] = aNode->addNormal(n);
-				}
 
-				if(bHasTexCoords)
-				{
-					vec2f tex = lpGlobalNode->getTexCoord2(idxTexCoords[j]);
-					aNode->addTexCoord2(tex);
-				}
+				//Add to index buffer
+				arrIndices[ iFace * faceUnit + j] = idxVertex[j];
 			}
 
-			if(szUnit == 3)
-			{
-				aNode->arrIndices.push_back(idxVertex[0]);
-				aNode->arrIndices.push_back(idxVertex[1]);
-				aNode->arrIndices.push_back(idxVertex[2]);
-			}
-			else if(szUnit == 4)
-			{
-				aNode->arrIndices.push_back(idxVertex[0]);
-				aNode->arrIndices.push_back(idxVertex[1]);
-				aNode->arrIndices.push_back(idxVertex[2]);
-
-				aNode->arrIndices.push_back(idxVertex[0]);
-				aNode->arrIndices.push_back(idxVertex[2]);
-				aNode->arrIndices.push_back(idxVertex[3]);
-			}
-
+			//Increment index of face
+			iFace ++;
 		}
 		else if((words[0] == "s")&&(ctWords == 2))
 		{
@@ -1029,20 +1076,24 @@ bool Mesh::loadObjGlobalVertexNormal(const char* chrFileName)
 		}
 	}
 
+	//Add Last Node indices
+	lpCurrentMeshNode->setFaceIndices(arrIndices, faceUnit);
 
-	//Check all nodes for vertex and normal data
-	for(size_t i=0; i<m_nodes.size(); i++)
-	{
-		MeshNode* lpNode = m_nodes[i];
-		if(lpNode->arrVertices.size() != lpNode->arrNormals.size())
-		{
-			DAnsiStr strMsg = printToAStr("MESHNODE[%d] NAME=%s Does Not have equal number of vertices and normals! [V=%d, N=%d]",
-                                          i, lpNode->getName().c_str(), lpNode->countVertices(), lpNode->countNormals());
-			ReportError(strMsg.ptr());
-		}
+	for(U32 i=0; i < countNodes(); i++) {
+
+		lpCurrentMeshNode = getNode(i);
+		if(arrAttribCount[vatPosition] > 0)
+			lpCurrentMeshNode->setVertexAttrib(arrVertices, vatPosition, arrAttribUnit[vatPosition]);
+
+		if(arrAttribCount[vatNormal] > 0)
+			lpCurrentMeshNode->setVertexAttrib(arrNormals, vatNormal, arrAttribUnit[vatNormal]);
+
+		if(arrAttribCount[vatTexCoord] > 0)
+			lpCurrentMeshNode->setVertexAttrib(arrTexCoords, vatTexCoord, arrAttribUnit[vatTexCoord]);
 	}
 
-	SAFE_DELETE(lpGlobalNode);
+
+	//Cleanup
 	arrProcessed.resize(0);
 	words.resize(0);
 	content.resize(0);

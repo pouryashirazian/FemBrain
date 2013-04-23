@@ -34,20 +34,20 @@ bool MeshRenderer::setup(const Mesh* aMesh, int iNode) {
 	if(aMesh == NULL)
 		return false;
 
-	if(iNode < 0 || iNode >= aMesh->countNodes())
+	if(iNode < 0 || iNode >= (int)aMesh->countNodes())
 		return false;
 
 	//Get Node
 	MeshNode* aNode = aMesh->getNode(iNode);
 
 	if(aNode->countVertices() > 0)
-		this->setupVertexAttribs(aNode->arrVertices, aNode->szUnitVertex, vatPosition);
+		this->setupVertexAttribs(aNode->vertices(), aNode->getUnitVertex(), vatPosition);
 
 	if(aNode->countNormals() > 0)
-		this->setupVertexAttribs(aNode->arrNormals, 3, vatNormal);
+		this->setupVertexAttribs(aNode->normals(), aNode->getUnitNormal(), vatNormal);
 
 	if(aNode->countFaces() > 0)
-		this->setupIndexBufferObject(aNode->arrIndices, ftTriangles);
+		this->setupIndexBufferObject(aNode->faceElements(), ftTriangles);
 
 	return true;
 }

@@ -201,6 +201,10 @@ bool FastRBF::copyVertexBufferToRestPos() {
 
 	if(m_ctVertices == 0)
 		return false;
+	if(m_stepVertex != 4) {
+		LogError("Vertices should be in the homogenous format XYZW for the displacement kernel to work!");
+		return false;
+	}
 
 	U32 szVertexBuffer = m_ctVertices * m_stepVertex * sizeof(float);
 	m_inoutMemRestPos = m_lpGPU->createMemBuffer(szVertexBuffer, ComputeDevice::memReadWrite);
@@ -309,20 +313,27 @@ bool FastRBF::setupFromMesh(Mesh* lpMesh) {
 
 	//Read-back vertices and normals
 	MeshNode* lpNode = lpMesh->getNode(0);
-	if(lpNode->countVertices() == 0 || lpNode->getUnitVertex() < 3 || lpNode->getUnitVertex() > 4)
+	if(lpNode->countVertices() == 0)
 		return false;
+
+	//Convert to homogenous format
+
 
 	//Setup Mesh
 	this->m_bbox = lpNode->computeBoundingBox();
 	this->cleanup();
 	if(lpNode->countVertices() > 0)
-		this->setupVertexAttribs(lpNode->arrVertices, lpNode->szUnitVertex, vatPosition);
+		this->setupVertexAttribs(lpNode->vertices(), lpNode->getUnitVertex(), vatPosition);
 
 	if(lpNode->countNormals() > 0)
-		this->setupVertexAttribs(lpNode->arrNormals, 3, vatNormal);
+		this->setupVertexAttribs(lpNode->normals(), lpNode->getUnitNormal(), vatNormal);
 
 	if(lpNode->countFaces() > 0)
-		this->setupIndexBufferObject(lpNode->arrIndices, ftTriangles);
+		this->setupIndexBufferObject(lpNode->faceElements(), ftTriangles);
+
+	//Copy to rest pos
+	copyVertexBufferToRestPos();
+
 
 	//Surface points and offsurface points
 	vector<float> vSurfXYZ;
@@ -332,11 +343,13 @@ bool FastRBF::setupFromMesh(Mesh* lpMesh) {
 	//Prepare input
 	U32 ctVertices = lpNode->countVertices();
 	vOffSurfXYZF.resize(2 * ctVertices * 4);
-	normals.assign(lpNode->arrNormals.begin(), lpNode->arrNormals.end());
+
+	U32 ctNormals = 0;
+	lpNode->getVertexAttrib(ctNormals, normals, vatNormal);
 
 	//Vertex stride is 3
 	if(lpNode->getUnitVertex() == 3) {
-		vSurfXYZ.assign(lpNode->arrVertices.begin(), lpNode->arrVertices.end());
+		lpNode->getVertexAttrib(ctVertices, vSurfXYZ, vatPosition);
 
 		//Loop over vertices
 		for(U32 i=0; i < ctVertices; i++) {
@@ -354,12 +367,12 @@ bool FastRBF::setupFromMesh(Mesh* lpMesh) {
 			vOffSurfXYZF[i * 8 + 7] = - m_offSurfaceLen;
 		}
 	}
-	else {
-
+	else if(lpNode->getUnitVertex() == 4) {
 		//Convert from homogenous format to xyz format
 		{
 			vector<float> vSurfXYZW;
-			vSurfXYZW.assign(lpNode->arrVertices.begin(), lpNode->arrVertices.end());
+			lpNode->getVertexAttrib(ctVertices, vSurfXYZW, vatPosition);
+
 			vSurfXYZ.resize(ctVertices*3);
 			for(U32 i=0; i<ctVertices; i++) {
 				vSurfXYZ[i*3] = vSurfXYZW[i*4];

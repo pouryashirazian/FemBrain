@@ -33,7 +33,7 @@ class MeshMaterial : public Asset
 {
 public:
     MeshMaterial();
-    MeshMaterial(const char* chrFilePath);
+    MeshMaterial(const string& name);
     virtual ~MeshMaterial();
 
     bool load(const char *chrFilePath);
@@ -62,7 +62,8 @@ public:
 class MeshNode {
 public:
 	MeshNode();
-    MeshNode(const string& name);
+    explicit MeshNode(const string& name);
+    explicit MeshNode(const MeshNode* lpNode);
 	virtual ~MeshNode();
 
     void init();
@@ -78,14 +79,16 @@ public:
 	 * index x szUnitVertex
 	 */
 	int add(const vec3f& v, VertexAttribType vat = vatPosition, int step = 3);
-	void add(const vector<float>& arrAttribs, VertexAttribType vat = vatPosition, int step = 3);
+	int add(const vec4f& v, VertexAttribType vat = vatPosition, int step = 4);
+	int add(const vector<float>& arrValues, VertexAttribType vat = vatPosition, int step = 3);
+	void setVertexAttrib(const vector<float>& arrAttribs, VertexAttribType vat = vatPosition, int step = 3);
 
 	int addVertex(const vec3f& v);
 	int addNormal(const vec3f& n);
 	int addTexCoord2(const vec2f& t);
 	int addTexCoord3(const vec3f& t);
 	void addFaceIndex(U32 index);
-	void addFaceIndices(const vector<U32>& arrFaces, int unitFace);
+	void setFaceIndices(const vector<U32>& arrFaces, int unitFace);
 
 
 	/*!
@@ -102,17 +105,18 @@ public:
 
 
 	//Statistics
-	U32 countVertices() const {return arrVertices.size() / (U32)szUnitVertex;}
-	U32 countNormals() const {return arrNormals.size() / 3;}
-	U32 countFaces() const {return arrIndices.size() / (U32)szUnitFace;}
-	U32 countTexCoords() const {return arrTexCoords.size() / (U32)szUnitTexCoord;}
+	U32 countVertices() const {return m_arrVertices.size() / (U32)m_szUnitVertex;}
+	U32 countColors() const {return m_arrColors.size() / m_szUnitColor;}
+	U32 countNormals() const {return m_arrNormals.size() / 3;}
+	U32 countFaces() const {return m_arrIndices.size() / (U32)m_szUnitFace;}
+	U32 countTexCoords() const {return m_arrTexCoords.size() / (U32)m_szUnitTexCoord;}
 
 	/*!
 	 * returns unit vertex memory stride in bytes
 	 */
-	U32 getVertexStride() const {return szUnitVertex * sizeof(float);}
+	U32 getVertexStride() const {return m_szUnitVertex * sizeof(float);}
 	U32 getNormalStride() const {return 3 * sizeof(float);}
-	U32 getFaceStride() const {return szUnitFace * sizeof(U32);}
+	U32 getFaceStride() const {return m_szUnitFace * sizeof(U32);}
 
 
 	//Access Vertex, Normal
@@ -122,28 +126,33 @@ public:
 	vec3f getTexCoord3(int idxVertex) const;
 
 	//Access Material
-	MeshMaterial* getMaterial() const {return lpMaterial;}
-	void setMaterial(MeshMaterial* aMaterial) {lpMaterial = aMaterial;}
+	MeshMaterial* getMaterial() const {return m_lpMaterial;}
+	void setMaterial(MeshMaterial* aMaterial) {m_lpMaterial = aMaterial;}
 
 	AABB computeBoundingBox() const;
 
     //Name
-    string getName() const {return strNodeName;}
-    void setName(const string& strName) {strNodeName = strName;}
+    string getName() const {return m_strNodeName;}
+    void setName(const string& strName) {m_strNodeName = strName;}
 
     //Steps
-    U8 getUnitVertex() const {return szUnitVertex;}
-    void setUnitVertex(U8 s) { szUnitVertex = s;}
-
-    U8 getUnitTexCoord() const {return szUnitTexCoord;}
-    void setUnitTexCoord(U8 s) {szUnitTexCoord = s;}
-
-    U8 getUnitFace() const {return szUnitFace;}
-    void setUnitFace(U8 s) {szUnitFace = s;}
+    U8 getUnitVertex() const {return m_szUnitVertex;}
+    U8 getUnitNormal() const {return 3;}
+    U8 getUnitColor() const {return m_szUnitColor;}
+    U8 getUnitTexCoord() const {return m_szUnitTexCoord;}
+    U8 getUnitFace() const {return m_szUnitFace;}
+    void setUnitFace(U8 s) {m_szUnitFace = s;}
 
     //Mesh parts
     void getVertexAttrib(U32& count, vector<float>& arrAttribs, VertexAttribType vat) const;
     void getFaces(U32& count, vector<U32>& faces) const;
+
+    //Mesh Parts
+    const vector<float>& vertices() const {return m_arrVertices;}
+    const vector<float>& normals() const {return m_arrNormals;}
+    const vector<float>& colors() const {return m_arrColors;}
+    const vector<float>& texcoords() const {return m_arrTexCoords;}
+    const vector<U32>& faceElements() const {return m_arrIndices;}
 
     /*!
      * Move the entire mesh to a new location
@@ -152,18 +161,21 @@ public:
     void scale(const vec3f& s);
     void rotate(const quat& q);
     void fitToBBox(const AABB& box);
-public:
-	std::vector<float> arrVertices;
-	std::vector<float> arrNormals;
-	std::vector<float> arrTexCoords;
-	std::vector<U32>	arrIndices;
+
+protected:
+	std::vector<float> m_arrVertices;
+	std::vector<float> m_arrNormals;
+	std::vector<float> m_arrColors;
+	std::vector<float> m_arrTexCoords;
+	std::vector<U32>	m_arrIndices;
 
     //Init data
-    string      strNodeName;
-	U8			szUnitVertex;
-	U8   		szUnitTexCoord;
-	U8			szUnitFace;
-	MeshMaterial* lpMaterial;
+    string      m_strNodeName;
+	U8			m_szUnitVertex;
+	U8			m_szUnitColor;
+	U8   		m_szUnitTexCoord;
+	U8			m_szUnitFace;
+	MeshMaterial* m_lpMaterial;
 };
 
 
@@ -182,7 +194,8 @@ public:
 
 	//Mesh Nodes
 	void addNode(MeshNode* lpMeshNode);
-	MeshNode*	getNode(int idx) const;
+	MeshNode* getNode(int idx) const;
+	MeshNode* getNode(const string& name) const;
     U32 countNodes() const {return m_nodes.size();}
 
 	//Mesh Materials
@@ -203,8 +216,9 @@ public:
     void rotate(const quat& q);
     void fitToBBox(const AABB& box);
 private:
+
+    //Loads Obj Mesh File
 	bool loadObj(const char* chrFileName);
-	bool loadObjGlobalVertexNormal(const char* chrFileName);
 
 private:
 	std::vector<MeshNode*> m_nodes;
@@ -212,19 +226,6 @@ private:
     std::map<string, MeshMaterial*> m_mapMaterial;
     string m_strFilePath;
 };
-
-/*
-class CMeshManager : public CResourceManager<CMesh>
-{
-public:
-	CMeshManager();
-	~CMeshManager();
-
-	void cleanup();
-
-	CMesh* loadResource(const DAnsiStr& inStrFilePath, DAnsiStr& inoutStrName);
-};
-*/
 
 }
 }

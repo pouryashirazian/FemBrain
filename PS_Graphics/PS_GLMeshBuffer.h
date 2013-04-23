@@ -34,7 +34,7 @@ using namespace PS::MATH;
 #define GL_POLYGON 0x0009
 */
 
-enum VertexAttribType {vatPosition, vatNormal, vatColor, vatTexCoord};
+enum VertexAttribType {vatPosition, vatNormal, vatColor, vatTexCoord, vatCount};
 
 enum FaceType {ftPoints = 0x0000, ftLines = 0x0001, ftLineLoop = 0x0002, ftLineStrip = 0x0003,
 			   ftTriangles = 0x0004, ftTriangleStrip = 0x0005, ftTriangleFan = 0x0006,

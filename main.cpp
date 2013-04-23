@@ -1132,14 +1132,15 @@ int main(int argc, char* argv[])
 	if(strFileExt == DAnsiStr("obj")) {
 		LogInfoArg1("Loading input mesh from obj file at: %s", g_appSettings.strModelFilePath.c_str());
 		Mesh* lpMesh = new Mesh(g_appSettings.strModelFilePath.c_str());
-		lpMesh->fitToBBox(AABB(vec3f(0,0,0), vec3f(8, 8, 8)));
+		//lpMesh->fitToBBox(AABB(vec3f(0,0,0), vec3f(8, 8, 8)));
 		g_lpFastRBF = new FastRBF(lpMesh);
+		g_lpDrawNormals = g_lpFastRBF->prepareMeshBufferNormals();
 
 		//Readback mesh
 		MeshNode* lpNode = lpMesh->getNode(0);
 		if(lpNode != NULL)
 			lpNode->readbackMeshV3T3(ctVertices, vertices, ctTriangles, elements);
-		g_lpDrawNormals = 0;
+
 
 		SAFE_DELETE(lpMesh);
 	}
@@ -1159,6 +1160,7 @@ int main(int argc, char* argv[])
 		//Save Mesh
 		CLMeshBuffer::StoreAsObjMesh("CubeStored.obj", lpBlobRender->computeDevice(), lpBlobRender);
 
+		//Create the RBF representation
 		g_lpFastRBF = new FastRBF(lpBlobRender);
 
 		//Read Back Polygonized Mesh

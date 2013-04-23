@@ -28,13 +28,13 @@ bool MeshRenderer::setup(const MeshNode* aNode) {
     if(aNode == NULL)
         return false;
     if(aNode->countVertices() > 0)
-        this->setupVertexAttribs(aNode->arrVertices, aNode->getUnitVertex(), vatPosition);
+        this->setupVertexAttribs(aNode->vertices(), aNode->getUnitVertex(), vatPosition);
     if(aNode->countNormals() > 0)
-        this->setupVertexAttribs(aNode->arrNormals, 3, vatNormal);
+        this->setupVertexAttribs(aNode->normals(), 3, vatNormal);
     if(aNode->countTexCoords() > 0)
-        this->setupVertexAttribs(aNode->arrTexCoords, aNode->getUnitTexCoord(), vatTexCoord);
+        this->setupVertexAttribs(aNode->texcoords(), aNode->getUnitTexCoord(), vatTexCoord);
     if(aNode->countFaces() > 0)
-        this->setupIndexBufferObject(aNode->arrIndices);
+        this->setupIndexBufferObject(aNode->faceElements());
 
     return true;
 }
