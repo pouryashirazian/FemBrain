@@ -34,7 +34,7 @@ int SaveArrayCSV(const char* lpArrayName, float* lpArray, U32 count)
 	return count;
 }
 
-void PrintArray(U32* lpData, U32 count)
+void PrintArray(const U32* lpData, U32 count)
 {
 	printf("\n");
 	for(U32 i=0; i<count; i++)
@@ -44,7 +44,7 @@ void PrintArray(U32* lpData, U32 count)
 	printf("\n");
 }
 
-void PrintArrayF(float* lpData, U32 count)
+void PrintArrayF(const float* lpData, U32 count)
 {
 	for(U32 i=0; i<count; i++)
 	{

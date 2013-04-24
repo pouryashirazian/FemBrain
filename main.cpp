@@ -80,6 +80,8 @@ public:
 		this->drawIsoSurface = disFull;
 		this->bPanCamera = false;
 		this->bDrawAABB = true;
+		this->bDrawNormals = true;
+
 		this->bDrawTetMesh = true;
 		this->bDrawAffineWidgets = true;
 		this->bDrawGround = true;
@@ -103,6 +105,7 @@ public:
 	bool bDrawGround;
 	bool bPanCamera;
 	bool bDrawAABB;
+	bool bDrawNormals;
 	bool bDrawTetMesh;
 	bool bDrawAffineWidgets;
 	bool bLogSql;
@@ -245,9 +248,11 @@ void Draw()
 		//Draw AABB and Normals
 		if(g_appSettings.bDrawAABB) {
 			g_lpFastRBF->drawBBox();
-			if(g_lpDrawNormals)
-				g_lpDrawNormals->draw();
 		}
+
+		//Draw Model Normals
+		if(g_lpDrawNormals && (g_appSettings.bDrawNormals))
+			g_lpDrawNormals->draw();
 
 		//Draw Collision
 		g_lpFastRBF->drawCollision();
@@ -424,8 +429,10 @@ void MousePress(int button, int state, int x, int y)
 	}
 	else if (button == GLUT_RIGHT_BUTTON) {
 		if (state == GLUT_DOWN) {
-			if (g_lpDeformable->isHapticInProgress())
+			if (g_lpDeformable->isHapticInProgress()) {
 				g_lpDeformable->hapticEnd();
+				g_lpFastRBF->resetCollision();
+			}
 			else if (g_appSettings.hapticMode == hmDynamic) {
 				g_lpDeformable->hapticStart(0);
 				g_hashVertices.clear();
@@ -537,9 +544,6 @@ void MousePassiveMove(int x, int y)
 		//Compute Collision using RBF Interpolation Function
 		if(g_lpFastRBF->intersects(aabbAvatar)) {
 			printf("FASTRBF: AVATAR collided with model\n");
-
-
-
 		}
 
 
@@ -784,9 +788,17 @@ void NormalKey(unsigned char key, int x, int y)
 	}
 	case('d'): {
 		g_appSettings.bDrawGround = !g_appSettings.bDrawGround;
+		LogInfoArg1("Draw ground checkerboard set to: %d", g_appSettings.bDrawGround);
 		glutPostRedisplay();
 		break;
 	}
+	case('n'): {
+		g_appSettings.bDrawNormals = !g_appSettings.bDrawNormals;
+		LogInfoArg1("Draw Model Normals set to: %d", g_appSettings.bDrawNormals);
+		glutPostRedisplay();
+		break;
+	}
+
 	case('['):{
 		g_arcBallCam.setZoom(g_arcBallCam.getZoom() + 0.5);
 		glutPostRedisplay();
@@ -1132,6 +1144,10 @@ int main(int argc, char* argv[])
 	if(strFileExt == DAnsiStr("obj")) {
 		LogInfoArg1("Loading input mesh from obj file at: %s", g_appSettings.strModelFilePath.c_str());
 		Mesh* lpMesh = new Mesh(g_appSettings.strModelFilePath.c_str());
+		AABB aabb = lpMesh->computeBoundingBox();
+		//Move to origin
+		lpMesh->move(aabb.center() * -1);
+
 		//lpMesh->fitToBBox(AABB(vec3f(0,0,0), vec3f(8, 8, 8)));
 		g_lpFastRBF = new FastRBF(lpMesh);
 		g_lpDrawNormals = g_lpFastRBF->prepareMeshBufferNormals();

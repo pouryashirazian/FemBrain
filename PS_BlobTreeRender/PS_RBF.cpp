@@ -315,15 +315,28 @@ bool FastRBF::setupFromMesh(Mesh* lpMesh) {
 	MeshNode* lpNode = lpMesh->getNode(0);
 	if(lpNode->countVertices() == 0)
 		return false;
-
-	//Convert to homogenous format
+	if(lpNode->getUnitFace() != 3) {
+		LogErrorArg1("Expected a triangle mesh but received a mesh with %d corners.", lpNode->getUnitFace());
+		return false;
+	}
 
 
 	//Setup Mesh
 	this->m_bbox = lpNode->computeBoundingBox();
 	this->cleanup();
+
+	//Convert to homogenous format since we apply deformations in OpenCL using float4
+	vector<float> vSurfXYZW;
+	U32 ctVertices = 0;
+	if(lpNode->getUnitVertex() == 3)
+		ctVertices = GLMeshBuffer::ConvertFloat3ToFloat4(lpNode->vertices(), vSurfXYZW);
+	else {
+		assert(lpNode->getUnitVertex() == 4);
+		lpNode->getVertexAttrib(ctVertices, vSurfXYZW, vatPosition);
+	}
+
 	if(lpNode->countVertices() > 0)
-		this->setupVertexAttribs(lpNode->vertices(), lpNode->getUnitVertex(), vatPosition);
+		this->setupVertexAttribs(vSurfXYZW, 4, vatPosition);
 
 	if(lpNode->countNormals() > 0)
 		this->setupVertexAttribs(lpNode->normals(), lpNode->getUnitNormal(), vatNormal);
@@ -336,66 +349,29 @@ bool FastRBF::setupFromMesh(Mesh* lpMesh) {
 
 
 	//Surface points and offsurface points
-	vector<float> vSurfXYZ;
 	vector<float> vOffSurfXYZF;
 	vector<float> normals;
-
-	//Prepare input
-	U32 ctVertices = lpNode->countVertices();
-	vOffSurfXYZF.resize(2 * ctVertices * 4);
-
 	U32 ctNormals = 0;
+
+	vOffSurfXYZF.resize(2 * ctVertices * 4);
 	lpNode->getVertexAttrib(ctNormals, normals, vatNormal);
 
-	//Vertex stride is 3
-	if(lpNode->getUnitVertex() == 3) {
-		lpNode->getVertexAttrib(ctVertices, vSurfXYZ, vatPosition);
+	//Loop over vertices
+	for (U32 i = 0; i < ctVertices; i++) {
+		vec3f ptOut = vec3f(&vSurfXYZW[i * 4]) + vec3f(&normals[i * 3]) * m_offSurfaceLen;
+		vec3f ptIn = vec3f(&vSurfXYZW[i * 4]) - vec3f(&normals[i * 3]) * m_offSurfaceLen;
 
-		//Loop over vertices
-		for(U32 i=0; i < ctVertices; i++) {
-			vec3f ptOut = vec3f(&vSurfXYZ[i * 3]) + vec3f(&normals[i * 3]) * m_offSurfaceLen;
-			vec3f ptIn = vec3f(&vSurfXYZ[i * 3]) - vec3f(&normals[i * 3]) * m_offSurfaceLen;
+		//The more we distance from skeleton the field becomes smaller so negative
+		vOffSurfXYZF[i * 8] = ptOut.x;
+		vOffSurfXYZF[i * 8 + 1] = ptOut.y;
+		vOffSurfXYZF[i * 8 + 2] = ptOut.z;
+		vOffSurfXYZF[i * 8 + 3] = - m_offSurfaceLen;
 
-			vOffSurfXYZF[i * 8] = ptOut.x;
-			vOffSurfXYZF[i * 8 + 1] = ptOut.y;
-			vOffSurfXYZF[i * 8 + 2] = ptOut.z;
-			vOffSurfXYZF[i * 8 + 3] = m_offSurfaceLen;
-
-			vOffSurfXYZF[i * 8 + 4] = ptIn.x;
-			vOffSurfXYZF[i * 8 + 5] = ptIn.y;
-			vOffSurfXYZF[i * 8 + 6] = ptIn.z;
-			vOffSurfXYZF[i * 8 + 7] = - m_offSurfaceLen;
-		}
-	}
-	else if(lpNode->getUnitVertex() == 4) {
-		//Convert from homogenous format to xyz format
-		{
-			vector<float> vSurfXYZW;
-			lpNode->getVertexAttrib(ctVertices, vSurfXYZW, vatPosition);
-
-			vSurfXYZ.resize(ctVertices*3);
-			for(U32 i=0; i<ctVertices; i++) {
-				vSurfXYZ[i*3] = vSurfXYZW[i*4];
-				vSurfXYZ[i*3 + 1] = vSurfXYZW[i*4 + 1];
-				vSurfXYZ[i*3 + 2] = vSurfXYZW[i*4 + 2];
-			}
-		}
-
-		//Loop over vertices
-		for(U32 i=0; i < ctVertices; i++) {
-			vec3f ptOut = vec3f(&vSurfXYZ[i * 3]) + vec3f(&normals[i * 3]) * m_offSurfaceLen;
-			vec3f ptIn = vec3f(&vSurfXYZ[i * 3]) - vec3f(&normals[i * 3]) * m_offSurfaceLen;
-
-			vOffSurfXYZF[i * 8] = ptOut.x;
-			vOffSurfXYZF[i * 8 + 1] = ptOut.y;
-			vOffSurfXYZF[i * 8 + 2] = ptOut.z;
-			vOffSurfXYZF[i * 8 + 3] = m_offSurfaceLen;
-
-			vOffSurfXYZF[i * 8 + 4] = ptIn.x;
-			vOffSurfXYZF[i * 8 + 5] = ptIn.y;
-			vOffSurfXYZF[i * 8 + 6] = ptIn.z;
-			vOffSurfXYZF[i * 8 + 7] = - m_offSurfaceLen;
-		}
+		//And closer positive
+		vOffSurfXYZF[i * 8 + 4] = ptIn.x;
+		vOffSurfXYZF[i * 8 + 5] = ptIn.y;
+		vOffSurfXYZF[i * 8 + 6] = ptIn.z;
+		vOffSurfXYZF[i * 8 + 7] = m_offSurfaceLen;
 	}
 
 	//Copy input to centers and fields arrays
@@ -404,9 +380,9 @@ bool FastRBF::setupFromMesh(Mesh* lpMesh) {
 
 	//Every other vertex will have its off-surface points
 	for(U32 i=0; i<ctVertices; i++) {
-		m_interpolationNodes.push_back(vSurfXYZ[i * 3]);
-		m_interpolationNodes.push_back(vSurfXYZ[i * 3 + 1]);
-		m_interpolationNodes.push_back(vSurfXYZ[i * 3 + 2]);
+		m_interpolationNodes.push_back(vSurfXYZW[i * 4]);
+		m_interpolationNodes.push_back(vSurfXYZW[i * 4 + 1]);
+		m_interpolationNodes.push_back(vSurfXYZW[i * 4 + 2]);
 		m_fields.push_back(0.0f);
 		if(i%2 == 0) {
 			m_interpolationNodes.push_back(vOffSurfXYZF[i*8]);
@@ -472,7 +448,7 @@ bool FastRBF::computeInterpolationFunction(U32 start_count, U32 iAttempt, U32 st
 	//Compute Residual Error
 	float fitting_error = computeMaxResidualError();
 	if(fitting_error > fitting_accuracy) {
-		LogInfoArg2("Fitting failed with max fitting error = %.2f, Attempt#%d", fitting_error, iAttempt);
+		LogInfoArg2("Fitting failed with max fitting error = %f, Attempt#%d", fitting_error, iAttempt);
 
 		if(start_count == m_ctTotalInterpolationNodes || iAttempt >= MAX_GREEDY_ATTEMPTS)
 			return false;
@@ -688,6 +664,11 @@ bool FastRBF::intersects(const vec3f& v, float& penetration) const {
 	}
 	else
 		return false;
+}
+
+void FastRBF::resetCollision() {
+	m_collision.resize(0);
+	m_penetration.resize(0);
 }
 
 void FastRBF::drawCollision() const {

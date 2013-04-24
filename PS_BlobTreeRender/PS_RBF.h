@@ -22,7 +22,7 @@ using namespace PS::MESH;
 #define DEFAULT_START_CENTERS_COUNT 1000
 #define DEFAULT_GREEDY_STEP 50
 #define DEFAULT_FITTING_ACCURACY 0.01f
-#define MAX_GREEDY_ATTEMPTS 1
+#define MAX_GREEDY_ATTEMPTS 3
 
 /*
  * A BlobTree model is defined using implicit primitives and operators.
@@ -67,6 +67,7 @@ public:
 	bool intersects(const vec3f& v, float& penetration) const;
 	//bool intersects(const vector<vec3f>& v, const vector<bool>& crossed) const;
 	bool intersects(const AABB& box);
+	void resetCollision();
 
 
 	//Shuffle interpolation nodes

@@ -945,6 +945,12 @@ bool Mesh::loadObj(const char* chrFileName)
 		}
 	}
 
+	//Normals
+	if(arrAttribCount[vatPosition] != arrAttribCount[vatNormal]) {
+		LogErrorArg2("Number of normals not match vertices. V# %d, N# %d", arrAttribCount[vatPosition], arrAttribCount[vatNormal]);
+		arrAttribCount[vatNormal] = 0;
+	}
+
 	//Allocate memory
 	arrVertices.resize(arrAttribCount[vatPosition] * arrAttribUnit[vatPosition]);
 	arrNormals.resize(arrAttribCount[vatNormal] * arrAttribUnit[vatNormal]);
@@ -977,7 +983,7 @@ bool Mesh::loadObj(const char* chrFileName)
 
 
 		int ctWords = (int)words.size();
-		if(words[0] == "v") {
+		if((words[0] == "v") && (arrAttribCount[vatPosition] > 0)) {
 			if(arrAttribUnit[vatPosition] == 3) {
 				vec3f v;
 				v.x = static_cast<float>(atof(words[1].ptr()));
@@ -998,7 +1004,7 @@ bool Mesh::loadObj(const char* chrFileName)
 
 			idxCurrent[vatPosition] ++;
 		}
-		else if(words[0] == "vn") {
+		else if((words[0] == "vn") && (arrAttribCount[vatNormal] > 0)) {
 
 			vec3f n;
 			n.x = static_cast<float>(atof(words[1].ptr()));
@@ -1007,7 +1013,7 @@ bool Mesh::loadObj(const char* chrFileName)
 			n.store(&arrNormals[idxCurrent[vatNormal] * 3]);
 			idxCurrent[vatNormal] ++;
 		}
-		else if(words[0] == "vt") {
+		else if((words[0] == "vt" && arrAttribCount[vatTexCoord] > 0)) {
 			U32 idxTex = idxCurrent[vatTexCoord] * arrAttribUnit[vatTexCoord];
 			for(int j=0; j<arrAttribUnit[vatTexCoord]; j++)
 				arrTexCoords[idxTex + j] = static_cast<float>(atof(words[j+1].ptr()));
@@ -1025,7 +1031,7 @@ bool Mesh::loadObj(const char* chrFileName)
 		{
 			lpCurrentMeshNode->setMaterial(getMaterial(string(words[1].cptr())));
 		}
-        else if((words[0] == "f")&&(ctWords > 3))
+        else if((words[0] == "f")&&(ctWords > 3)&&(ctFaces > 0))
 		{
 			int idxVertex[4];
 			int idxTexCoords[4];

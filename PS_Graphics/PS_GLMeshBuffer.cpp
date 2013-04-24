@@ -386,5 +386,37 @@ GLMeshBuffer* GLMeshBuffer::PrepareMeshBufferForDrawingNormals(float len, U32 ct
     return lpDrawNormal;
 }
 
+U32 GLMeshBuffer::ConvertFloat4ToFloat3(const vector<float>& arrInFloat4, vector<float>& arrOutFloat3) {
+	if(arrInFloat4.size() == 0)
+		return 0;
+
+	U32 ctAttribs = arrInFloat4.size() / 4;
+	arrOutFloat3.resize(ctAttribs * 3);
+	for(U32 i=0; i < ctAttribs; i++) {
+		arrOutFloat3[i * 3] = arrInFloat4[i * 4];
+		arrOutFloat3[i * 3 + 1] = arrInFloat4[i * 4 + 1];
+		arrOutFloat3[i * 3 + 2] = arrInFloat4[i * 4 + 2];
+	}
+
+	return ctAttribs;
+}
+
+U32 GLMeshBuffer::ConvertFloat3ToFloat4(const vector<float>& arrInFloat3, vector<float>& arrOutFloat4) {
+	if(arrInFloat3.size() == 0)
+		return 0;
+
+	U32 ctAttribs = arrInFloat3.size() / 3;
+	arrOutFloat4.resize(ctAttribs * 4);
+	for(U32 i=0; i < ctAttribs; i++) {
+		arrOutFloat4[i * 4] = arrInFloat3[i * 3];
+		arrOutFloat4[i * 4 + 1] = arrInFloat3[i * 3 + 1];
+		arrOutFloat4[i * 4 + 2] = arrInFloat3[i * 3 + 2];
+		arrOutFloat4[i * 4 + 3] = 1.0f;
+	}
+
+	return ctAttribs;
+}
+
+
 
 

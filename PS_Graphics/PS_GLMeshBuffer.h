@@ -104,6 +104,12 @@ public:
     static GLMeshBuffer* PrepareMeshBufferForDrawingNormals(float len, U32 ctVertices, U32 fstep,
                                                              const vector<float>& arrVertices,
                                                              const vector<float>& arrNormals);
+
+    //Convert from Homogenous to XYZ and reverse
+    static U32 ConvertFloat4ToFloat3(const vector<float>& arrInFloat4, vector<float>& arrOutFloat3);
+    static U32 ConvertFloat3ToFloat4(const vector<float>& arrInFloat3, vector<float>& arrOutFloat4);
+
+
 protected:
 	//Releases all buffer objects for rendering
 	virtual void cleanup();
