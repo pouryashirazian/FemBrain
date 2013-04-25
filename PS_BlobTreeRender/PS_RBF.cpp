@@ -674,11 +674,14 @@ void FastRBF::resetCollision() {
 void FastRBF::drawCollision() const {
 
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
+
+	glPointSize(5.0f);
 	glColor3f(1.0f, 0.0f, 0.0f);
 	glBegin(GL_POINTS);
 	for(U32 i=0; i<m_collision.size(); i++)
 		glVertex3fv(&m_collision[i].e[0]);
 	glEnd();
+
 	glPopAttrib();
 
 }

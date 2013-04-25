@@ -24,61 +24,13 @@ AvatarCube::AvatarCube(const vec3d& lo, const vec3d& hi)
 }
 
 AvatarCube::~AvatarCube(){
-	this->cleanup();
+	GLMeshBuffer::cleanup();
 }
 
-void AvatarCube::cleanup()
-{
-	GLMeshBuffer::cleanup();
-	if(glIsProgram(m_uShaderFill))
-		glDeleteProgram(m_uShaderFill);
-	if(glIsProgram(m_uShaderLine))
-		glDeleteProgram(m_uShaderLine);
-}
 void AvatarCube::setup(const vec3d& lo, const vec3d& hi)
 {
 	this->m_lo = lo;
 	this->m_hi = hi;
-	//vec3f center = (hi + lo) * 0.5;
-	//Vertex Shader Code
-	const char * vshaderFill =
-		"varying vec3 N;"
-		"varying vec3 V; "
-		"void main(void) {"
-		"gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;"
-		"gl_FrontColor = gl_Color;"
-		"N = normalize(gl_NormalMatrix * gl_Normal);"
-		"V = vec3(gl_ModelViewMatrix * gl_Vertex); }";
-
-	//Fragment Shader Code
-	const char* fShaderFill =
-		"varying vec3 N;"
-		"varying vec3 V;"
-		"void main(void) {"
-		"vec3 L = normalize(gl_LightSource[0].position.xyz - V);"
-		"vec3 E = normalize(-V);"
-		"vec3 R = normalize(-reflect(L, N));"
-		"vec4 Iamb = 0.5 * gl_LightSource[0].ambient * gl_Color;"
-		"vec4 Idif = (gl_LightSource[0].diffuse * gl_Color) * max(dot(N,L), 0.0);"
-		"vec4 Ispec = (gl_LightSource[0].specular * (vec4(0.8, 0.8, 0.8, 0.8) + 0.2 * gl_Color)) * pow(max(dot(R, E), 0.0), 32.0);"
-		"gl_FragColor = gl_FrontLightModelProduct.sceneColor + Iamb + Idif + Ispec;	}";
-
-	const char* fShaderLine =
-		"varying vec3 N;"
-		"varying vec3 V;"
-		"void main(void) {"
-		"vec4 color = vec4(0,0,0,1);"
-		"vec3 L = normalize(gl_LightSource[0].position.xyz - V);"
-		"vec3 E = normalize(-V);"
-		"vec3 R = normalize(-reflect(L, N));"
-		"vec4 Iamb = 0.5 * gl_LightSource[0].ambient * color;"
-		"vec4 Idif = (gl_LightSource[0].diffuse * color) * max(dot(N,L), 0.0);"
-		"vec4 Ispec = (gl_LightSource[0].specular * (vec4(0.8, 0.8, 0.8, 0.8) + 0.2 * color)) * pow(max(dot(R, E), 0.0), 4.0);"
-		"gl_FragColor = gl_FrontLightModelProduct.sceneColor + Iamb + Idif + Ispec;	}";
-
-	CompileShaderCode(vshaderFill, fShaderFill, m_uShaderFill);
-	CompileShaderCode(vshaderFill, fShaderLine, m_uShaderLine);
-
 
 	float l = lo.x;
 	float r = hi.x;
@@ -88,7 +40,7 @@ void AvatarCube::setup(const vec3d& lo, const vec3d& hi)
 	float f = hi.z;
 
 	float vertices[][3] = { { l, b, f }, { l, t, f }, { r, t, f },
-			{ r, b, f }, { l, b, n }, { l, t, n }, { r, t, n }, { r, b, n } };
+							{ r, b, f }, { l, b, n }, { l, t, n }, { r, t, n }, { r, b, n } };
 
 	float normals[][3] = { { -1, -1, 1 }, { -1, 1, 1 }, { 1, 1, 1 }, { 1, -1, 1 },
 							{ -l, -1, -1 }, { -1, 1, -1 }, { 1, 1, -1 }, { 1, -1, -1 } };
@@ -154,18 +106,6 @@ void AvatarCube::setup(const vec3d& lo, const vec3d& hi)
 	setupIndexBufferObject(arrIndices, ftQuads);
 }
 
-void AvatarCube::draw()
-{
-	/*
-	this->setWireFrameMode(false);
-	this->setShaderEffectProgram(m_uShaderFill);
-	GLMeshBuffer::draw();
-	*/
-
-	this->setWireFrameMode(true);
-	this->setShaderEffectProgram(m_uShaderLine);
-	GLMeshBuffer::draw();
-}
 
 
 

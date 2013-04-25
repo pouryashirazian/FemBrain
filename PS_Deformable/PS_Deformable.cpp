@@ -507,6 +507,9 @@ bool Deformable::hapticStart(int index)
 {
 	m_idxPulledVertex = index;
 	m_bHapticInProgress = true;
+	m_vHapticIndices.resize(0);
+	m_vHapticDisplacements.resize(0);
+
 	return true;
 }
 
@@ -521,8 +524,8 @@ bool Deformable::hapticStart(const vec3d& wpos)
 		}
 	}
 
-	m_bHapticInProgress = true;
-	return true;
+	//Call the usual
+	return hapticStart(m_idxPulledVertex);
 }
 
 void Deformable::hapticEnd()

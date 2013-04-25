@@ -12,17 +12,12 @@ public:
 	AvatarCube(const vec3d& lo, const vec3d& hi);
 	virtual ~AvatarCube();
 
-	void draw();
-
 	vec3d lower() const {return m_lo;}
 	vec3d upper() const {return m_hi;}
 private:
-	void cleanup();
 	void setup(const vec3d& lo, const vec3d& hi);
 
 private:
-	U32 m_uShaderFill;
-	U32 m_uShaderLine;
 	vec3d m_lo;
 	vec3d m_hi;
 };

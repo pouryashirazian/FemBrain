@@ -39,6 +39,11 @@ public:
     ShaderManager();
     virtual ~ShaderManager();
     U32 add(const char* vertexShaderCode, const char* fragmentShaderCode, const char* name);
+    U32 addFromFile(const char* chrVertexShaderPath,
+    				 const char* chrFragShaderPath,
+    				 const char* name = NULL);
+
+//    void addFromFolder(const char* chrShadersPath);
 };
 
 typedef SingletonHolder<ShaderManager, CreateUsingNew, PhoenixSingleton> TheShaderManager;

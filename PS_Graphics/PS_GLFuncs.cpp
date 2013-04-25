@@ -435,7 +435,7 @@ bool ReadShaderCode(const char* lpChrFilePath, char** lpSourceCode)
 	*lpSourceCode = new char[size+1];
 	//Read file content
 	fp.read(*lpSourceCode, size);
-	*lpSourceCode[size] = '\0';
+//	*lpSourceCode[size] = '\0';
 
 
 	fp.close();

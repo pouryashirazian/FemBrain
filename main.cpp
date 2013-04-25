@@ -160,6 +160,8 @@ Deformable* 		g_lpDeformable = NULL;
 //Info Lines
 std::vector<std::string> g_infoLines;
 AppSettings g_appSettings;
+U32 g_uiHardEdgesShader;
+U32 g_uiPhongShader;
 
 
 ////////////////////////////////////////////////
@@ -268,6 +270,17 @@ void Draw()
 		vec3f wpos = TheUITransform::Instance().translate;
 		glPushMatrix();
 			glTranslatef(wpos.x, wpos.y, wpos.z);
+
+			//Draw Avatar Filled
+			glEnable(GL_LIGHTING);
+			g_lpAvatarCube->setShaderEffectProgram(g_uiPhongShader);
+			g_lpAvatarCube->setWireFrameMode(false);
+			g_lpAvatarCube->draw();
+			glDisable(GL_LIGHTING);
+
+			//Draw Edges
+			g_lpAvatarCube->setShaderEffectProgram(g_uiHardEdgesShader);
+			g_lpAvatarCube->setWireFrameMode(true);
 			g_lpAvatarCube->draw();
 
 			if (g_appSettings.bDrawAffineWidgets)
@@ -431,11 +444,10 @@ void MousePress(int button, int state, int x, int y)
 		if (state == GLUT_DOWN) {
 			if (g_lpDeformable->isHapticInProgress()) {
 				g_lpDeformable->hapticEnd();
-				g_lpFastRBF->resetCollision();
+				g_hashVertices.clear();
 			}
 			else if (g_appSettings.hapticMode == hmDynamic) {
 				g_lpDeformable->hapticStart(0);
-				g_hashVertices.clear();
 			}
 		}
 	} else if (button == GLUT_MIDDLE_BUTTON) {
@@ -500,8 +512,52 @@ void MousePassiveMove(int x, int y)
 				 dx, dy, wpos.x, wpos.y, wpos.z, strAxis.c_str());
 		g_infoLines[INDEX_HAPTIC_INFO] = string(buffer);
 
+		//Avatar corners
 		vec3d lower = g_lpAvatarCube->lower() + wpos;
 		vec3d upper = g_lpAvatarCube->upper() + wpos;
+
+
+		//Avatar Box
+		AABB aabbAvatar(vec3(lower.x, lower.y, lower.z), vec3(upper.x, upper.y, upper.z));
+
+
+		//1.If boxes donot intersect return
+		if(!g_lpFastRBF->bbox().intersect(aabbAvatar)) {
+			g_appSettings.idxCollisionFace = -1;
+			g_hashVertices.clear();
+			return;
+		}
+
+		//Compute Collision using RBF Interpolation Function
+//		if(g_lpFastRBF->intersects(aabbAvatar)) {
+//			printf("FASTRBF: AVATAR collided with model\n");
+//		}
+
+		//List all the vertices in the model impacted
+		{
+			vector<vec3d> arrVertices;
+			vector<int> arrIndices;
+			g_lpDeformable->pickVertices(lower, upper, arrVertices, arrIndices);
+
+
+			//Add new vertices
+		//	g_hashVertices.clear();
+			for(U32 i=0; i<arrIndices.size(); i++)
+			{
+				//printf("Collision Index = %d \n", arrIndices[i]);
+				//If it does not have the vertex then add it. If we have it then the original vertex is used.
+				if(g_hashVertices.find(arrIndices[i]) == g_hashVertices.end())
+					g_hashVertices.insert(std::pair<int, vec3d>(arrIndices[i], arrVertices[i]));
+			}
+
+			//Remove outside vertices
+		}
+
+		//2.If no vertices impacted then return
+		if(g_hashVertices.size() == 0)
+			return;
+
+		//Input Arrays
 		vec3d n[6];
 		vec3d s[6];
 		//X. Left and Right
@@ -523,36 +579,6 @@ void MousePassiveMove(int x, int y)
 		s[3] = upper;
 		s[4] = lower;
 		s[5] = upper;
-
-		//List all the vertices in the model impacted
-		{
-			vector<vec3d> arrVertices;
-			vector<int> arrIndices;
-			g_lpDeformable->pickVertices(lower, upper, arrVertices, arrIndices);
-			for(U32 i=0; i<arrIndices.size(); i++)
-			{
-				printf("Collision Index = %d \n", arrIndices[i]);
-				//If it does not have the vertex then add it. If we have it then the original vertex is used.
-				if(g_hashVertices.find(arrIndices[i]) == g_hashVertices.end())
-					g_hashVertices.insert(std::pair<int, vec3d>(arrIndices[i], arrVertices[i]));
-			}
-		}
-
-		//Avatar Box
-		AABB aabbAvatar(vec3(lower.x, lower.y, lower.z), vec3(upper.x, upper.y, upper.z));
-
-		//Compute Collision using RBF Interpolation Function
-		if(g_lpFastRBF->intersects(aabbAvatar)) {
-			printf("FASTRBF: AVATAR collided with model\n");
-		}
-
-
-		//Compute Collision Geometrically
-		if(!g_lpDeformable->aabb().intersect(aabbAvatar) || (g_hashVertices.size() == 0)) {
-			g_appSettings.idxCollisionFace = -1;
-			return;
-		}
-		printf("Collision Detected Geometrically.\n");
 
 		//Detect Collision Face
 		//Check against six faces of Avatar to find the intersection
@@ -594,23 +620,26 @@ void MousePassiveMove(int x, int y)
 		//Compute Displacement
 		vector<vec3d> arrForces;
 		vector<int> arrIndices;
-		int idxFace = g_appSettings.idxCollisionFace;
+		int idxCFace = g_appSettings.idxCollisionFace;
 		for (std::map<int, vec3d>::iterator it = g_hashVertices.begin();
 				it != g_hashVertices.end(); ++it) {
 			vec3d v = it->second;
 
 			//1000000
-			double dot = vec3d::dot(s[idxFace] - v, n[idxFace])
-					* g_appSettings.hapticForceCoeff;
-			//double dot = vec3d::dot(s[idxFace] - v, n[idxFace]);
+			double dot = vec3d::dot(s[idxCFace] - v, n[idxCFace]) *
+						  g_appSettings.hapticForceCoeff;
+			dot = MATHMAX(dot, 0);
+
+			/*
 			string arrFaces[] = { "LEFT", "RIGHT", "BOTTOM", "TOP", "NEAR",
 					"FAR" };
-			printf(
-					"Face[%d] = %s, dot = %.4f, VERTEX USED: [%.4f, %.4f, %.4f], COEFF: %.2f \n",
-					idxFace, arrFaces[idxFace].c_str(), dot, v.x, v.y, v.z,
+			printf("Face[%d] = %s, dot = %.4f, VERTEX USED: [%.4f, %.4f, %.4f], COEFF: %.2f \n",
+					idxCFace, arrFaces[idxCFace].c_str(), dot, v.x, v.y, v.z,
 					g_appSettings.hapticForceCoeff);
-			arrForces.push_back(n[idxFace] * dot);
+				*/
+
 			arrIndices.push_back(it->first);
+			arrForces.push_back(n[idxCFace] * dot);
 		}
 
 		//Apply displacements/forces to the model
@@ -948,7 +977,7 @@ bool LoadSettings(const std::string& strSimFP)
 		return false;
 	}
 
-
+	//Loading Settings
 	LogInfo("Loading Settings from the ini file.");
 	CSketchConfig cfg(DAnsiStr(strSimFP.c_str()), CSketchConfig::fmRead);
 
@@ -989,6 +1018,14 @@ bool LoadSettings(const std::string& strSimFP)
 		g_arcBallCam.setPan(cfg.readVec2f("CAMERA", "PAN"));
 	}
 
+	//DISPLAY SETTINGS
+	g_appSettings.bDrawAABB = cfg.readBool("DISPLAY", "AABB", true);
+	g_appSettings.bDrawAffineWidgets = cfg.readBool("DISPLAY", "AFFINEWIDGETS", true);
+	g_appSettings.bDrawGround = cfg.readBool("DISPLAY", "GROUND", true);
+	g_appSettings.bDrawNormals = cfg.readBool("DISPLAY", "NORMALS", true);
+	g_appSettings.bDrawTetMesh = cfg.readBool("DISPLAY", "TETMESH", true);
+	g_appSettings.drawIsoSurface = cfg.readInt("DISPLAY", "ISOSURF", disFull);
+
 	//DISPLAY INFO
 	g_infoLines.push_back(GetGPUInfo());
 	g_infoLines.push_back(string("CAMERA"));
@@ -1016,6 +1053,15 @@ bool SaveSettings(const std::string& strSimFP)
 	vec3d sides = g_lpAvatarCube->upper() - g_lpAvatarCube->lower();
 	cfg.writeVec3f("AVATAR", "POS", TheUITransform::Instance().translate);
 	cfg.writeVec3f("AVATAR", "THICKNESS", vec3f(sides.x, sides.y, sides.z));
+
+	//DISPLAY SETTINGS
+	cfg.writeBool("DISPLAY", "AABB", g_appSettings.bDrawAABB);
+	cfg.writeBool("DISPLAY", "AFFINEWIDGETS", g_appSettings.bDrawAffineWidgets);
+	cfg.writeBool("DISPLAY", "GROUND", g_appSettings.bDrawAffineWidgets);
+	cfg.writeBool("DISPLAY", "NORMALS", g_appSettings.bDrawNormals);
+	cfg.writeBool("DISPLAY", "TETMESH", g_appSettings.bDrawTetMesh);
+	cfg.writeInt("DISPLAY", "ISOSURF", g_appSettings.drawIsoSurface);
+
 
 	return true;
 }
@@ -1121,7 +1167,11 @@ int main(int argc, char* argv[])
 	}
 
 	//Build Shaders for drawing the mesh
-	TheShaderManager::Instance().add(g_lpVertexShaderCode, g_lpFragShaderCode, "phong");
+	DAnsiStr strShaderRoot = ExtractOneLevelUp(ExtractFilePath(GetExePath())) + "DATA/shaders/";
+	DAnsiStr strVPath = strShaderRoot + "avataredges.vsh";
+	DAnsiStr strFPath = strShaderRoot + "avataredges.fsh";
+	g_uiPhongShader = TheShaderManager::Instance().add(g_lpVertexShaderCode, g_lpFragShaderCode, "phong");
+	g_uiHardEdgesShader = TheShaderManager::Instance().addFromFile(strVPath.cptr(), strFPath.cptr());
 
 	//Load Settings
 	if(!LoadSettings(g_appSettings.strSimFilePath))
@@ -1133,6 +1183,7 @@ int main(int argc, char* argv[])
 	TheSceneGraph::Instance().addSceneBox(AABB(vec3f(-10,-10,-16), vec3f(10,10,16)));
 	g_lpSceneBox = reinterpret_cast<GLMeshBuffer*>(TheSceneGraph::Instance().last());
 	g_lpSceneBox->setShaderEffectProgram(TheShaderManager::Instance().get("phong"));
+	g_lpAvatarCube->setShaderEffectProgram(TheShaderManager::Instance().get("phong"));
 
 	DAnsiStr strFileExt = ExtractFileExt(DAnsiStr(g_appSettings.strModelFilePath.c_str()));
 	//Mesh
@@ -1178,11 +1229,13 @@ int main(int argc, char* argv[])
 
 		//Create the RBF representation
 		g_lpFastRBF = new FastRBF(lpBlobRender);
+		g_lpFastRBF->setShaderEffectProgram(g_uiPhongShader);
+		g_lpDrawNormals = g_lpFastRBF->prepareMeshBufferNormals();
 
 		//Read Back Polygonized Mesh
 		if(!lpBlobRender->readbackMeshV3T3(ctVertices, vertices, ctTriangles, elements))
 			LogError("Unable to read mesh from RBF in the format of V3T3");
-		g_lpDrawNormals = lpBlobRender->prepareMeshBufferForDrawingNormals(0.3);
+
 
 		SAFE_DELETE(lpBlobRender);
 	}

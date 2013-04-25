@@ -96,7 +96,6 @@ bool CLMeshBuffer::CopyMeshBufferCL(ComputeDevice* lpDevice,
 		if(lpSource->isVertexBufferValid(attribs[i])) {
 			//Readback the attributes
 			if(ReadbackMeshVertexAttribCL(lpDevice, lpSource, attribs[i], ctVertices, fstep, values)) {
-				PS::DEBUG::PrintArrayF(&values[0], 200);
 				lpDest->setupVertexAttribs(values, fstep, attribs[i]);
 				ctCompleted ++;
 			}
