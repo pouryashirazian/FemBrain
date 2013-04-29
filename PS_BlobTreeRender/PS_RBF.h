@@ -61,10 +61,12 @@ public:
 	int polygonize(float cellsize = DEFAULT_CELL_SIZE);
 
 	//Intersection functions
-	bool intersects(const vector<vec3f>& vertices,
-					  vector<float>& penetrations,
-					  int& idxMaxPenetrated) const;
 	bool intersects(const vec3f& v, float& penetration) const;
+	int intersects(const vector<vec3f>& vertices,
+					  vector<bool>& collisions,
+					  vector<float>& penetrations,
+					  int& idxMaxPenetrated);
+
 	//bool intersects(const vector<vec3f>& v, const vector<bool>& crossed) const;
 	bool intersects(const AABB& box);
 	void resetCollision();

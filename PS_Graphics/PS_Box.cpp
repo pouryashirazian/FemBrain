@@ -50,5 +50,13 @@ bool AABB::intersect(const Ray& ray, float t0, float t1) const
 	return ((tmin < t1) && (tmax > t0));
 }
 
+void AABB::getVertices(vector<vec3f>& vertices) const {
+	vertices.resize(8);
+	vec3f dims = m_upper - m_lower;
+	for(int i=0; i<8; i++) {
+		vertices[i] = m_lower + vec3f::mul(vec3f((i & 0x04) >> 2, (i & 0x02) >> 1, i & 0x01), dims);
+	}
+}
+
 }
 }

@@ -461,11 +461,6 @@ void MousePress(int button, int state, int x, int y)
 	glutPostRedisplay();
 }
 
-//
-//bool ComputeCollisionGeometrically() {
-//
-//}
-
 
 /*!
  * Passive Move for mouse
@@ -528,10 +523,17 @@ void MousePassiveMove(int x, int y)
 			return;
 		}
 
-		//Compute Collision using RBF Interpolation Function
-//		if(g_lpFastRBF->intersects(aabbAvatar)) {
-//			printf("FASTRBF: AVATAR collided with model\n");
-//		}
+		//2.Compute Collision using RBF Interpolation Function
+		vector<vec3f> avatarVertices;
+		vector<bool> flags;
+		vector<float> penetrations;
+		int idxMaxPenetration;
+		aabbAvatar.getVertices(avatarVertices);
+		g_lpFastRBF->resetCollision();
+		int ctIntersected = g_lpFastRBF->intersects(avatarVertices, flags, penetrations, idxMaxPenetration);
+		if(ctIntersected == 0) {
+			return;
+		}
 
 		//List all the vertices in the model impacted
 		{
@@ -541,22 +543,72 @@ void MousePassiveMove(int x, int y)
 
 
 			//Add new vertices
-		//	g_hashVertices.clear();
 			for(U32 i=0; i<arrIndices.size(); i++)
 			{
-				//printf("Collision Index = %d \n", arrIndices[i]);
 				//If it does not have the vertex then add it. If we have it then the original vertex is used.
 				if(g_hashVertices.find(arrIndices[i]) == g_hashVertices.end())
 					g_hashVertices.insert(std::pair<int, vec3d>(arrIndices[i], arrVertices[i]));
 			}
-
-			//Remove outside vertices
 		}
 
-		//2.If no vertices impacted then return
+		//If no vertices impacted then return. If we return here then gaps cannot be filled.
 		if(g_hashVertices.size() == 0)
 			return;
 
+
+		//Compute Center of vertices
+		/*
+		vector<vec3f> collisions;
+		vec3f c = vec3f(0,0,0);
+		collisions.reserve(ctIntersected);
+		for(U32 i=0; i< avatarVertices.size(); i++) {
+			if(flags[i]) {
+				collisions.push_back(avatarVertices[i]);
+				c = c + avatarVertices[i];
+			}
+		}
+		c = c * (1.0f / (float)avatarVertices.size());
+		vec3f n = (c - aabbAvatar.center());
+		printf("ctIntersected: %d, Avatar normal is [%.2f, %.2f, %.2f]\n", ctIntersected, n.x, n.y, n.z);
+
+		vec3d avatarNormal = vec3d(n.x, n.y, n.z);
+		vec3d avatarCollisionFaceCenter = vec3d(c.x, c.y, c.z);
+
+		//List all the vertices in the model impacted
+		{
+			vector<vec3d> arrVertices;
+			vector<int> arrIndices;
+			g_lpDeformable->pickVertices(lower, upper, arrVertices, arrIndices);
+
+
+			//Add new vertices
+			for(U32 i=0; i<arrIndices.size(); i++)
+			{
+				//If it does not have the vertex then add it. If we have it then the original vertex is used.
+				if(g_hashVertices.find(arrIndices[i]) == g_hashVertices.end())
+					g_hashVertices.insert(std::pair<int, vec3d>(arrIndices[i], arrVertices[i]));
+			}
+		}
+
+		//If no vertices impacted then return. If we return here then gaps cannot be filled.
+		if(g_hashVertices.size() == 0)
+			return;
+
+		//Process Vertices
+		vector<vec3d> arrForces;
+		vector<int> arrIndices;
+		for (map<int, vec3d>::iterator it = g_hashVertices.begin(); it != g_hashVertices.end(); ++it) {
+
+			double dot = vec3d::dot(avatarCollisionFaceCenter - it->second, avatarNormal) * g_appSettings.hapticForceCoeff;
+			dot = MATHMAX(dot, 0);
+
+			arrIndices.push_back(it->first);
+			arrForces.push_back(avatarNormal * dot);
+		}
+
+		//Apply displacements/forces to the model
+		g_lpDeformable->hapticSetCurrentForces(arrIndices, arrForces);
+*/
 		//Input Arrays
 		vec3d n[6];
 		vec3d s[6];
@@ -630,13 +682,13 @@ void MousePassiveMove(int x, int y)
 						  g_appSettings.hapticForceCoeff;
 			dot = MATHMAX(dot, 0);
 
-			/*
+		/*
 			string arrFaces[] = { "LEFT", "RIGHT", "BOTTOM", "TOP", "NEAR",
 					"FAR" };
 			printf("Face[%d] = %s, dot = %.4f, VERTEX USED: [%.4f, %.4f, %.4f], COEFF: %.2f \n",
 					idxCFace, arrFaces[idxCFace].c_str(), dot, v.x, v.y, v.z,
 					g_appSettings.hapticForceCoeff);
-				*/
+		*/
 
 			arrIndices.push_back(it->first);
 			arrForces.push_back(n[idxCFace] * dot);
@@ -644,7 +696,6 @@ void MousePassiveMove(int x, int y)
 
 		//Apply displacements/forces to the model
 		g_lpDeformable->hapticSetCurrentForces(arrIndices, arrForces);
-
 
 		glutPostRedisplay();
 	}
@@ -1106,7 +1157,8 @@ int main(int argc, char* argv[])
 
 	//VegWriter::WriteVegFile("/home/pourya/Desktop/Models/pyramid/pyramid.1.node");
 	//Setup the event logger
-	PS::TheEventLogger::Instance().setWriteFlags(PS_LOG_WRITE_EVENTTYPE | PS_LOG_WRITE_TIMESTAMP | PS_LOG_WRITE_SOURCE | PS_LOG_WRITE_TO_SCREEN);
+	//PS::TheEventLogger::Instance().setWriteFlags(PS_LOG_WRITE_EVENTTYPE | PS_LOG_WRITE_TIMESTAMP | PS_LOG_WRITE_SOURCE | PS_LOG_WRITE_TO_SCREEN);
+	PS::TheEventLogger::Instance().setWriteFlags(PS_LOG_WRITE_EVENTTYPE | PS_LOG_WRITE_SOURCE | PS_LOG_WRITE_TO_SCREEN);
 	LogInfo("Starting FemBrain");
 	
 	//Initialize app

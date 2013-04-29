@@ -7,9 +7,12 @@
 #include "PS_Vector.h"
 #include "PS_Ray.h"
 #include "PS_Matrix.h"
+#include <vector>
 
 #ifndef PS_BOX_H
 #define PS_BOX_H
+
+using namespace std;
 
 namespace PS{
 namespace MATH{
@@ -61,6 +64,7 @@ public:
     vec3f upper() const {return this->m_upper;}
     vec3f extent() const { return (m_upper - m_lower);}
     vec3f center() const { return (m_upper + m_lower) * 0.5f;}
+    void getVertices(vector<vec3f>& vertices) const;
 
     AABB operator=(const AABB& other) {
     	m_lower = other.m_lower;

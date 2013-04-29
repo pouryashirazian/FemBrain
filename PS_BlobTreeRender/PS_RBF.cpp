@@ -609,18 +609,30 @@ bool FastRBF::readbackMeshV3T3(U32& ctVertices, vector<float>& vertices,
 	return true;
 }
 
-bool FastRBF::intersects(const vector<vec3f>& vertices,
+int FastRBF::intersects(const vector<vec3f>& vertices,
+						  vector<bool>& collisions,
 						  vector<float>& penetrations,
-						  int& idxMaxPenetrated) const {
+						  int& idxMaxPenetrated) {
 
 	int ctIntersected = 0;
+	collisions.resize(vertices.size());
 	penetrations.resize(vertices.size());
 	float fMaxPenetration = 0.0f;
 	idxMaxPenetrated = -1;
+
+	m_collision.resize(0);
+	m_penetration.resize(0);
 	for(U32 i=0; i<vertices.size(); i++) {
-		bool bres = this->intersects(vertices[i], penetrations[i]);
-		if(bres)
+		if(intersects(vertices[i], penetrations[i])) {
+			m_collision.push_back(vertices[i]);
+			m_penetration.push_back(penetrations[i]);
+
+			collisions[i] = true;
 			ctIntersected++;
+		}
+		else
+			collisions[i] = false;
+
 
 		if(penetrations[i] > fMaxPenetration) {
 			fMaxPenetration = penetrations[i];
@@ -628,7 +640,7 @@ bool FastRBF::intersects(const vector<vec3f>& vertices,
 		}
 	}
 
-	return (ctIntersected > 0);
+	return ctIntersected;
 }
 
 //bool intersects(const vector<vec3f>& v, const vector<bool>& crossed) const;
@@ -672,16 +684,32 @@ void FastRBF::resetCollision() {
 }
 
 void FastRBF::drawCollision() const {
+	if(m_collision.size() == 0)
+		return;
 
+	//Compute Collision Face Center
+	vec3f c = m_collision[0];
+	for(U32 i=1; i<m_collision.size(); i++)
+		c = c + m_collision[i];
+	c = c * (1.0f / (float)m_collision.size());
+	//Draw Center
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
+	glPointSize(5.0f);
+	glColor3f(0.0f, 1.0f, 0.0f);
+	glBegin(GL_POINTS);
+		glVertex3fv(&c.e[0]);
+	glEnd();
+	glPopAttrib();
 
+
+	//Draw Collision Points
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glPointSize(5.0f);
 	glColor3f(1.0f, 0.0f, 0.0f);
 	glBegin(GL_POINTS);
 	for(U32 i=0; i<m_collision.size(); i++)
 		glVertex3fv(&m_collision[i].e[0]);
 	glEnd();
-
 	glPopAttrib();
 
 }
