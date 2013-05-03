@@ -478,7 +478,7 @@ void Deformable::setupIntegrator()
 	SAFE_DELETE(m_lpIntegrator);
 
 	// initialize the Integrator
-	m_lpIntegrator = new VolumeConservingIntegrator(m_dof, m_timeStep,
+	m_lpIntegrator = new OclVolConservedIntegrator(m_dof, m_timeStep,
 													 m_lpMassMatrix,
 													 m_lpDeformableForceModel,
 													 m_positiveDefiniteSolver,

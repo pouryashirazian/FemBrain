@@ -15,6 +15,9 @@ namespace DEBUG{
 
 //All Debug Utility Functions
 int SaveArrayCSV(const char* lpArrayName, float* lpArray, U32 count);
+bool SaveArray(const char* lpArrayName, double* lpArray, U32 count);
+bool LoadArray(const char* lpArrayName, double** lpArray, U32& count);
+
 
 void PrintArray(const U32* lpData, U32 count);
 void PrintArrayF(const float* lpData, U32 count);

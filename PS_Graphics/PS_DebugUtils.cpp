@@ -18,7 +18,6 @@ namespace DEBUG{
 
 int SaveArrayCSV(const char* lpArrayName, float* lpArray, U32 count)
 {
-
 	DAnsiStr strPath = ExtractFilePath(GetExePath());
 	DAnsiStr strFP = printToAStr("%s/%s", strPath.ptr(), lpArrayName);
 	DAnsiStr strLine;
@@ -33,6 +32,27 @@ int SaveArrayCSV(const char* lpArrayName, float* lpArray, U32 count)
 	WriteTextFile(strFP, strLine);
 	return count;
 }
+
+bool SaveArray(const char* lpArrayName, double* lpArray, U32 count) {
+	DAnsiStr strPath = ExtractFilePath(GetExePath());
+	DAnsiStr strFP = printToAStr("%s/%s", strPath.ptr(), lpArrayName);
+	DAnsiStr strLine;
+	for(int i=0; i<count; i++)
+	{
+		if(i < count - 1)
+			strLine += printToAStr("%f, ", lpArray[i]);
+		else
+			strLine += printToAStr("%f", lpArray[i]);
+	}
+
+	WriteTextFile(strFP, strLine);
+	return count;
+}
+
+bool LoadArray(const char* lpArrayName, double** lpArray, U32& count) {
+
+}
+
 
 void PrintArray(const U32* lpData, U32 count)
 {

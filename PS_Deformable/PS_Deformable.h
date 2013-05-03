@@ -20,6 +20,7 @@
 #include "generateMassMatrix.h"
 //#include "implicitBackwardEulerSparse.h"
 #include "PS_VolumeConservingIntegrator.h"
+#include "OclVolConservedIntegrator.h"
 #include "sceneObjectDeformable.h"
 #include "graph.h"
 #include "DBLogger.h"
@@ -170,7 +171,7 @@ private:
 	ForceModel* m_lpDeformableForceModel;
 
 	//Integrator
-	VolumeConservingIntegrator* m_lpIntegrator;
+	OclVolConservedIntegrator* m_lpIntegrator;
 
 	//Deformable Mesh
 	SceneObjectDeformable * m_lpDeformableMesh;
