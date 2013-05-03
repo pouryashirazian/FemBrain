@@ -355,19 +355,6 @@ int Deformable::FixedVerticesToFixedDOF(std::vector<int>& arrInFixedVertices,
 void Deformable::timestep()
 {
 	//Apply forces
-		/*
-		if (m_ctTimeStep % 100 == 0) // set some force at the first timestep
-		{
-			LogInfoArg1("Apply force at timestep %d",m_ctTimeStep);
-			memset(m_arrExtForces, 0, sizeof(double) * m_dof);
-
-			// apply force of -500 N to vertex 12, in y-direction, 3*12+1 = 37
-			m_idxPulledVertex = 12;
-			m_arrExtForces[37] = -500;
-
-			m_lpIntegrator->SetExternalForces(m_arrExtForces);
-		}
-		*/
 	if(m_lpIntegrator == NULL)
 		return;
 
@@ -391,8 +378,6 @@ void Deformable::timestep()
 
 	//Increment time step
 	m_ctTimeStep++;
-
-	glutPostRedisplay();
 }
 
 int Deformable::pickVertex(const vec3d& wpos, vec3d& vertex)

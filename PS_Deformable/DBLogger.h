@@ -39,6 +39,7 @@ public:
 		double youngModulo;
 		double poissonRatio;
 
+		double msAnimationFrameTime;
 		double msComputeTetrahedra;
 		double msComputeDeformation;
 		double msRenderTime;

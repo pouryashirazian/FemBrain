@@ -67,6 +67,7 @@ public:
 
     Vec2 operator+(const Vec2& rhs) const;
     Vec2 operator-(const Vec2& rhs) const;
+    bool operator==(const Vec2& rhs) const;
 public:
     union{
         struct{
@@ -143,6 +144,12 @@ Vec2<T> Vec2<T>::operator-(const Vec2<T>& rhs) const
     result.x = x - rhs.x;
     result.y = y - rhs.y;
     return result;
+}
+
+template<typename T>
+bool Vec2<T>::operator==(const Vec2<T>& rhs) const
+{
+    return (x == rhs.x && y == rhs.y);
 }
 
 template<typename T>

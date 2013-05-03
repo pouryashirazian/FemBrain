@@ -1,12 +1,15 @@
-Problems:
-1. Modeling and animating has a large distance between them. The model should be easily converted to
-animation.
+Research Problems:
+1. Modeling and animating has a large gap between them. 
 2. The collision between avatar and the deformable model is only detected when avatar hits a vertex of model.
-
+3. Puncture by shunt insertion requires topology update around the collision area
+4. Implement Tetrahedralization on the GPU completely.
+5. GPU-Solver for finite elements
 
 Framework Todos:
-1. Obj export
-2. Transformation Nodes for scene graph
+1. Transformation Nodes for scene graph
+2. Shader to draw normals at vertices
+3. Ray-tracing BlobTree and RBF representation 
+4. 
 
 
 

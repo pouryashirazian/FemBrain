@@ -27,7 +27,7 @@
 #include "PS_Graphics/PS_DebugUtils.h"
 #include "PS_Graphics/SceneGraph.h"
 #include "PS_Graphics/CLMeshBuffer.h"
-
+#include "PS_Graphics/Lerping.h"
 
 
 #include "PS_Deformable/PS_Deformable.h"
@@ -50,8 +50,12 @@ using namespace PS::HPC;
 #define FOVY 45.0
 #define ZNEAR 0.01
 #define ZFAR 100.0
-#define DEFAULT_TIMER_MILLIS 33
+
 #define DEFAULT_FORCE_COEFF 600000
+//#define ANIMATION_TIMER_MILLISEC 33
+#define ANIMATION_TIMER_MILLISEC 1000/60
+#define ANIMATION_TIME_SAMPLE_INTERVAL 5
+
 
 #define INDEX_GPU_INFO 	   0
 #define INDEX_CAMERA_INFO 1
@@ -89,10 +93,16 @@ public:
 		this->enablePhysics = true;
 		this->bLogSql = true;
 		this->idxCollisionFace = -1;
-		this->timerInterval = DEFAULT_TIMER_MILLIS;
+		this->animTimerInterval = ANIMATION_TIMER_MILLISEC;
 		this->ctAnimFrame = 0;
 		this->ctAnimLogger = 0;
 		this->ctLogsCollected = 0;
+
+		//Animation
+		this->msAnimationTimeAcc = 0;
+		this->animFPS = 0;
+
+
 		this->hapticMode = 0;
 		this->hapticForceCoeff = DEFAULT_FORCE_COEFF;
 		this->cellsize = DEFAULT_CELL_SIZE;
@@ -116,10 +126,15 @@ public:
 	double currentCollisionFaceModelDist;
 	double hapticForceCoeff;
 
-	U32  timerInterval;
+	//Stats
+	U64  ctLogsCollected;
 	U64  ctAnimFrame;
 	U64  ctAnimLogger;
-	U64  ctLogsCollected;
+	U32  animTimerInterval;
+	double msAnimationFrameTime;
+	double msAnimationTimeAcc;
+	int animFPS;
+
 
 	int appWidth;
 	int appHeight;
@@ -141,7 +156,11 @@ public:
 	int hapticNeighborhoodPropagationRadius;
 };
 
+void AdvanceHapticPosition();
+
+
 std::map<int, vec3d> g_hashVertices;
+LerpedVector<vec2f> g_hapticPosLerp(vec2f(0,0), Loki::Functor<void>(AdvanceHapticPosition));
 
 //Visual Cues
 AvatarCube* g_lpAvatarCube = NULL;
@@ -211,6 +230,12 @@ const char* g_lpFragShaderCode =
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+void AdvanceHapticPosition() {
+//	if(g_lpDeformable->isHapticInProgress() && g_appSettings.hapticMode == hmDynamic) {
+//		vec2f v = g_hapticPosLerp.value();
+//		printf("Hx= %.3f, Hy= %.3f\n", v.x, v.y);
+//	}
+}
 
 void Draw()
 {
@@ -336,7 +361,12 @@ void Draw()
 				g_arcBallCam.getPan().y);
 		g_infoLines[INDEX_CAMERA_INFO] = string(chrMsg);
 
-		sprintf(chrMsg, "ANIMATION FRAME# %08llu, LOGS# %08llu, ", g_appSettings.ctAnimFrame, g_appSettings.ctLogsCollected);
+		//Frame Count, Frame Time and FPS, Log Count
+		sprintf(chrMsg, "ANIMATION FRAME# %08llu, TIME# %.2f, FPS# %d, LOGS# %08llu",
+				g_appSettings.ctAnimFrame,
+				g_appSettings.msAnimationFrameTime,
+				g_appSettings.animFPS,
+				g_appSettings.ctLogsCollected);
 		g_infoLines[INDEX_ANIMATION_INFO] = string(chrMsg);
 
 		if(g_lpFastRBF && g_lpDeformable) {
@@ -416,8 +446,11 @@ void MousePress(int button, int state, int x, int y)
 	}
 
 
+	//Set Values
 	g_appSettings.screenDragStart = vec2i(x, y);
 	g_appSettings.screenDragEnd = vec2i(x, y);
+	g_hapticPosLerp.setValue(vec2f(x, y));
+	g_hapticPosLerp.setTarget(vec2f(x, y));
 
 	if (button == GLUT_LEFT_BUTTON)
 	{
@@ -471,9 +504,12 @@ void MousePassiveMove(int x, int y)
 	{
 		float dx = x - g_appSettings.screenDragStart.x;
 		float dy = g_appSettings.screenDragStart.y - y;
+
 		dx *= 0.001f;
 		dy *= 0.001f;
 		g_appSettings.screenDragStart = vec2i(x, y);
+		g_hapticPosLerp.bumpTarget(vec2f(dx, dy));
+
 		string strAxis;
 		vec3f worldAvatarPos = TheUITransform::Instance().translate;
 
@@ -524,6 +560,7 @@ void MousePassiveMove(int x, int y)
 		}
 
 		//2.Compute Collision using RBF Interpolation Function
+		/*
 		vector<vec3f> avatarVertices;
 		vector<bool> flags;
 		vector<float> penetrations;
@@ -534,6 +571,7 @@ void MousePassiveMove(int x, int y)
 		if(ctIntersected == 0) {
 			return;
 		}
+		*/
 
 		//List all the vertices in the model impacted
 		{
@@ -1002,23 +1040,43 @@ void SpecialKey(int key, int x, int y)
 
 void TimeStep(int t)
 {
+	tbb::tick_count tkStart = tbb::tick_count::now();
 	g_lpDeformable->timestep();
-	g_appSettings.ctAnimFrame ++;
+	g_appSettings.msAnimationTimeAcc += (tbb::tick_count::now() - tkStart).seconds() * 1000.0;
 
-	//Log Database
-	if(g_appSettings.bLogSql && (g_appSettings.ctAnimFrame - g_appSettings.ctAnimLogger > 5))
-	{
-		if(g_lpDeformable->isVolumeChanged())
+	g_appSettings.ctAnimFrame ++;
+	g_hapticPosLerp.advance();
+
+	//Sample For Logs and Info
+	if(g_appSettings.ctAnimFrame - g_appSettings.ctAnimLogger > ANIMATION_TIME_SAMPLE_INTERVAL) {
+
+		//Store counter
+		g_appSettings.ctAnimLogger = g_appSettings.ctAnimFrame;
+
+		//Compute Time
+		g_appSettings.msAnimationFrameTime = g_appSettings.msAnimationTimeAcc / (double)ANIMATION_TIME_SAMPLE_INTERVAL;
+		g_appSettings.msAnimationTimeAcc = 0.0;
+		g_appSettings.animFPS = 1000 / (g_appSettings.msAnimationFrameTime > 1.0 ? (int)g_appSettings.msAnimationFrameTime : 1);
+
+		//Log Database
+		if(g_appSettings.bLogSql)
 		{
-			DBLogger::Record rec;
-			g_lpDeformable->statFillRecord(rec);
-			TheDataBaseLogger::Instance().append(rec);
-			g_appSettings.ctAnimLogger = g_appSettings.ctAnimFrame;
-			g_appSettings.ctLogsCollected ++;
+			if(g_lpDeformable->isVolumeChanged())
+			{
+				DBLogger::Record rec;
+				g_lpDeformable->statFillRecord(rec);
+				TheDataBaseLogger::Instance().append(rec);
+				g_appSettings.ctLogsCollected ++;
+			}
 		}
+
 	}
 
-	glutTimerFunc(g_appSettings.timerInterval, TimeStep, 0);
+	//Animation Frame Prepared now display
+	glutPostRedisplay();
+
+	//Set Timer for next frame
+	glutTimerFunc(g_appSettings.animTimerInterval, TimeStep, 0);
 }
 
 bool LoadSettings(const std::string& strSimFP)
@@ -1108,7 +1166,7 @@ bool SaveSettings(const std::string& strSimFP)
 	//DISPLAY SETTINGS
 	cfg.writeBool("DISPLAY", "AABB", g_appSettings.bDrawAABB);
 	cfg.writeBool("DISPLAY", "AFFINEWIDGETS", g_appSettings.bDrawAffineWidgets);
-	cfg.writeBool("DISPLAY", "GROUND", g_appSettings.bDrawAffineWidgets);
+	cfg.writeBool("DISPLAY", "GROUND", g_appSettings.bDrawGround);
 	cfg.writeBool("DISPLAY", "NORMALS", g_appSettings.bDrawNormals);
 	cfg.writeBool("DISPLAY", "TETMESH", g_appSettings.bDrawTetMesh);
 	cfg.writeInt("DISPLAY", "ISOSURF", g_appSettings.drawIsoSurface);
@@ -1176,7 +1234,7 @@ int main(int argc, char* argv[])
 	glutKeyboardFunc(NormalKey);
 	glutSpecialFunc(SpecialKey);
 	glutCloseFunc(Close);
-	glutTimerFunc(g_appSettings.timerInterval, TimeStep, 0);
+	glutTimerFunc(g_appSettings.animTimerInterval, TimeStep, 0);
 
 	//Print GPU INFO
 	GetGPUInfo();
