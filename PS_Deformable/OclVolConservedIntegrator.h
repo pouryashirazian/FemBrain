@@ -10,6 +10,9 @@
 
 #include "../AA_VegaFem/integrator/implicitNewmarkSparse.h"
 //#define VIENNACL_WITH_OPENCL
+
+
+//Uses ViennaCL for performing conjugate gradient solver on the GPU
 //
 //#include "viennacl/scalar.hpp"
 //#include "viennacl/vector.hpp"

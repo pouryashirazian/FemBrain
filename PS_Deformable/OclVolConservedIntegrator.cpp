@@ -202,6 +202,7 @@ int OclVolConservedIntegrator::DoTimestep() {
 		//Save System Matrix A in Ax = B
 		systemMatrix->Save("systemmatrix.txt", 0);
 
+
 		char solverString[16] = "PCG";
 #endif
 
