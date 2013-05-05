@@ -35,7 +35,7 @@
 //       The PCG solver (Jacobi-preconditioned Conjugate Gradients) is included 
 //       with Vega and therefore always available.
 
-//#define PARDISO
+#define PARDISO
 //#define SPOOLES
-#define PCG
+//#define PCG
 

@@ -8,11 +8,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../AA_VegaFem/include/matrixIO.h"
-#include "../AA_VegaFem/include/performanceCounter.h"
-#include "../AA_VegaFem/include/insertRows.h"
-#include "../AA_VegaFem/integrator/implicitNewmarkSparse.h"
+#include <map>
+#include <vector>
 #include "OclVolConservedIntegrator.h"
+#include "vegafem/include/matrixIO.h"
+#include "vegafem/include/performanceCounter.h"
+#include "vegafem/include/insertRows.h"
+#include "PS_Graphics/PS_DebugUtils.h"
+
+//
+// ViennaCL includes
+//
+#include "viennacl/scalar.hpp"
+#include "viennacl/vector.hpp"
+#include "viennacl/compressed_matrix.hpp"
+#include "viennacl/linalg/jacobi_precond.hpp"
+#include "viennacl/linalg/cg.hpp"
+#include "viennacl/linalg/bicgstab.hpp"
+
+using namespace std;
+
 
 OclVolConservedIntegrator::OclVolConservedIntegrator(int r, double timestep,
 		SparseMatrix * massMatrix_, ForceModel * forceModel_,
@@ -166,53 +181,39 @@ int OclVolConservedIntegrator::DoTimestep() {
 		PerformanceCounter counterSystemSolveTime;
 		memset(buffer, 0, sizeof(double) * r);
 
-#ifdef SPOOLES
-		int info;
-		if (numSolverThreads > 1)
+
+		//Solve using ocl accelerated solver
+		U32 nRows = systemMatrix->GetNumRows();
+		U32 nCols = systemMatrix->GetNumColumns();
+		vector < map< unsigned int, ScalarType > > cpu_sparse_matrix(nRows);
+		for(U32 i=0; i<nRows; i++)
 		{
-			SPOOLESSolverMT * solver = new SPOOLESSolverMT(systemMatrix, numSolverThreads);
-			info = solver->SolveLinearSystem(buffer, bufferConstrained);
-			delete(solver);
+			U32 nRowLength = systemMatrix->GetRowLength(i);
+			for(U32 j=0; j < nRowLength; j++) {
+				U32 idxCol = systemMatrix->GetColumnIndex(i, j);
+				cpu_sparse_matrix[i][idxCol] = systemMatrix->GetEntry(i, j);
+			}
 		}
-		else
-		{
-			SPOOLESSolver * solver = new SPOOLESSolver(systemMatrix);
-			info = solver->SolveLinearSystem(buffer, bufferConstrained);
-			delete(solver);
-		}
-		char solverString[16] = "SPOOLES";
-#endif
 
-#ifdef PARDISO
-		int info = pardisoSolver->ComputeCholeskyDecomposition(systemMatrix);
-		if (info == 0)
-		info = pardisoSolver->SolveLinearSystem(buffer, bufferConstrained);
-		char solverString[16] = "PARDISO";
-#endif
+		//Compressed Matrices
+		viennacl::compressed_matrix<ScalarType> vcl_compressed_matrix(nRows, nCols);
+		viennacl::vector<ScalarType> vcl_rhs(nRows);
+		viennacl::vector<ScalarType> vcl_result(nRows);
 
-		//Profile finds this function as a hotspot
-#ifdef PCG
+		//copy matrix
+		copy(cpu_sparse_matrix, vcl_compressed_matrix);
 
-		int info =
-				jacobiPreconditionedCGSolver->SolveLinearSystemWithJacobiPreconditioner(
-						buffer, bufferConstrained, 1e-6, 10000);
-		if (info > 0)
-			info = 0;
+		//copy rhs
+		copy(bufferConstrained, bufferConstrained + nRows, vcl_rhs.begin());
 
-		//Save System Matrix A in Ax = B
-		systemMatrix->Save("systemmatrix.txt", 0);
+		//solve
+		viennacl::linalg::jacobi_precond< viennacl::compressed_matrix<ScalarType> > vcl_jacobi_precond(vcl_compressed_matrix, viennacl::linalg::jacobi_tag() );
+		vcl_result = viennacl::linalg::solve(vcl_compressed_matrix, vcl_rhs, viennacl::linalg::cg_tag(1e-6, 10000), vcl_jacobi_precond);
 
+		//Transfer results to cpu
+		copy(vcl_result.begin(), vcl_result.end(), &buffer[0]);
+		char solverString[16] = "VIENNACL";
 
-		char solverString[16] = "PCG";
-#endif
-
-		if (info != 0) {
-			printf(
-					"Error: %s sparse solver returned non-zero exit status %d.\n",
-					solverString, (int) info);
-			exit(-1);
-			return 1;
-		}
 
 		counterSystemSolveTime.StopCounter();
 		systemSolveTime = counterSystemSolveTime.GetElapsedTime();

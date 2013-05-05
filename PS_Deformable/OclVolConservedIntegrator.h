@@ -8,7 +8,7 @@
 #ifndef OCLVOLCONSERVEDINTEGRATOR_H_
 #define OCLVOLCONSERVEDINTEGRATOR_H_
 
-#include "../AA_VegaFem/integrator/implicitNewmarkSparse.h"
+#include "vegafem/integrator/implicitNewmarkSparse.h"
 //#define VIENNACL_WITH_OPENCL
 
 

@@ -6,7 +6,7 @@
  */
 
 #include "TetGenExporter.h"
-#include <AA_TetGen/tetgen.h>
+#include <tetgen/tetgen.h>
 
 TetGenExporter::TetGenExporter() {
 

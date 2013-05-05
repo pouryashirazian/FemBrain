@@ -55,7 +55,7 @@ namespace HPC{
 SumScan::SumScan(){
 
 	//Load Kernel
-	DAnsiStr strFP = ExtractOneLevelUp(ExtractFilePath(GetExePath())) + "clpp/";
+	DAnsiStr strFP = ExtractOneLevelUp(ExtractFilePath(GetExePath())) + "3rdparty/clpp/";
 	clppProgram::setBasePath(string(strFP.cptr()));
 
 	//Setup context

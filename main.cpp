@@ -168,7 +168,8 @@ AbstractWidget*	g_lpAffineWidget = NULL;
 GLMeshBuffer* g_lpGroundMatrix = NULL;
 GLMeshBuffer* g_lpSceneBox = NULL;
 GLMeshBuffer* g_lpDrawNormals = NULL;
-GLMeshBuffer* g_lpDrawMesh = NULL;
+MeshRenderer* g_lpDrawMesh = NULL;
+
 
 
 //SimulationObjects
@@ -268,6 +269,9 @@ void Draw()
 	//Draw Deformable Mesh
 	if(g_lpDeformable && g_appSettings.bDrawTetMesh)
 		g_lpDeformable->draw();
+
+	if(g_lpDrawMesh)
+		g_lpDrawMesh->draw();
 
 	if(g_lpFastRBF && (g_appSettings.drawIsoSurface != disNone)) {
 		g_lpFastRBF->setWireFrameMode(g_appSettings.drawIsoSurface == disWireFrame);
@@ -798,6 +802,7 @@ void Close()
 	SAFE_DELETE(g_lpFastRBF);
 	SAFE_DELETE(g_lpDeformable);
 	SAFE_DELETE(g_lpAvatarCube);
+	SAFE_DELETE(g_lpDrawMesh);
 }
 
 string QueryOGL(GLenum name)
@@ -1090,8 +1095,15 @@ bool LoadSettings(const std::string& strSimFP)
 	LogInfo("Loading Settings from the ini file.");
 	CSketchConfig cfg(DAnsiStr(strSimFP.c_str()), CSketchConfig::fmRead);
 
-	//MODEL
-	g_appSettings.strModelFilePath = (string)(cfg.readString("MODEL", "INPUTFILE").c_str());
+	//READ MODEL FILE
+	bool isRelativePath = cfg.readBool("MODEL", "RELATIVEPATH", true);
+	string strSimFileDir = (string)(PS::FILESTRINGUTILS::ExtractFilePath(DAnsiStr(strSimFP.c_str())).c_str());
+	if(isRelativePath)
+		g_appSettings.strModelFilePath = strSimFileDir + (string)(cfg.readString("MODEL", "INPUTFILE").c_str());
+	else
+		g_appSettings.strModelFilePath = (string)(cfg.readString("MODEL", "INPUTFILE").c_str());
+
+
 	int ctFixed = 	cfg.readInt("MODEL", "FIXEDVERTICESCOUNT", 0);
 	bool bres = cfg.readIntArray("MODEL", "FIXEDVERTICES", ctFixed, g_appSettings.vFixedVertices);
 	if(!bres) LogError("Unable to read specified number of fixed vertices!");
@@ -1194,8 +1206,9 @@ int main(int argc, char* argv[])
 		while(iArg < argc) {
 			string strArg = string(argv[iArg]);
 			if(strArg == "-f") {
-				g_appSettings.strSimFilePath = string(ExtractFilePath(GetExePath()).c_str()) + string(argv[++iArg]);
-				LogInfoArg1("Simulation filepath selected is %s", g_appSettings.strSimFilePath.c_str());
+				string strSimFP = string(argv[++iArg]);
+				g_appSettings.strSimFilePath = string(ExtractFilePath(GetExePath()).c_str()) + strSimFP;
+				LogInfoArg1("Simulation filepath selected is %s", strSimFP.c_str());
 			}
 			else if(strArg == "-h") {
 				printf("Usage: FemBrain -f [SIM FILE] \n");
@@ -1277,7 +1290,8 @@ int main(int argc, char* argv[])
 	}
 
 	//Build Shaders for drawing the mesh
-	DAnsiStr strShaderRoot = ExtractOneLevelUp(ExtractFilePath(GetExePath())) + "DATA/shaders/";
+	DAnsiStr strShaderRoot = ExtractOneLevelUp(ExtractFilePath(GetExePath())) + "data/shaders/";
+	DAnsiStr strMeshesRoot = ExtractOneLevelUp(ExtractFilePath(GetExePath())) + "data/models/mesh/";
 	DAnsiStr strVPath = strShaderRoot + "avataredges.vsh";
 	DAnsiStr strFPath = strShaderRoot + "avataredges.fsh";
 	g_uiPhongShader = TheShaderManager::Instance().add(g_lpVertexShaderCode, g_lpFragShaderCode, "phong");
@@ -1286,6 +1300,11 @@ int main(int argc, char* argv[])
 	//Load Settings
 	if(!LoadSettings(g_appSettings.strSimFilePath))
 		exit(0);
+
+	//Load the mesh
+	string strFP = string(strMeshesRoot.cptr()) + string("brainScaled.obj");
+//	g_lpDrawMesh = new MeshRenderer(strFP);
+//	g_lpDrawMesh->setShaderEffectProgram(TheShaderManager::Instance().get("phong"));
 
 	//Ground and Room
 	TheSceneGraph::Instance().addGroundMatrix(32, 32, 0.2f);

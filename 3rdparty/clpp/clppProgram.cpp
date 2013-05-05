@@ -43,6 +43,7 @@ bool clppProgram::compile(clppContext* context, string fileName)
 
 	_context = context;
 
+	printf("BASE PATH = %s\n", _basePath.c_str());
 	string programSource = loadSource(_basePath + fileName);
 
 	//---- Some preprocessing

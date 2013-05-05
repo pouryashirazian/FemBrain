@@ -7,6 +7,7 @@
 #include "PS_DebugUtils.h"
 #include "../PS_Base/PS_FileDirectory.h"
 #include <iostream>
+#include <fstream>
 #include <stdio.h>
 
 using namespace std;
@@ -16,12 +17,10 @@ using namespace PS::FILESTRINGUTILS;
 namespace PS{
 namespace DEBUG{
 
-int SaveArrayCSV(const char* lpArrayName, float* lpArray, U32 count)
+int SaveArrayCSV(const char* chrFilePath, float* lpArray, U32 count)
 {
-	DAnsiStr strPath = ExtractFilePath(GetExePath());
-	DAnsiStr strFP = printToAStr("%s/%s", strPath.ptr(), lpArrayName);
 	DAnsiStr strLine;
-	for(int i=0; i<count; i++)
+	for(U32 i=0; i<count; i++)
 	{
 		if(i < count - 1)
 			strLine += printToAStr("%f, ", lpArray[i]);
@@ -29,28 +28,57 @@ int SaveArrayCSV(const char* lpArrayName, float* lpArray, U32 count)
 			strLine += printToAStr("%f", lpArray[i]);
 	}
 
-	WriteTextFile(strFP, strLine);
+	WriteTextFile(DAnsiStr(chrFilePath), strLine);
 	return count;
 }
 
-bool SaveArray(const char* lpArrayName, double* lpArray, U32 count) {
-	DAnsiStr strPath = ExtractFilePath(GetExePath());
-	DAnsiStr strFP = printToAStr("%s/%s", strPath.ptr(), lpArrayName);
-	DAnsiStr strLine;
-	for(int i=0; i<count; i++)
+bool SaveArray(const char* chrFilePath, double* lpArray, U32 count) {
+	ofstream myfile;
+	myfile.open (chrFilePath);
+
+	char buffer[1024];
+	sprintf(buffer, "%d\n", count);
+	myfile << buffer;
+	for(U32 i=0; i<count; i++) {
+		sprintf(buffer, "%f\n", lpArray[i]);
+		myfile << buffer;
+	}
+	myfile.close();	return count;
+}
+
+bool LoadArray(const char* chrFilePath, double** lpArray, U32& count) {
+
+	count = 0;
+	string line;
+	ifstream myfile (chrFilePath);
+	if (myfile.is_open())
 	{
-		if(i < count - 1)
-			strLine += printToAStr("%f, ", lpArray[i]);
-		else
-			strLine += printToAStr("%f", lpArray[i]);
+		//Read count
+		if(myfile.good()) {
+			getline(myfile, line);
+			count = atoi(line.c_str());
+			if(count > 0)
+				*lpArray = new double[count];
+			else
+				return false;
+		}
+
+		int index = 0;
+		while ( myfile.good() )
+		{
+			getline (myfile,line);
+			*lpArray[index] = atof(line.c_str());
+
+			if(index >= count) {
+				printf("Out of bounds!\n");
+				myfile.close();
+				return false;
+			}
+		}
+		myfile.close();
 	}
 
-	WriteTextFile(strFP, strLine);
-	return count;
-}
-
-bool LoadArray(const char* lpArrayName, double** lpArray, U32& count) {
-
+	return (count > 0);
 }
 
 

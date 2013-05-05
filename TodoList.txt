@@ -6,10 +6,13 @@ Research Problems:
 5. GPU-Solver for finite elements
 
 Framework Todos:
-1. Transformation Nodes for scene graph
-2. Shader to draw normals at vertices
-3. Ray-tracing BlobTree and RBF representation 
-4. 
+
+Shadow for models
+Try Paradiso
+Transformation Nodes for scene graph
+Shader to draw normals at vertices
+Ray-tracing BlobTree and RBF representation 
+ 
 
 
 

@@ -32,13 +32,14 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/3rdparty}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/3rdparty/eigen}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/3rdparty/vegafem/include}&quot;"/>
+									<listOptionValue builtIn="false" value="/opt/intel/mkl/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/OPENCL/common/inc"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLUI/src/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLEW/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/TBB/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/LOKI/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/BOARD/include"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/AA_VegaFem/include}&quot;"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.other.other.1950008776" name="Other flags" superClass="gnu.cpp.compiler.option.other.other" value="-c -fmessage-length=0 -march=corei7-avx -mtune=corei7-avx" valueType="string"/>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.1031905752" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">
@@ -59,6 +60,12 @@
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.base.2033305238" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.base">
 								<option id="gnu.cpp.link.option.libs.776492898" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="tbb"/>
+									<listOptionValue builtIn="false" value="mkl_intel_lp64"/>
+									<listOptionValue builtIn="false" value="mkl_intel_thread"/>
+									<listOptionValue builtIn="false" value="mkl_core"/>
+									<listOptionValue builtIn="false" value="pthread"/>
+									<listOptionValue builtIn="false" value="iomp5"/>
+									<listOptionValue builtIn="false" value="m"/>
 									<listOptionValue builtIn="false" value="OpenCL"/>
 									<listOptionValue builtIn="false" value="GLEW"/>
 									<listOptionValue builtIn="false" value="glut"/>
@@ -76,6 +83,8 @@
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLEW/lib"/>
 									<listOptionValue builtIn="false" value="&quot;${CPP_COMPONENTS}/LOKI/lib&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/AA_TetGen}&quot;"/>
+									<listOptionValue builtIn="false" value="/opt/intel/mkl/lib/intel64"/>
+									<listOptionValue builtIn="false" value="/opt/intel/lib/intel64"/>
 								</option>
 								<option id="gnu.cpp.link.option.flags.618014586" name="Linker flags" superClass="gnu.cpp.link.option.flags" value="" valueType="string"/>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.907987824" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
@@ -122,14 +131,16 @@
 								<option id="gnu.cpp.compiler.option.debugging.level.1921516180" name="Debug Level" superClass="gnu.cpp.compiler.option.debugging.level" value="gnu.cpp.compiler.debugging.level.none" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.1065265090" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
-									<listOptionValue builtIn="false" value="/usr/local/include/eigen3"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/3rdparty}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/3rdparty/eigen}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/3rdparty/vegafem/include}&quot;"/>
+									<listOptionValue builtIn="false" value="/opt/intel/mkl/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/OPENCL/common/inc"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLUI/src/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLEW/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/TBB/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/LOKI/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/BOARD/include"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/AA_VegaFem/include}&quot;"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.other.other.187829704" name="Other flags" superClass="gnu.cpp.compiler.option.other.other" value="-c -fmessage-length=0 -march=corei7-avx -mtune=corei7-avx" valueType="string"/>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.107137020" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">
@@ -149,6 +160,12 @@
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.base.306214580" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.base">
 								<option id="gnu.cpp.link.option.libs.1132655833" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="tbb"/>
+									<listOptionValue builtIn="false" value="mkl_intel_lp64"/>
+									<listOptionValue builtIn="false" value="mkl_intel_thread"/>
+									<listOptionValue builtIn="false" value="mkl_core"/>
+									<listOptionValue builtIn="false" value="pthread"/>
+									<listOptionValue builtIn="false" value="iomp5"/>
+									<listOptionValue builtIn="false" value="m"/>
 									<listOptionValue builtIn="false" value="OpenCL"/>
 									<listOptionValue builtIn="false" value="GLEW"/>
 									<listOptionValue builtIn="false" value="glut"/>
@@ -161,12 +178,13 @@
 									<listOptionValue builtIn="false" value="loki"/>
 								</option>
 								<option id="gnu.cpp.link.option.paths.1705414817" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
-									<listOptionValue builtIn="false" value="/usr/lib"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/TBB/build/linux_intel64_gcc_cc4.6_libc2.15_kernel3.2.0_release"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/BOARD/lib"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLEW/lib"/>
 									<listOptionValue builtIn="false" value="&quot;${CPP_COMPONENTS}/LOKI/lib&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/AA_TetGen}&quot;"/>
+									<listOptionValue builtIn="false" value="/opt/intel/mkl/lib/intel64"/>
+									<listOptionValue builtIn="false" value="/opt/intel/lib/intel64"/>
 								</option>
 								<option id="gnu.cpp.link.option.debugging.prof.180915147" name="Generate prof information (-p)" superClass="gnu.cpp.link.option.debugging.prof" value="true" valueType="boolean"/>
 								<option id="gnu.cpp.link.option.debugging.gprof.1977762243" name="Generate gprof information (-pg)" superClass="gnu.cpp.link.option.debugging.gprof" value="true" valueType="boolean"/>

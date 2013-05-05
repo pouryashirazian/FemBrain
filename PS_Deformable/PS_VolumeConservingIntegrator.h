@@ -8,7 +8,7 @@
 #ifndef PS_VOLUMECONSERVINGINTEGRATOR_H_
 #define PS_VOLUMECONSERVINGINTEGRATOR_H_
 
-#include "../AA_VegaFem/integrator/implicitNewmarkSparse.h"
+#include "vegafem/integrator/implicitNewmarkSparse.h"
 
 class VolumeConservingIntegrator: public ImplicitNewmarkSparse {
 public:

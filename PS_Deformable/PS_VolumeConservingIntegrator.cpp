@@ -8,11 +8,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../AA_VegaFem/include/matrixIO.h"
-#include "../AA_VegaFem/include/performanceCounter.h"
-#include "../AA_VegaFem/include/insertRows.h"
-#include "../AA_VegaFem/integrator/implicitNewmarkSparse.h"
 #include "PS_VolumeConservingIntegrator.h"
+#include "vegafem/include/matrixIO.h"
+#include "vegafem/include/performanceCounter.h"
+#include "vegafem/include/insertRows.h"
+
 
 VolumeConservingIntegrator::VolumeConservingIntegrator(int r, double timestep,
 		SparseMatrix * massMatrix_, ForceModel * forceModel_,

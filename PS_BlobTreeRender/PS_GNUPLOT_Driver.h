@@ -14,7 +14,7 @@
 #include <sstream>
 
 #include <string>
-#include "../AA_Sqlite/sqlite3.h"
+#include "sqlite/sqlite3.h"
 
 using namespace std;
 

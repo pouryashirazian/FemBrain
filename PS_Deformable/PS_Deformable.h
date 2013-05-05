@@ -171,7 +171,7 @@ private:
 	ForceModel* m_lpDeformableForceModel;
 
 	//Integrator
-	OclVolConservedIntegrator* m_lpIntegrator;
+	ImplicitNewmarkSparse* m_lpIntegrator;
 
 	//Deformable Mesh
 	SceneObjectDeformable * m_lpDeformableMesh;

@@ -6,6 +6,7 @@
 #include "volumetricMeshENuMaterial.h"
 #include "generateMeshGraph.h"
 #include <algorithm>
+#include "tbb/task_scheduler_init.h"
 
 #define DEFAULT_TIME_STEP 0.0333
 
@@ -478,6 +479,7 @@ void Deformable::setupIntegrator()
 	SAFE_DELETE(m_lpIntegrator);
 
 	// initialize the Integrator
+/*
 	m_lpIntegrator = new OclVolConservedIntegrator(m_dof, m_timeStep,
 													 m_lpMassMatrix,
 													 m_lpDeformableForceModel,
@@ -485,7 +487,20 @@ void Deformable::setupIntegrator()
 													 m_vFixedDofs.size(),
 													 &m_vFixedDofs[0],
 													 m_dampingMassCoeff,
-													 m_dampingStiffnessCoeff);
+													 m_dampingStiffnessCoeff,
+													 1, 1E-6, tbb::task_scheduler_init::default_num_threads());
+*/
+
+	m_lpIntegrator = new VolumeConservingIntegrator(m_dof, m_timeStep,
+													 m_lpMassMatrix,
+													 m_lpDeformableForceModel,
+													 m_positiveDefiniteSolver,
+													 m_vFixedDofs.size(),
+													 &m_vFixedDofs[0],
+													 m_dampingMassCoeff,
+													 m_dampingStiffnessCoeff,
+													 1, 1E-6, tbb::task_scheduler_init::default_num_threads());
+
 }
 
 bool Deformable::hapticStart(int index)
