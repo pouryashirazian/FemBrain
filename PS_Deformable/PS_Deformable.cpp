@@ -17,16 +17,19 @@ Deformable::Deformable()
 
 Deformable::Deformable(const char* lpVegFilePath,
 						  const char* lpObjFilePath,
-						  std::vector<int>& vFixedVertices)
+						  std::vector<int>& vFixedVertices,
+						  int ctThreads,
+						  const char* lpModelTitle)
 {
-	this->setup(lpVegFilePath, lpObjFilePath, vFixedVertices);
+	this->setup(lpVegFilePath, lpObjFilePath, vFixedVertices, ctThreads, lpModelTitle);
 }
 
 Deformable::Deformable(U32 ctVertices, double* lpVertices,
 						  U32 ctElements, int* lpElements,
-						  std::vector<int>& vFixedVertices)
+						  std::vector<int>& vFixedVertices,
+						  int ctThreads)
 {
-	this->setup(ctVertices, lpVertices, ctElements, lpElements, vFixedVertices);
+	this->setup(ctVertices, lpVertices, ctElements, lpElements, vFixedVertices, ctThreads);
 }
 
 Deformable::~Deformable()
@@ -62,7 +65,9 @@ void Deformable::cleanup()
 //Setup
 void Deformable::setup(const char* lpVegFilePath,
 						  const char* lpObjFilePath,
-						  std::vector<int>& vFixedVertices)
+						  std::vector<int>& vFixedVertices,
+						  int ctThreads,
+						  const char* lpModelTitle)
 {
 	m_fOnDeform = NULL;
 
@@ -75,7 +80,11 @@ void Deformable::setup(const char* lpVegFilePath,
 	m_idxPulledVertex = -1;
 	m_bRenderFixedVertices = true;
 	m_bRenderVertices = false;
-	m_strModelName = PS::FILESTRINGUTILS::ExtractFileTitleOnly(DAnsiStr(lpVegFilePath));
+
+	if(lpModelTitle == NULL)
+		m_strModelName = PS::FILESTRINGUTILS::ExtractFileTitleOnly(DAnsiStr(lpVegFilePath)).cptr();
+	else
+		m_strModelName = string(lpModelTitle);
 
 	//m_hapticCompliance = 1.0;
 	m_hapticCompliance = 1.0;
@@ -139,7 +148,7 @@ void Deformable::setup(const char* lpVegFilePath,
 	m_lpIntegrator = NULL;
 
 	//Create the integrator
-	this->setupIntegrator();
+	this->setupIntegrator(ctThreads);
 
 
 	//Compute AABB
@@ -176,7 +185,8 @@ void Deformable::setup(const char* lpVegFilePath,
  */
 void Deformable::setup(U32 ctVertices, double* lpVertices,
 						  U32 ctElements, int* lpElements,
-						  std::vector<int>& vFixedVertices)
+						  std::vector<int>& vFixedVertices,
+						  int ctThreads)
 {
 	m_fOnDeform = NULL;
 	//m_lpDeformableMesh = new SceneObjectDeformable(const_cast<char*>(lpObjFilePath));
@@ -238,7 +248,7 @@ void Deformable::setup(U32 ctVertices, double* lpVertices,
 	m_lpIntegrator = NULL;
 
 	//Create the integrator
-	this->setupIntegrator();
+	this->setupIntegrator(ctThreads);
 
 	//Compute AABB
 	Vec3d lo, up;
@@ -260,10 +270,6 @@ void Deformable::statFillRecord(DBLogger::Record& rec) const
 {
 	rec.ctElements = m_lpTetMesh->getNumElements();
 	rec.ctVertices = m_lpTetMesh->getNumVertices();
-
-	rec.msComputeDeformation = m_lpIntegrator->GetSystemSolveTime();
-	rec.msComputeTetrahedra = 0;
-	rec.msRenderTime = 0;
 	rec.restVolume = m_restVolume;
 	rec.totalVolume = this->computeVolume();
 
@@ -282,8 +288,13 @@ void Deformable::statFillRecord(DBLogger::Record& rec) const
 
 	rec.xpElementType = "TET";
 	rec.xpForceModel = "COROTATIONAL LINEAR FEM";
-	rec.xpIntegrator = "Backward Euler";
-	rec.xpModelName = m_strModelName.cptr();
+
+#ifdef PARDISO
+	rec.xpIntegrator = "PARDISO DIRECT SOLVER";
+#else
+	rec.xpIntegrator = "JACOBI PRECONDITIONED CG";
+#endif
+	rec.xpModelName = m_strModelName;
 	rec.xpTime = DBLogger::timestamp();
 }
 
@@ -470,13 +481,15 @@ bool Deformable::removeFixedVertex(int index){
 	return true;
 }
 
-void Deformable::setupIntegrator()
+void Deformable::setupIntegrator(int ctThreads)
 {
 	//Update DOFS
 	FixedVerticesToFixedDOF(m_vFixedVertices, m_vFixedDofs);
 
 	//Rebuilt Integrator
 	SAFE_DELETE(m_lpIntegrator);
+
+	LogInfoArg1("Setup Integrator with %d threads.", ctThreads);
 
 	// initialize the Integrator
 /*
@@ -488,7 +501,7 @@ void Deformable::setupIntegrator()
 													 &m_vFixedDofs[0],
 													 m_dampingMassCoeff,
 													 m_dampingStiffnessCoeff,
-													 1, 1E-6, tbb::task_scheduler_init::default_num_threads());
+													 1, 1E-6, ctThreads);
 */
 
 	m_lpIntegrator = new VolumeConservingIntegrator(m_dof, m_timeStep,
@@ -499,7 +512,7 @@ void Deformable::setupIntegrator()
 													 &m_vFixedDofs[0],
 													 m_dampingMassCoeff,
 													 m_dampingStiffnessCoeff,
-													 1, 1E-6, tbb::task_scheduler_init::default_num_threads());
+													 1, 1E-6, ctThreads);
 
 }
 

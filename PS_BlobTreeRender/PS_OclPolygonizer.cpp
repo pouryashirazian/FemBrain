@@ -183,6 +183,8 @@ namespace HPC{
 		}
 
 		//Set Traversal Route
+		string strPrintPath = string(lpFilePath) + ".print.txt";
+		printBlobTree(strPrintPath.c_str());
 		if(!setTraversalRoute())
 		{
 			LogError("Failed to find a tree traversal route in this BlobTree!");
@@ -230,7 +232,6 @@ namespace HPC{
 	}
 
 	bool GPUPoly::setTraversalRoute() {
-		printBlobTree("blobtree.txt");
 
 		//Set OP next and Link Properties
 		SIMPLESTACK<MAX_TREE_NODES> stkOps;

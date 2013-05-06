@@ -162,8 +162,8 @@ namespace PS{
 			//DWideStr wstr(chrMessage);
 			//MessageBoxW(0, (LPCWSTR)wstr.ptr(), (LPCWSTR)L"LOGSYSTEM", MB_OK);			
 #else // !_WIN32
-			fprintf(stderr, "\n");
 			fprintf(stderr, chrMessage);
+			fprintf(stderr, "\n");
 #endif // _WIN32
 		}
 	}

@@ -1,6 +1,8 @@
 #include "../PS_Base/PS_MathBase.h"
 #include "sqlite/sqlite3.h"
 #include "loki/Singleton.h"
+#include <loki/Functor.h>
+
 #include <tbb/task.h>
 #include <tbb/concurrent_queue.h>
 #include <string>
@@ -15,9 +17,7 @@ struct TaskLogInsertResult {
 	U32 ctWrittenRecords;
 };
 
-//CALLBACK Definition
-typedef void (*FOnInsertionCompleted)();
-
+typedef Functor<void> FOnInsertionCompleted;
 
 /*!
  * DBLogger handles all performance and events to be written to the database
@@ -39,16 +39,22 @@ public:
 		double youngModulo;
 		double poissonRatio;
 
-		double msAnimationFrameTime;
-		double msComputeTetrahedra;
-		double msComputeDeformation;
-		double msRenderTime;
-
 		double restVolume;
 		double totalVolume;
 		U32 ctVertices;
 		U32 ctElements;
 		U32 szTotalMemUsed;
+
+		//Stats
+		int 	ctSolverThreads;
+		double msAnimTotalFrame;
+		double msAnimSysSolver;
+		double msAnimApplyDisplacements;
+		int 	animFPS;
+		double msPolyTriangleMesh;
+		double msPolyTetrahedraMesh;
+		double msRBFCreation;
+		double msRBFEvaluation;
 	};
 
 	bool insert(const Record& record);
@@ -62,6 +68,8 @@ public:
 	}
 
 	void flush();
+	void flushAndWait();
+	void insertCompleted();
 
 	static string timestamp();
 
@@ -72,6 +80,7 @@ private:
 	bool createTable();
 
 private:
+	bool m_isTaskInProgress;
 	U32 m_lastXPID;
 	string m_strDB;
 	vector<Record> m_vRecords;
@@ -85,7 +94,7 @@ class DBInsertionTask : public tbb::task {
 public:
 	DBInsertionTask(const string& strDB,
 					  const std::vector<DBLogger::Record>& vRecords,
-					  FOnInsertionCompleted fOnCompleted);
+					  const FOnInsertionCompleted& fOnCompleted);
 
 	bool insertRecord(sqlite3* lpDB, const DBLogger::Record& record);
 	tbb::task* execute();

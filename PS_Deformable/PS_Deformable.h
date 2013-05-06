@@ -48,7 +48,9 @@ public:
 	 */
 	explicit Deformable(const char* lpVegFilePath,
 						   const char* lpObjFilePath,
-						   std::vector<int>& vFixedVertices);
+						   std::vector<int>& vFixedVertices,
+						   int ctThreads = 0,
+						   const char* lpModelTitle = NULL);
 
 	/*!
 	 * Constructs a deformable model from the BlobTree by performing a round of
@@ -56,7 +58,8 @@ public:
 	 */
 	explicit Deformable(U32 ctVertices, double* lpVertices,
 						   U32 ctElements, int* lpElements,
-						   std::vector<int>& vFixedVertices);
+						   std::vector<int>& vFixedVertices,
+						   int ctThreads = 0);
 
 	virtual ~Deformable();
 
@@ -114,8 +117,8 @@ public:
 	TetMesh* getTetMesh() const {return m_lpTetMesh;}
 
 	//ModelName
-	DAnsiStr getModelName() const {return m_strModelName;}
-	void setModelName(const DAnsiStr& strModelName) {m_strModelName = strModelName;}
+	string getModelName() const {return m_strModelName;}
+	void setModelName(const string& strModelName) {m_strModelName = strModelName;}
 
 
 	//Set callbacks
@@ -123,7 +126,7 @@ public:
 		m_fOnDeform = fOnDeform;
 	}
 
-
+	double getSolverTime() const { return m_lpIntegrator->GetSystemSolveTime();}
 	/*!
 	 * Return: Outputs number of dofs
 	 */
@@ -135,13 +138,16 @@ private:
 	 */
 	void setup(const char* lpVegFilePath,
 			    const char* lpObjFilePath,
-			    std::vector<int>& vFixedVertices);
+			    std::vector<int>& vFixedVertices,
+			    int ctThreads = 0,
+			    const char* lpModelTitle = NULL);
 
 	void setup(U32 ctVertices, double* lpVertices,
 				U32 ctElements, int* lpElements,
-				std::vector<int>& vFixedVertices);
+				std::vector<int>& vFixedVertices,
+				int ctThreads = 0);
 
-	void setupIntegrator();
+	void setupIntegrator(int ctThreads = 8);
 
 	void cleanup();
 
@@ -206,7 +212,7 @@ private:
 	bool m_bRenderFixedVertices;
 	bool m_bRenderVertices;
 
-	DAnsiStr m_strModelName;
+	string m_strModelName;
 };
 
 #endif /* PS_DEFORMABLE_H_ */

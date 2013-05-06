@@ -17,15 +17,9 @@ using namespace PS::FILESTRINGUTILS;
 //Global result to notify caller of the result of running the task
 tbb::concurrent_queue<TaskLogInsertResult> g_resultQ;
 
-//Callback handler for insertion operation
-void insertionCompleted() {
-	TaskLogInsertResult result;
-	g_resultQ.try_pop(result);
-	LogInfoArg1("Insertion task completed! Written records: %d\n", result.ctWrittenRecords);
-}
-
 DBLogger::DBLogger()
 {
+	m_isTaskInProgress = false;
 	DAnsiStr strFP = ExtractFilePath(GetExePath()) + "fembrain_logs.db";
 	m_strDB = string(strFP.c_str());
 
@@ -52,8 +46,11 @@ bool DBLogger::insert(const Record& record)
 	if(!lpDB)
 		return false;
 	char* lpSqlError = 0;
-	const char *strSQL = "INSERT INTO tblPerfLog (xpID, xpModelName, xpTime, xpForceModel, xpIntegrator, totalVolume, restVolume, ctVertices, ctElements, elementType, poissonRatio, youngModulo) values"
-						"(@xp_id, @xp_model_name, @xp_time, @xp_force_model, @xp_integrator, @total_volume, @rest_volume, @ct_vertices, @ct_elements, @element_type, @poisson_ratio, @young_modulo);";
+	const char *strSQL = "INSERT INTO tblPerfLog (xpID, xpModelName, xpTime, xpForceModel, xpIntegrator, totalVolume, restVolume, ctVertices, ctElements, elementType, poissonRatio, youngModulo, "
+						  "ctSolverThreads, ctAnimFPS, msAnimTotalFrame, msAnimSysSolver, msAnimApplyDisplacements, msPolyTriangleMesh, msPolyTetrahedraMesh, msRBFCreation, msRBFEvaluation) values"
+						"(@xp_id, @xp_model_name, @xp_time, @xp_force_model, @xp_integrator, @total_volume, @rest_volume, @ct_vertices, @ct_elements, @element_type, @poisson_ratio, @young_modulo, "
+						"@solver_threads, @anim_fps, @ms_anim_totalframe, @ms_anim_syssolver, @ms_anim_applydisplacements, @ms_poly_triangletime, @ms_poly_tetrahedratime, @ms_rbf_creation, "
+						"@ms_rbf_evaluation);";
 	sqlite3_stmt* statement;
 	sqlite3_prepare_v2(lpDB, strSQL, -1, &statement, NULL);
 
@@ -93,6 +90,35 @@ bool DBLogger::insert(const Record& record)
 
 	idxParam = sqlite3_bind_parameter_index(statement, "@young_modulo");
 	sqlite3_bind_double(statement, idxParam, record.youngModulo);
+
+	//Write statistics
+	idxParam = sqlite3_bind_parameter_index(statement, "@solver_threads");
+	sqlite3_bind_double(statement, idxParam, record.ctSolverThreads);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@anim_fps");
+	sqlite3_bind_double(statement, idxParam, record.animFPS);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@ms_anim_totalframe");
+	sqlite3_bind_double(statement, idxParam, record.msAnimTotalFrame);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@ms_anim_syssolver");
+	sqlite3_bind_double(statement, idxParam, record.msAnimSysSolver);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@ms_anim_applydisplacements");
+	sqlite3_bind_double(statement, idxParam, record.msAnimApplyDisplacements);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@ms_poly_triangletime");
+	sqlite3_bind_double(statement, idxParam, record.msPolyTriangleMesh);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@ms_poly_tetrahedratime");
+	sqlite3_bind_double(statement, idxParam, record.msPolyTetrahedraMesh);
+
+	//ms_rbf_creation, @ms_rbf_evaluation
+	idxParam = sqlite3_bind_parameter_index(statement, "@ms_rbf_creation");
+	sqlite3_bind_double(statement, idxParam, record.msRBFCreation);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@ms_rbf_evaluation");
+	sqlite3_bind_double(statement, idxParam, record.msRBFEvaluation);
 
 	rc = sqlite3_step(statement);
 	if(rc != SQLITE_DONE)
@@ -176,7 +202,9 @@ bool DBLogger::createTable()
 
 	const char *strSQL1 = "CREATE TABLE IF NOT EXISTS tblPerfLog(xpID INTEGER PRIMARY KEY AUTOINCREMENT, xpModelName VARCHAR(30), xpTime DATETIME, "
 						 "xpForceModel VARCHAR(128), xpIntegrator VARCHAR(30), totalVolume double, restVolume double, ctVertices int, ctElements int, "
-						 "elementType VARCHAR(16), poissonRatio double, youngModulo double);";
+						 "elementType VARCHAR(16), poissonRatio double, youngModulo double, ctSolverThreads int, ctAnimFPS int, msAnimTotalFrame double, "
+						 "msAnimSysSolver double, msAnimApplyDisplacements double, msPolyTriangleMesh double, msPolyTetrahedraMesh double, "
+						 "msRBFCreation double, msRBFEvaluation double);";
 	rc = sqlite3_exec(db, strSQL1, sqlite_Callback, 0, &lpSqlError);
 	if(rc != SQLITE_OK)
 	{
@@ -190,15 +218,31 @@ bool DBLogger::createTable()
 
 void DBLogger::flush()
 {
-//	for(U32 i=0; i<m_vRecords.size(); i++)
-//		this->insert(m_vRecords[i]);
-//	m_vRecords.resize(0);
-	DBInsertionTask* t = new( tbb::task::allocate_root()) DBInsertionTask(m_strDB, m_vRecords, insertionCompleted);
+	if(m_vRecords.size() == 0)
+		return;
+
+	m_isTaskInProgress = true;
+	Functor<void> FOnCompleted(this, &DBLogger::insertCompleted);
+	DBInsertionTask* t = new( tbb::task::allocate_root()) DBInsertionTask(m_strDB, m_vRecords, FOnCompleted);
 	tbb::task::enqueue(*t);
 
 	m_vRecords.resize(0);
 }
 
+void DBLogger::flushAndWait() {
+	flush();
+	while(m_isTaskInProgress) {
+		//LogInfo("Waiting for db flush thread to finish!");
+		sleep(1);
+	}
+}
+
+void DBLogger::insertCompleted() {
+	TaskLogInsertResult result;
+	g_resultQ.try_pop(result);
+	LogInfoArg1("Insertion task completed! Written records: %d\n", result.ctWrittenRecords);
+	m_isTaskInProgress = false;
+}
 
 string DBLogger::timestamp()
 {
@@ -216,7 +260,7 @@ string DBLogger::timestamp()
 ////////////////////////////////////////////////////////////////////////////////////////
 DBInsertionTask::DBInsertionTask(const string& strDB,
 		  const std::vector<DBLogger::Record>& vRecords,
-		  FOnInsertionCompleted fOnCompleted) {
+		  const FOnInsertionCompleted& fOnCompleted) {
 
 	m_strDB = strDB;
 	m_vRecords.assign(vRecords.begin(), vRecords.end());
@@ -252,7 +296,7 @@ tbb::task* DBInsertionTask::execute() {
 	int ctInserted = 0;
 
 	//Insert all records to db
-	for(int i=0; i<m_vRecords.size(); i++) {
+	for(U32 i=0; i<m_vRecords.size(); i++) {
 		if(insertRecord(lpDB, m_vRecords[i]))
 			ctInserted++;
 	}
@@ -274,31 +318,30 @@ bool DBInsertionTask::insertRecord(sqlite3* lpDB,
 
 	printf("WRITING: %s\n", record.xpTime.c_str());
 	char* lpSqlError = 0;
-	const char *strSQL =
-			"INSERT INTO tblPerfLog (xpID, xpModelName, xpTime, xpForceModel, xpIntegrator, totalVolume, restVolume, ctVertices, ctElements, elementType, poissonRatio, youngModulo) values"
-					"(@xp_id, @xp_model_name, @xp_time, @xp_force_model, @xp_integrator, @total_volume, @rest_volume, @ct_vertices, @ct_elements, @element_type, @poisson_ratio, @young_modulo);";
+
+	const char *strSQL = "INSERT INTO tblPerfLog (xpID, xpModelName, xpTime, xpForceModel, xpIntegrator, totalVolume, restVolume, ctVertices, ctElements, elementType, poissonRatio, youngModulo, "
+						  "ctSolverThreads, ctAnimFPS, msAnimTotalFrame, msAnimSysSolver, msAnimApplyDisplacements, msPolyTriangleMesh, msPolyTetrahedraMesh, msRBFCreation, msRBFEvaluation) values"
+						"(@xp_id, @xp_model_name, @xp_time, @xp_force_model, @xp_integrator, @total_volume, @rest_volume, @ct_vertices, @ct_elements, @element_type, @poisson_ratio, @young_modulo, "
+						"@solver_threads, @anim_fps, @ms_anim_totalframe, @ms_anim_syssolver, @ms_anim_applydisplacements, @ms_poly_triangletime, @ms_poly_tetrahedratime, @ms_rbf_creation, "
+						"@ms_rbf_evaluation);";
 	sqlite3_stmt* statement;
 	sqlite3_prepare_v2(lpDB, strSQL, -1, &statement, NULL);
 
 	int idxParam = sqlite3_bind_parameter_index(statement, "@xp_id");
-	sqlite3_bind_int(statement, idxParam, record.xpID);
+	sqlite3_bind_int(statement, idxParam, record.xpID + 1);
 
 	//Bind All Parameters for Insert Statement
 	idxParam = sqlite3_bind_parameter_index(statement, "@xp_model_name");
-	sqlite3_bind_text(statement, idxParam, record.xpModelName.c_str(), -1,
-			SQLITE_TRANSIENT );
+	sqlite3_bind_text(statement, idxParam, record.xpModelName.c_str(), -1, SQLITE_TRANSIENT);
 
 	idxParam = sqlite3_bind_parameter_index(statement, "@xp_time");
-	sqlite3_bind_text(statement, idxParam, record.xpTime.c_str(), -1,
-			SQLITE_TRANSIENT );
+	sqlite3_bind_text(statement, idxParam, record.xpTime.c_str(), -1, SQLITE_TRANSIENT);
 
 	idxParam = sqlite3_bind_parameter_index(statement, "@xp_force_model");
-	sqlite3_bind_text(statement, idxParam, record.xpForceModel.c_str(), -1,
-			SQLITE_TRANSIENT );
+	sqlite3_bind_text(statement, idxParam, record.xpForceModel.c_str(), -1, SQLITE_TRANSIENT);
 
 	idxParam = sqlite3_bind_parameter_index(statement, "@xp_integrator");
-	sqlite3_bind_text(statement, idxParam, record.xpIntegrator.c_str(), -1,
-			SQLITE_TRANSIENT );
+	sqlite3_bind_text(statement, idxParam, record.xpIntegrator.c_str(), -1, SQLITE_TRANSIENT);
 
 	idxParam = sqlite3_bind_parameter_index(statement, "@total_volume");
 	sqlite3_bind_double(statement, idxParam, record.totalVolume);
@@ -313,14 +356,42 @@ bool DBInsertionTask::insertRecord(sqlite3* lpDB,
 	sqlite3_bind_int(statement, idxParam, record.ctElements);
 
 	idxParam = sqlite3_bind_parameter_index(statement, "@element_type");
-	sqlite3_bind_text(statement, idxParam, record.xpElementType.c_str(), -1,
-			SQLITE_TRANSIENT );
+	sqlite3_bind_text(statement, idxParam, record.xpElementType.c_str(), -1, SQLITE_TRANSIENT);
 
 	idxParam = sqlite3_bind_parameter_index(statement, "@poisson_ratio");
 	sqlite3_bind_double(statement, idxParam, record.poissonRatio);
 
 	idxParam = sqlite3_bind_parameter_index(statement, "@young_modulo");
 	sqlite3_bind_double(statement, idxParam, record.youngModulo);
+
+	//Write statistics
+	idxParam = sqlite3_bind_parameter_index(statement, "@solver_threads");
+	sqlite3_bind_double(statement, idxParam, record.ctSolverThreads);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@anim_fps");
+	sqlite3_bind_double(statement, idxParam, record.animFPS);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@ms_anim_totalframe");
+	sqlite3_bind_double(statement, idxParam, record.msAnimTotalFrame);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@ms_anim_syssolver");
+	sqlite3_bind_double(statement, idxParam, record.msAnimSysSolver);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@ms_anim_applydisplacements");
+	sqlite3_bind_double(statement, idxParam, record.msAnimApplyDisplacements);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@ms_poly_triangletime");
+	sqlite3_bind_double(statement, idxParam, record.msPolyTriangleMesh);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@ms_poly_tetrahedratime");
+	sqlite3_bind_double(statement, idxParam, record.msPolyTetrahedraMesh);
+
+	//ms_rbf_creation, @ms_rbf_evaluation
+	idxParam = sqlite3_bind_parameter_index(statement, "@ms_rbf_creation");
+	sqlite3_bind_double(statement, idxParam, record.msRBFCreation);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@ms_rbf_evaluation");
+	sqlite3_bind_double(statement, idxParam, record.msRBFEvaluation);
 
 	int rc = sqlite3_step(statement);
 	if (rc != SQLITE_DONE) {

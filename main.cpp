@@ -82,6 +82,7 @@ public:
 		this->currentCollisionFaceModelDist = this->initialCollisionFaceModelDist = 0;
 		this->groundLevel = 0.0f;
 		this->drawIsoSurface = disFull;
+		this->bEditConstrainedNodes = false;
 		this->bPanCamera = false;
 		this->bDrawAABB = true;
 		this->bDrawNormals = true;
@@ -90,13 +91,13 @@ public:
 		this->bDrawAffineWidgets = true;
 		this->bDrawGround = true;
 
-		this->enablePhysics = true;
 		this->bLogSql = true;
 		this->idxCollisionFace = -1;
 		this->animTimerInterval = ANIMATION_TIMER_MILLISEC;
 		this->ctAnimFrame = 0;
 		this->ctAnimLogger = 0;
 		this->ctLogsCollected = 0;
+		this->ctSolverThreads = task_scheduler_init::default_num_threads();
 
 		//Animation
 		this->msAnimationTimeAcc = 0;
@@ -119,23 +120,14 @@ public:
 	bool bDrawTetMesh;
 	bool bDrawAffineWidgets;
 	bool bLogSql;
-	bool enablePhysics;
+	bool bEditConstrainedNodes;
 
 	int idxCollisionFace;
 	double initialCollisionFaceModelDist;
 	double currentCollisionFaceModelDist;
 	double hapticForceCoeff;
 
-	//Stats
-	U64  ctLogsCollected;
-	U64  ctAnimFrame;
-	U64  ctAnimLogger;
-	U32  animTimerInterval;
-	double msAnimationFrameTime;
-	double msAnimationTimeAcc;
-	int animFPS;
-
-
+	//AppSettings
 	int appWidth;
 	int appHeight;
 	int hapticMode;
@@ -148,12 +140,26 @@ public:
 	vec2i screenDragStart;
 	vec2i screenDragEnd;
 
-
 	//Fixed Vertices
 	vector<int> vFixedVertices;
 
 	//Propagate force to neighborhood
 	int hapticNeighborhoodPropagationRadius;
+
+	//Stats
+	U64  ctLogsCollected;
+	U64  ctAnimFrame;
+	U64  ctAnimLogger;
+	U32  animTimerInterval;
+	double msAnimationFrameTime;
+	double msAnimationTimeAcc;
+
+	double msAnimApplyDisplacements;
+	double msPolyTriangleMesh;
+	double msPolyTetrahedraMesh;
+	double msRBFCreation;
+	int ctSolverThreads;
+	int animFPS;
 };
 
 void AdvanceHapticPosition();
@@ -186,6 +192,7 @@ U32 g_uiPhongShader;
 
 ////////////////////////////////////////////////
 //Function Prototype
+void Close();
 void Draw();
 void Resize(int w, int h);
 void TimeStep(int t);
@@ -473,6 +480,12 @@ void MousePress(int button, int state, int x, int y)
 					int idxVertex = g_lpDeformable->pickVertex(wpos, closestVertex);
 					g_lpDeformable->setPulledVertex(idxVertex);
 					LogInfoArg1("Selected Vertex Index = %d ", idxVertex);
+
+					//Edit Fixed Vertices
+					if(g_appSettings.bEditConstrainedNodes) {
+						g_appSettings.vFixedVertices.push_back(idxVertex);
+						LogInfoArg1("Added last selection to fixed vertices. count = %d", g_appSettings.vFixedVertices.size());
+					}
 				}
 			}
 		}
@@ -785,14 +798,17 @@ void MouseWheel(int button, int dir, int x, int y)
 }
 
 void ApplyDeformations(U32 dof, double* displacements) {
+	tbb::tick_count tsStart = tbb::tick_count::now();
 	if(g_lpFastRBF)
 		g_lpFastRBF->applyFemDisplacements(dof, displacements);
+
+	g_appSettings.msAnimApplyDisplacements = (tbb::tick_count::now() - tsStart).seconds() * 1000.0;
 }
 
 void Close()
 {
 	//Flush events to db and text log files
-	TheDataBaseLogger::Instance().flush();
+	TheDataBaseLogger::Instance().flushAndWait();
 	PS::TheEventLogger::Instance().flush();
 
 	//Cleanup
@@ -824,9 +840,9 @@ string GetGPUInfo()
 	string strRenderer   = QueryOGL(GL_RENDERER);
 	string strVersion	 = QueryOGL(GL_VERSION);
 	string strExtensions = QueryOGL(GL_EXTENSIONS);
-	cout << "GPU VENDOR: " << strVendorName << endl;
-	cout << "GPU RENDERER: " << strRenderer << endl;
-	cout << "GPU VERSION: " << strVersion << endl;
+//	cout << "GPU VENDOR: " << strVendorName << endl;
+//	cout << "GPU RENDERER: " << strRenderer << endl;
+//	cout << "GPU VERSION: " << strVersion << endl;
 	
 	LogInfoArg1("GPU VENDOR: %s", strVendorName.c_str());
 	LogInfoArg1("GPU RENDERER: %s", strRenderer.c_str());
@@ -852,15 +868,22 @@ void NormalKey(unsigned char key, int x, int y)
 	switch(key)
 	{
 	case('+'):{
-//		g_appSettings.cellsize += 0.01;
-//		LogInfoArg1("Changed cellsize to: %.2f", g_appSettings.cellsize);
+		g_appSettings.cellsize += 0.01;
+		LogInfoArg1("Changed cellsize to: %.2f", g_appSettings.cellsize);
 //		g_lpBlobRender->runPolygonizer(g_appSettings.cellsize);
 		break;
 	}
 	case('-'):{
-//		g_appSettings.cellsize -= 0.01;
-//		LogInfoArg1("Changed cellsize to: %.2f", g_appSettings.cellsize);
+		g_appSettings.cellsize -= 0.01;
+		LogInfoArg1("Changed cellsize to: %.2f", g_appSettings.cellsize);
 //		g_lpBlobRender->runPolygonizer(g_appSettings.cellsize);
+		break;
+	}
+
+	case('f'): {
+		LogInfo("Begin selecting fixed nodes now!");
+		g_appSettings.bEditConstrainedNodes = true;
+		g_appSettings.vFixedVertices.resize(0);
 		break;
 	}
 	case('g'):{
@@ -1070,7 +1093,19 @@ void TimeStep(int t)
 			{
 				DBLogger::Record rec;
 				g_lpDeformable->statFillRecord(rec);
+
+				//StatInfo
+				rec.ctSolverThreads = g_appSettings.ctSolverThreads;
+				rec.animFPS = g_appSettings.animFPS;
+				rec.msAnimTotalFrame = g_appSettings.msAnimationFrameTime;
+				rec.msAnimSysSolver  = g_lpDeformable->getSolverTime() * 1000.0;
+				rec.msAnimApplyDisplacements = g_appSettings.msAnimApplyDisplacements;
+				rec.msPolyTriangleMesh 		 = g_appSettings.msPolyTriangleMesh;
+				rec.msPolyTetrahedraMesh 	 = g_appSettings.msPolyTetrahedraMesh;
+				rec.msRBFCreation 			 = g_appSettings.msRBFCreation;
+				rec.msRBFEvaluation = 0.0;
 				TheDataBaseLogger::Instance().append(rec);
+
 				g_appSettings.ctLogsCollected ++;
 			}
 		}
@@ -1183,6 +1218,11 @@ bool SaveSettings(const std::string& strSimFP)
 	cfg.writeBool("DISPLAY", "TETMESH", g_appSettings.bDrawTetMesh);
 	cfg.writeInt("DISPLAY", "ISOSURF", g_appSettings.drawIsoSurface);
 
+	//MODEL PROPS
+	if(g_appSettings.bEditConstrainedNodes) {
+		cfg.writeInt("MODEL", "FIXEDVERTICESCOUNT", g_appSettings.vFixedVertices.size());
+		cfg.writeIntArray("MODEL", "FIXEDVERTICES", g_appSettings.vFixedVertices);
+	}
 
 	return true;
 }
@@ -1210,6 +1250,11 @@ int main(int argc, char* argv[])
 				g_appSettings.strSimFilePath = string(ExtractFilePath(GetExePath()).c_str()) + strSimFP;
 				LogInfoArg1("Simulation filepath selected is %s", strSimFP.c_str());
 			}
+			else if(strArg == "-t") {
+				g_appSettings.ctSolverThreads = atoi(argv[++iArg]);
+				LogInfoArg1("Number of solver threads %d", g_appSettings.ctSolverThreads);
+			}
+
 			else if(strArg == "-h") {
 				printf("Usage: FemBrain -f [SIM FILE] \n");
 				printf("-f [SIM FILE] Input file defining the simulation scene.\n");
@@ -1220,13 +1265,6 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	//Read Minc File
-	//MincReader* lpMinc = new MincReader("/home/pourya/Desktop/Projects/FemBrain/AA_Models/mri/brainweb/minc/subject04_csf_v.mnc");
-//	MincReader* lpMinc = new MincReader("/home/pourya/Desktop/Projects/FemBrain/AA_Models/mri/icbm/icbm_avg_152_t2_tal_lin.mnc");
-//	SAFE_DELETE(lpMinc);
-
-
-	//VegWriter::WriteVegFile("/home/pourya/Desktop/Models/pyramid/pyramid.1.node");
 	//Setup the event logger
 	//PS::TheEventLogger::Instance().setWriteFlags(PS_LOG_WRITE_EVENTTYPE | PS_LOG_WRITE_TIMESTAMP | PS_LOG_WRITE_SOURCE | PS_LOG_WRITE_TO_SCREEN);
 	PS::TheEventLogger::Instance().setWriteFlags(PS_LOG_WRITE_EVENTTYPE | PS_LOG_WRITE_SOURCE | PS_LOG_WRITE_TO_SCREEN);
@@ -1301,10 +1339,6 @@ int main(int argc, char* argv[])
 	if(!LoadSettings(g_appSettings.strSimFilePath))
 		exit(0);
 
-	//Load the mesh
-	string strFP = string(strMeshesRoot.cptr()) + string("brainScaled.obj");
-//	g_lpDrawMesh = new MeshRenderer(strFP);
-//	g_lpDrawMesh->setShaderEffectProgram(TheShaderManager::Instance().get("phong"));
 
 	//Ground and Room
 	TheSceneGraph::Instance().addGroundMatrix(32, 32, 0.2f);
@@ -1328,8 +1362,13 @@ int main(int argc, char* argv[])
 		//Move to origin
 		lpMesh->move(aabb.center() * -1);
 
-		//lpMesh->fitToBBox(AABB(vec3f(0,0,0), vec3f(8, 8, 8)));
+		//No triangle polygonization time
+		g_appSettings.msPolyTriangleMesh = 0;
+
+		tbb::tick_count tsStart = tbb::tick_count::now();
 		g_lpFastRBF = new FastRBF(lpMesh);
+		g_appSettings.msRBFCreation = (tbb::tick_count::now() - tsStart).seconds() * 1000.0;
+
 		g_lpDrawNormals = g_lpFastRBF->prepareMeshBufferNormals();
 
 		//Readback mesh
@@ -1351,13 +1390,18 @@ int main(int argc, char* argv[])
 		}
 
 		LogInfoArg1("Polygonizing BlobTree file with cellsize: %.2f", g_appSettings.cellsize);
+		tbb::tick_count tsStart = tbb::tick_count::now();
 		lpBlobRender->runPolygonizer(g_appSettings.cellsize);
+		g_appSettings.msPolyTriangleMesh = (tbb::tick_count::now() - tsStart).seconds() * 1000.0;
 
 		//Save Mesh
-		CLMeshBuffer::StoreAsObjMesh("CubeStored.obj", lpBlobRender->computeDevice(), lpBlobRender);
+		//CLMeshBuffer::StoreAsObjMesh("CubeStored.obj", lpBlobRender->computeDevice(), lpBlobRender);
 
 		//Create the RBF representation
+		tsStart = tbb::tick_count::now();
 		g_lpFastRBF = new FastRBF(lpBlobRender);
+		g_appSettings.msRBFCreation = (tbb::tick_count::now() - tsStart).seconds() * 1000.0;
+
 		g_lpFastRBF->setShaderEffectProgram(g_uiPhongShader);
 		g_lpDrawNormals = g_lpFastRBF->prepareMeshBufferNormals();
 
@@ -1371,29 +1415,41 @@ int main(int argc, char* argv[])
 
 
 	{
+		DAnsiStr strModelFP = PS::FILESTRINGUTILS::ChangeFileExt(DAnsiStr(g_appSettings.strModelFilePath.c_str()), "");
+		DAnsiStr strModelTitleOnly = PS::FILESTRINGUTILS::ExtractFileTitleOnly(strModelFP);
+		DAnsiStr strModelMeshV3T3 = strModelFP + "TriMeshV3T3";
+		DAnsiStr strModelTetMesh = strModelFP + "TetMesh";
+		DAnsiStr strModelTetMeshNodes = strModelFP + "TetMesh.node";
+		DAnsiStr strModelTetMeshVegFile = strModelTetMesh + ".veg";
+		DAnsiStr strModelTetMeshObjFile = strModelTetMesh + ".obj";
 
-		//Produce Quality Tetrahedral Mesh
-		TetGenExporter::tesselate(ctVertices, &vertices[0], ctTriangles, &elements[0], "IsoSurfMeshIn", "TetMeshOut");
+
+		//Produce Quality Tetrahedral Mesh using TetGen for now
+		tbb::tick_count tsStart = tbb::tick_count::now();
+		TetGenExporter::tesselate(ctVertices, &vertices[0], ctTriangles, &elements[0],
+								  strModelMeshV3T3.cptr(),
+								  strModelTetMesh.cptr());
+		g_appSettings.msPolyTetrahedraMesh = (tbb::tick_count::now() - tsStart).seconds() * 1000.0;
 
 		//Export a veg file for the Fem Engine
-		VegWriter::WriteVegFile("TetMeshOut.node");
+		VegWriter::WriteVegFile(strModelTetMeshNodes.cptr());
 
 
 		//Create Deformable Model from: Triangle Mesh and Tetrahedra Mesh
-		DAnsiStr strVegFile = "TetMeshOut.veg";
-		DAnsiStr strObjFile = "TetMeshOut.obj";
 
 		//Obj mesh is useful though for viewing the boundary tetrahedra produced by tetgen
 		//Produce special obj mesh with the same vertices and surface triangles
-		VolumetricMesh * mesh = VolumetricMeshLoader::load(strVegFile.ptr());
+		VolumetricMesh * mesh = VolumetricMeshLoader::load(strModelTetMeshVegFile.ptr());
 		GenerateSurfaceMesh generateSurfaceMesh;
 		ObjMesh * objMesh = generateSurfaceMesh.ComputeMesh(mesh, true);
-		objMesh->save(string(strObjFile.cptr()));
+		objMesh->save(string(strModelTetMeshObjFile.cptr()));
 
 		//Setup Deformable object
-		g_lpDeformable = new Deformable(strVegFile.cptr(),
-										strObjFile.cptr(),
-										g_appSettings.vFixedVertices);
+		g_lpDeformable = new Deformable(strModelTetMeshVegFile.cptr(),
+										strModelTetMeshObjFile.cptr(),
+										g_appSettings.vFixedVertices,
+										g_appSettings.ctSolverThreads,
+										strModelTitleOnly.cptr());
 
 		//Deformations will be applied using opencl kernel
 		g_lpDeformable->setDeformCallback(ApplyDeformations);

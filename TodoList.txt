@@ -4,11 +4,19 @@ Research Problems:
 3. Puncture by shunt insertion requires topology update around the collision area
 4. Implement Tetrahedralization on the GPU completely.
 5. GPU-Solver for finite elements
-
+==============================================================================================
 Framework Todos:
 
+OpenCL Kernel for computing model volume on the fly in Deformable
+Comments for blob files and AppConfig files
+Color coded polygonizer based on material properties
+Apply material properies per implicit primitives and blend them
+Flight of staircases scenario
+cleanup logger to reflect useful info
 Shadow for models
-Try Paradiso
+
+
+Ground matrix should be blended in gray more
 Transformation Nodes for scene graph
 Shader to draw normals at vertices
 Ray-tracing BlobTree and RBF representation 
