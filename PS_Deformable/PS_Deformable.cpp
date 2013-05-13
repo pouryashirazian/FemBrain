@@ -188,6 +188,7 @@ void Deformable::setup(U32 ctVertices, double* lpVertices,
 						  std::vector<int>& vFixedVertices,
 						  int ctThreads)
 {
+	m_bApplyGravity = false;
 	m_fOnDeform = NULL;
 	//m_lpDeformableMesh = new SceneObjectDeformable(const_cast<char*>(lpObjFilePath));
 	//m_lpDeformableMesh->EnableVertexSelection();
@@ -374,8 +375,7 @@ void Deformable::timestep()
 	m_lpIntegrator->SetExternalForcesToZero();
 
 	//Update the haptic external forces applied
-	//this->hapticUpdateDisplace();
-	this->hapticUpdateForce();
+	this->applyAllExternalForces();
 
 	//Time Step
 	m_lpIntegrator->DoTimestep();
@@ -503,7 +503,7 @@ void Deformable::setupIntegrator(int ctThreads)
 													 m_dampingStiffnessCoeff,
 													 1, 1E-6, ctThreads);
 */
-
+	int ctFixed = m_vFixedVertices.size();
 	m_lpIntegrator = new VolumeConservingIntegrator(m_dof, m_timeStep,
 													 m_lpMassMatrix,
 													 m_lpDeformableForceModel,
@@ -550,7 +550,7 @@ void Deformable::hapticEnd()
 }
 
 //Apply External Forces to the integrator
-bool Deformable::hapticUpdateForce()
+bool Deformable::applyAllExternalForces()
 {
 	if (m_vHapticIndices.size() == 0)
 		return false;
@@ -560,8 +560,18 @@ bool Deformable::hapticUpdateForce()
 	//Reset External Force
 	memset(m_arrExtForces, 0, sizeof(double) * m_dof);
 
+	//Apply Gravity along global y direction: W = mg
+	if(m_bApplyGravity) {
+		printf("APPLY GRAVITY\n");
+		for(U32 i=0; i < m_dof; i++) {
+			if(i % 3 == 1) {
+				m_arrExtForces[i] = 10;
+			}
+		}
+	}
+
 	//Instead of pulled vertex we may now have an array of vertices
-	for(size_t i=0; i<m_vHapticIndices.size(); i++)
+	for(U32 i=0; i<m_vHapticIndices.size(); i++)
 	{
 		int idxVertex = m_vHapticIndices[i];
 		m_arrExtForces[3 * idxVertex + 0] += m_vHapticForces[i].x;
@@ -570,7 +580,7 @@ bool Deformable::hapticUpdateForce()
 	}
 
 	//Distribute force over the neighboring vertices
-	for(size_t iVertex = 0; iVertex < m_vHapticIndices.size(); iVertex++)
+	for(U32 iVertex = 0; iVertex < m_vHapticIndices.size(); iVertex++)
 	{
 		set<int> affectedVertices;
 		set<int> lastLayerVertices;

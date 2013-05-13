@@ -45,6 +45,9 @@ public:
 		U32 ctElements;
 		U32 szTotalMemUsed;
 
+		//Polygonization cellsize
+		float cellsize;
+
 		//Stats
 		int 	ctSolverThreads;
 		double msAnimTotalFrame;

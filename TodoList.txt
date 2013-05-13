@@ -6,7 +6,9 @@ Research Problems:
 5. GPU-Solver for finite elements
 ==============================================================================================
 Framework Todos:
-
+Output Triangle mesh obj
+Per cellsize fixed nodes
+Print blobtree with correct range kids
 OpenCL Kernel for computing model volume on the fly in Deformable
 Comments for blob files and AppConfig files
 Color coded polygonizer based on material properties

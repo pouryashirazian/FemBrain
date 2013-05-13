@@ -46,9 +46,9 @@ bool DBLogger::insert(const Record& record)
 	if(!lpDB)
 		return false;
 	char* lpSqlError = 0;
-	const char *strSQL = "INSERT INTO tblPerfLog (xpID, xpModelName, xpTime, xpForceModel, xpIntegrator, totalVolume, restVolume, ctVertices, ctElements, elementType, poissonRatio, youngModulo, "
+	const char *strSQL = "INSERT INTO tblPerfLog (xpID, xpModelName, xpTime, xpForceModel, xpIntegrator, cellsize, totalVolume, restVolume, ctVertices, ctElements, elementType, poissonRatio, youngModulo, "
 						  "ctSolverThreads, ctAnimFPS, msAnimTotalFrame, msAnimSysSolver, msAnimApplyDisplacements, msPolyTriangleMesh, msPolyTetrahedraMesh, msRBFCreation, msRBFEvaluation) values"
-						"(@xp_id, @xp_model_name, @xp_time, @xp_force_model, @xp_integrator, @total_volume, @rest_volume, @ct_vertices, @ct_elements, @element_type, @poisson_ratio, @young_modulo, "
+						"(@xp_id, @xp_model_name, @xp_time, @xp_force_model, @xp_integrator, @cell_size, @total_volume, @rest_volume, @ct_vertices, @ct_elements, @element_type, @poisson_ratio, @young_modulo, "
 						"@solver_threads, @anim_fps, @ms_anim_totalframe, @ms_anim_syssolver, @ms_anim_applydisplacements, @ms_poly_triangletime, @ms_poly_tetrahedratime, @ms_rbf_creation, "
 						"@ms_rbf_evaluation);";
 	sqlite3_stmt* statement;
@@ -69,6 +69,9 @@ bool DBLogger::insert(const Record& record)
 
 	idxParam = sqlite3_bind_parameter_index(statement, "@xp_integrator");
 	sqlite3_bind_text(statement, idxParam, record.xpIntegrator.c_str(), -1, SQLITE_TRANSIENT);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@cell_size");
+	sqlite3_bind_double(statement, idxParam, record.cellsize);
 
 	idxParam = sqlite3_bind_parameter_index(statement, "@total_volume");
 	sqlite3_bind_double(statement, idxParam, record.totalVolume);
@@ -201,7 +204,7 @@ bool DBLogger::createTable()
 	}
 
 	const char *strSQL1 = "CREATE TABLE IF NOT EXISTS tblPerfLog(xpID INTEGER PRIMARY KEY AUTOINCREMENT, xpModelName VARCHAR(30), xpTime DATETIME, "
-						 "xpForceModel VARCHAR(128), xpIntegrator VARCHAR(30), totalVolume double, restVolume double, ctVertices int, ctElements int, "
+						 "xpForceModel VARCHAR(128), xpIntegrator VARCHAR(30), cellsize double, totalVolume double, restVolume double, ctVertices int, ctElements int, "
 						 "elementType VARCHAR(16), poissonRatio double, youngModulo double, ctSolverThreads int, ctAnimFPS int, msAnimTotalFrame double, "
 						 "msAnimSysSolver double, msAnimApplyDisplacements double, msPolyTriangleMesh double, msPolyTetrahedraMesh double, "
 						 "msRBFCreation double, msRBFEvaluation double);";
@@ -319,9 +322,9 @@ bool DBInsertionTask::insertRecord(sqlite3* lpDB,
 	printf("WRITING: %s\n", record.xpTime.c_str());
 	char* lpSqlError = 0;
 
-	const char *strSQL = "INSERT INTO tblPerfLog (xpID, xpModelName, xpTime, xpForceModel, xpIntegrator, totalVolume, restVolume, ctVertices, ctElements, elementType, poissonRatio, youngModulo, "
+	const char *strSQL = "INSERT INTO tblPerfLog (xpID, xpModelName, xpTime, xpForceModel, xpIntegrator, cellsize, totalVolume, restVolume, ctVertices, ctElements, elementType, poissonRatio, youngModulo, "
 						  "ctSolverThreads, ctAnimFPS, msAnimTotalFrame, msAnimSysSolver, msAnimApplyDisplacements, msPolyTriangleMesh, msPolyTetrahedraMesh, msRBFCreation, msRBFEvaluation) values"
-						"(@xp_id, @xp_model_name, @xp_time, @xp_force_model, @xp_integrator, @total_volume, @rest_volume, @ct_vertices, @ct_elements, @element_type, @poisson_ratio, @young_modulo, "
+						"(@xp_id, @xp_model_name, @xp_time, @xp_force_model, @xp_integrator, @cell_size, @total_volume, @rest_volume, @ct_vertices, @ct_elements, @element_type, @poisson_ratio, @young_modulo, "
 						"@solver_threads, @anim_fps, @ms_anim_totalframe, @ms_anim_syssolver, @ms_anim_applydisplacements, @ms_poly_triangletime, @ms_poly_tetrahedratime, @ms_rbf_creation, "
 						"@ms_rbf_evaluation);";
 	sqlite3_stmt* statement;
@@ -342,6 +345,9 @@ bool DBInsertionTask::insertRecord(sqlite3* lpDB,
 
 	idxParam = sqlite3_bind_parameter_index(statement, "@xp_integrator");
 	sqlite3_bind_text(statement, idxParam, record.xpIntegrator.c_str(), -1, SQLITE_TRANSIENT);
+
+	idxParam = sqlite3_bind_parameter_index(statement, "@cell_size");
+	sqlite3_bind_double(statement, idxParam, record.cellsize);
 
 	idxParam = sqlite3_bind_parameter_index(statement, "@total_volume");
 	sqlite3_bind_double(statement, idxParam, record.totalVolume);

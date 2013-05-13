@@ -1097,6 +1097,7 @@ void TimeStep(int t)
 				//StatInfo
 				rec.ctSolverThreads = g_appSettings.ctSolverThreads;
 				rec.animFPS = g_appSettings.animFPS;
+				rec.cellsize = g_appSettings.cellsize;
 				rec.msAnimTotalFrame = g_appSettings.msAnimationFrameTime;
 				rec.msAnimSysSolver  = g_lpDeformable->getSolverTime() * 1000.0;
 				rec.msAnimApplyDisplacements = g_appSettings.msAnimApplyDisplacements;
@@ -1140,8 +1141,10 @@ bool LoadSettings(const std::string& strSimFP)
 
 
 	int ctFixed = 	cfg.readInt("MODEL", "FIXEDVERTICESCOUNT", 0);
-	bool bres = cfg.readIntArray("MODEL", "FIXEDVERTICES", ctFixed, g_appSettings.vFixedVertices);
-	if(!bres) LogError("Unable to read specified number of fixed vertices!");
+	if(ctFixed > 0) {
+		if(!cfg.readIntArray("MODEL", "FIXEDVERTICES", ctFixed, g_appSettings.vFixedVertices))
+			LogError("Unable to read specified number of fixed vertices!");
+	}
 
 	//Translation Widget
 	TheUITransform::Instance().axis = uiaX;
@@ -1444,6 +1447,7 @@ int main(int argc, char* argv[])
 		ObjMesh * objMesh = generateSurfaceMesh.ComputeMesh(mesh, true);
 		objMesh->save(string(strModelTetMeshObjFile.cptr()));
 
+		int ctFixed = g_appSettings.vFixedVertices.size();
 		//Setup Deformable object
 		g_lpDeformable = new Deformable(strModelTetMeshVegFile.cptr(),
 										strModelTetMeshObjFile.cptr(),
@@ -1452,6 +1456,7 @@ int main(int argc, char* argv[])
 										strModelTitleOnly.cptr());
 
 		//Deformations will be applied using opencl kernel
+		g_lpDeformable->setGravity(true);
 		g_lpDeformable->setDeformCallback(ApplyDeformations);
 		g_lpDeformable->setHapticForceRadius(g_appSettings.hapticNeighborhoodPropagationRadius);
 	}

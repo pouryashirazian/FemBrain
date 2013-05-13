@@ -9,6 +9,7 @@
 #define PS_DEFORMABLE_H_
 
 #include <vector>
+#include "loki/Functor.h"
 #include "../PS_Base/PS_MathBase.h"
 #include "../PS_Base/PS_String.h"
 #include "../PS_Graphics/PS_GLMeshBuffer.h"
@@ -26,6 +27,7 @@
 #include "DBLogger.h"
 
 using namespace std;
+using namespace Loki;
 using namespace PS::MATH;
 
 #define DEFAULT_FORCE_NEIGHBORHOOD_SIZE 5
@@ -33,7 +35,7 @@ using namespace PS::MATH;
 
 //ApplyDeformations
 typedef void (*FOnApplyDeformations)(U32 dof, double* displacements);
-
+//typedef Functor<void,  U32, double*> FOnDeformations;
 
 /*!
  *	Deformable model
@@ -81,7 +83,6 @@ public:
 	bool hapticStart(int index);
 	bool hapticStart(const vec3d& wpos);
 	void hapticEnd();
-	bool hapticUpdateForce();
 	bool hapticUpdateDisplace();
 	void hapticSetCurrentForces(const vector<int>& indices,
 									const vector<vec3d>& forces);
@@ -120,6 +121,12 @@ public:
 	string getModelName() const {return m_strModelName;}
 	void setModelName(const string& strModelName) {m_strModelName = strModelName;}
 
+	//Gravity
+	void setGravity(bool bGravity) {m_bApplyGravity = bGravity;}
+	bool getGravity() const {return m_bApplyGravity;}
+
+	//Apply External Forces
+	bool applyAllExternalForces();
 
 	//Set callbacks
 	void setDeformCallback(FOnApplyDeformations fOnDeform) {
@@ -211,6 +218,7 @@ private:
 
 	bool m_bRenderFixedVertices;
 	bool m_bRenderVertices;
+	bool m_bApplyGravity;
 
 	string m_strModelName;
 };

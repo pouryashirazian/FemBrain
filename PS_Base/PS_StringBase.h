@@ -485,7 +485,7 @@ namespace PS{
     CTString<Type> CTString<Type>::substrT(int offset, int count) const
 	{
 		CTString output;
-		if(m_length == 0) return output;
+		if(m_length == 0 || count == 0) return output;
 		if(!isPos(offset)) return output;
 
         if(count == int(-1))

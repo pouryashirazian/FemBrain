@@ -361,7 +361,8 @@ namespace PS{
 				{
 					strTemp = strVal.substr(0, strVal.length() - 1);
 					strTemp.removeStartEndSpaces();
-					arrayInt.push_back(atoi(strTemp.ptr()));
+					if(strTemp.length() > 0)
+						arrayInt.push_back(atoi(strTemp.ptr()));
 				}
 			}
 		}
