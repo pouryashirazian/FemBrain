@@ -9,7 +9,7 @@
 #include "SceneBox.h"
 #include "GroundMartrix.h"
 
-SceneNode::SceneNode(): m_bVisible(true), m_lpEffect(NULL), m_lpTransform(NULL) {
+SceneNode::SceneNode(): m_bVisible(true) {
 }
 
 SceneNode::~SceneNode() {
@@ -98,9 +98,9 @@ void SceneGraph::drawBBoxes() {
     }
 }
 
-void SceneGraph::animate(U64 timer) {
+void SceneGraph::timestep(U64 timer) {
     for(U32 i=0; i < m_vSceneNodes.size(); i++) {
-        m_vSceneNodes[i]->animate(timer);
+        m_vSceneNodes[i]->timestep(timer);
     }
 }
 

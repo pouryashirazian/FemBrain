@@ -40,7 +40,7 @@ typedef void (*FOnApplyDeformations)(U32 dof, double* displacements);
 /*!
  *	Deformable model
  */
-class Deformable{
+class Deformable {
 public:
 	Deformable();
 
@@ -66,7 +66,10 @@ public:
 	virtual ~Deformable();
 
 
+	//Draw
 	void draw();
+
+	//TimeStep
 	void timestep();
 
 	//Pick a vertex
@@ -127,6 +130,7 @@ public:
 
 	//Apply External Forces
 	bool applyAllExternalForces();
+	bool applyHapticForces();
 
 	//Set callbacks
 	void setDeformCallback(FOnApplyDeformations fOnDeform) {

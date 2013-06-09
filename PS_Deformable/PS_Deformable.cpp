@@ -549,26 +549,36 @@ void Deformable::hapticEnd()
 	m_vHapticDisplacements.resize(0);
 }
 
-//Apply External Forces to the integrator
+//Apply External Forces to the integerator
 bool Deformable::applyAllExternalForces()
 {
+	//Reset External Force
+	memset(m_arrExtForces, 0, sizeof(double) * m_dof);
+
+	//1.Apply Gravity along global y direction: W = mg
+	if(m_bApplyGravity) {
+		//printf("APPLY GRAVITY\n");
+		for(U32 i=0; i < m_dof; i++) {
+			if(i % 3 == 1) {
+				m_arrExtForces[i] = -10;
+			}
+		}
+	}
+
+	//2.Apply Haptics
+	applyHapticForces();
+
+	//Integrate
+	m_lpIntegrator->SetExternalForces(m_arrExtForces);
+
+	return true;
+}
+
+bool Deformable::applyHapticForces() {
 	if (m_vHapticIndices.size() == 0)
 		return false;
 	if (!m_bHapticInProgress)
 		return false;
-
-	//Reset External Force
-	memset(m_arrExtForces, 0, sizeof(double) * m_dof);
-
-	//Apply Gravity along global y direction: W = mg
-	if(m_bApplyGravity) {
-		printf("APPLY GRAVITY\n");
-		for(U32 i=0; i < m_dof; i++) {
-			if(i % 3 == 1) {
-				m_arrExtForces[i] = 10;
-			}
-		}
-	}
 
 	//Instead of pulled vertex we may now have an array of vertices
 	for(U32 i=0; i<m_vHapticIndices.size(); i++)
@@ -633,10 +643,6 @@ bool Deformable::applyAllExternalForces()
 			}
 		}
 	}
-
-	// set forces to the integrator
-	m_lpIntegrator->SetExternalForces(m_arrExtForces);
-	///m_lpIntegrator->SetqState(m_arrExtForces);
 
 	return true;
 }

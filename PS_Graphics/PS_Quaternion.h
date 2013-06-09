@@ -167,7 +167,6 @@ public:
     	return this->multiply(rhs);
     }
 
-
 public:
     //x/y/z components of quaternion.
     vec3f q;

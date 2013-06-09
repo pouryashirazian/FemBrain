@@ -11,6 +11,8 @@
 #include <string>
 #include "loki/Singleton.h"
 #include "loki/Functor.h"
+#include "loki/SmartPtr.h"
+
 #include "PS_CopyStack.h"
 #include "AssetManager.h"
 #include "ShaderManager.h"
@@ -19,6 +21,7 @@
 #include "PS_ArcBallCamera.h"
 #include "PS_Box.h"
 
+using namespace Loki;
 using namespace std;
 using namespace PS;
 using namespace PS::MATH;
@@ -60,6 +63,13 @@ private:
 	//PS::MESH::MeshMaterial* m_lpMaterial;
 };
 
+//SmartPtrSceneNodeTransform
+typedef Loki::SmartPtr< SceneNodeTransform, RefCounted, DisallowConversion,
+    AssertCheck, DefaultSPStorage, PropagateConst > SmartPtrSceneNodeTransform;
+
+//SmartPtrSceneEffect
+typedef Loki::SmartPtr< SceneNodeEffect, RefCounted, DisallowConversion,
+	AssertCheck, DefaultSPStorage, PropagateConst > SmartPtrSceneNodeEffect;
 
 /*!
  * \brief The SceneNode class is an element in the scenegraph can have
@@ -74,17 +84,16 @@ public:
 	virtual void draw() = 0;    
 	virtual void drawBBox() const;
 
+    //Advances animation
+    virtual void timestep(U64 timer) {
+        PS_UNUSED(timer);
+    }
+
     //Computes the bounding box of the model
 	void setBBox(const AABB& box) { m_bbox = box;}
     virtual AABB bbox() const {
         return m_bbox;
     }
-
-    //Advances animation using the timer value
-    virtual void animate(U64 timer) {
-        PS_UNUSED(timer);
-    }
-
 
     //TODO: Method for marshalling this node in a compact data-structure
     //The compact structure will serve as input to high performance rendering
@@ -100,11 +109,14 @@ public:
     void setVisible(bool visible) {m_bVisible = visible;}
 
     //Effect to be managed by asset and shadermanager collections
-    SceneNodeEffect* effect() const {return m_lpEffect;}
-    void setEffect(SceneNodeEffect* lpEffect) { m_lpEffect = lpEffect;}
+    SmartPtrSceneNodeEffect effect() const {return m_spEffect;}
+    void setEffect(const SmartPtrSceneNodeEffect& spEffect) { m_spEffect = spEffect;}
 
     //Transformation
-    SceneNodeTransform* transformation() const { return m_lpTransform;}
+    SmartPtrSceneNodeTransform transform() const { return m_spTransform;}
+    void setTransform(const SmartPtrSceneNodeTransform& spTransform) {
+    	m_spTransform = spTransform;
+    }
 
     //TODO: IO to be able to read and write scene nodes to disk in very fast binary format
     bool read() {return false;}
@@ -117,9 +129,10 @@ protected:
 	//Attribs
     string m_name;
     bool m_bVisible;
+
     //bool m_bAnimated;
-    SceneNodeEffect* m_lpEffect;
-    SceneNodeTransform* m_lpTransform;
+    SmartPtrSceneNodeEffect m_spEffect;
+    SmartPtrSceneNodeTransform m_spTransform;
 };
 
 /*!
@@ -134,7 +147,7 @@ public:
     //nodes and calling individual draw methods
     void draw();
     void drawBBoxes();
-    void animate(U64 timer);
+    void timestep(U64 timer);
 
     //Nodes
     void add(SceneNode* aNode);

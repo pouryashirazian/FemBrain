@@ -69,7 +69,10 @@ public:
     //Transformations
     Vec4<T> map(const Vec4<T>& v) const;
     void scale(const Vec3<T>& s);
+//    void rotate(const quat& q);
+//    void rotate(float angleDeg, const vec3f& axis);
     void translate(const Vec3<T>& t);
+
 
 
     //Conditionals
@@ -118,6 +121,7 @@ public:
     inline Matrix operator+(const Matrix& rhs) const;
     inline Matrix operator-(const Matrix& rhs) const;
 
+    friend class Quaternion;
 public:
     T e[m_ctColElements][m_ctRowElements];
 };
@@ -364,6 +368,25 @@ void Matrix<T>::scale(const Vec3<T>& s)
 
 	*this = *this * work;
 }
+/*
+template <typename T>
+void Matrix<T>::rotate(const quat& q)
+{
+	Matrix<T> work;
+	q.toMatrix(work);
+	*this = *this * work;
+}
+
+template <typename T>
+void Matrix<T>::rotate(float angleDeg, const vec3f& axis)
+{
+	Matrix<T> work;
+	quat q;
+	q.fromAngleAxis(angleDeg, axis);
+	q.toMatrix(work);
+	*this = *this * work;
+}
+*/
 
 template <typename T>
 void Matrix<T>::translate(const Vec3<T>& t)

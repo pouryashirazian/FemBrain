@@ -35,7 +35,7 @@
 #include "PS_Deformable/Avatar.h"
 #include "PS_Deformable/TetGenExporter.h"
 //#include "PS_Deformable/MincReader.h"
-
+#include "PS_Deformable/MassSpringSystem.h"
 #include "volumetricMeshLoader.h"
 #include "generateSurfaceMesh.h"
 
@@ -92,6 +92,7 @@ public:
 		this->bDrawGround = true;
 
 		this->bLogSql = true;
+		this->bGravity = true;
 		this->idxCollisionFace = -1;
 		this->animTimerInterval = ANIMATION_TIMER_MILLISEC;
 		this->ctAnimFrame = 0;
@@ -120,6 +121,7 @@ public:
 	bool bDrawTetMesh;
 	bool bDrawAffineWidgets;
 	bool bLogSql;
+	bool bGravity;
 	bool bEditConstrainedNodes;
 
 	int idxCollisionFace;
@@ -175,7 +177,7 @@ GLMeshBuffer* g_lpGroundMatrix = NULL;
 GLMeshBuffer* g_lpSceneBox = NULL;
 GLMeshBuffer* g_lpDrawNormals = NULL;
 MeshRenderer* g_lpDrawMesh = NULL;
-
+Cube* g_lpCube = NULL;
 
 
 //SimulationObjects
@@ -253,6 +255,9 @@ void Draw()
 
 	//Render
 	g_arcBallCam.look();
+
+	if(g_lpCube)
+		g_lpCube->draw();
 
 	//Draw Box
 	if(g_lpSceneBox) {
@@ -1159,6 +1164,7 @@ bool LoadSettings(const std::string& strSimFP)
 	g_appSettings.bLogSql = cfg.readBool("SYSTEM", "LOGSQL", g_appSettings.bLogSql);
 	g_appSettings.cellsize = cfg.readFloat("SYSTEM", "CELLSIZE", DEFAULT_CELL_SIZE);
 	g_appSettings.hapticNeighborhoodPropagationRadius = cfg.readInt("AVATAR", "RADIUS");
+	g_appSettings.bGravity = cfg.readBool("SYSTEM", "GRAVITY", true);
 
 	//Avatar
 	TheUITransform::Instance().translate = cfg.readVec3f("AVATAR", "POS");
@@ -1207,6 +1213,7 @@ bool SaveSettings(const std::string& strSimFP)
 
 	//Write Cellsize
 	cfg.writeFloat("SYSTEM", "CELLSIZE", g_appSettings.cellsize);
+	cfg.writeBool("SYSTEM", "GRAVITY", g_appSettings.bDrawGround);
 
 	//Avatar
 	vec3d sides = g_lpAvatarCube->upper() - g_lpAvatarCube->lower();
@@ -1350,6 +1357,7 @@ int main(int argc, char* argv[])
 	g_lpSceneBox = reinterpret_cast<GLMeshBuffer*>(TheSceneGraph::Instance().last());
 	g_lpSceneBox->setShaderEffectProgram(TheShaderManager::Instance().get("phong"));
 	g_lpAvatarCube->setShaderEffectProgram(TheShaderManager::Instance().get("phong"));
+	g_lpCube = new Cube();
 
 	DAnsiStr strFileExt = ExtractFileExt(DAnsiStr(g_appSettings.strModelFilePath.c_str()));
 	//Mesh
@@ -1456,7 +1464,8 @@ int main(int argc, char* argv[])
 										strModelTitleOnly.cptr());
 
 		//Deformations will be applied using opencl kernel
-		g_lpDeformable->setGravity(true);
+		LogInfoArg1("GRAVITY is: %d", g_appSettings.bGravity);
+		g_lpDeformable->setGravity(g_appSettings.bGravity);
 		g_lpDeformable->setDeformCallback(ApplyDeformations);
 		g_lpDeformable->setHapticForceRadius(g_appSettings.hapticNeighborhoodPropagationRadius);
 	}

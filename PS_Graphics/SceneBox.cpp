@@ -104,6 +104,7 @@ void SceneBox::setup(const vec3f& lo, const vec3f& hi) {
 	m_faceMode = ftQuads;
 }
 
+
 /*
 
 void DrawBox(const vec3f& lo, const vec3f& hi, const vec3f& color, float lineWidth)

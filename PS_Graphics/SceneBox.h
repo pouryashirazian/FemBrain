@@ -5,8 +5,11 @@ public:
 	SceneBox();
 	SceneBox(const vec3f& lo, const vec3f& hi);
 	virtual ~SceneBox();
-
 	void setup(const vec3f& lo, const vec3f& hi);
+
+	//Draw Call
+	//void draw();
+
 
     //Sizes
     float width() const {return (m_hi.x - m_lo.x);}
