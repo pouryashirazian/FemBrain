@@ -1,15 +1,24 @@
+//#include <tr1/unordered_map.h>
 #include "PS_Deformable.h"
 #include "../PS_Base/PS_Logger.h"
 #include "../PS_Base/PS_FileDirectory.h"
+#include "../PS_Base/PS_MathBase.h"
 #include "../PS_Graphics/PS_Box.h"
+#include "../PS_Graphics/Intersections.h"
+
 #include "volumetricMeshLoader.h"
 #include "volumetricMeshENuMaterial.h"
 #include "generateMeshGraph.h"
 #include <algorithm>
 #include "tbb/task_scheduler_init.h"
 
+
+using namespace __gnu_cxx;
+using namespace std;
+
 #define DEFAULT_TIME_STEP 0.0333
 
+using namespace PS::INTERSECTIONS;
 
 Deformable::Deformable()
 {
@@ -303,23 +312,23 @@ double Deformable::computeVolume() const
 {
 	U32 ctElements = m_lpTetMesh->getNumElements();
 	double vol = 0.0;
-	int idxIndices[4];
-	Vec3d elemVertices[4];
+	int indices[4];
+	Vec3d vertices[4];
 	for(U32 i=0; i<ctElements; i++)
 	{
 		//int ctVertices = m_lpTetMesh->getNumVertices();
 		//int ctV2 = m_lpDeformableMesh->GetNumVertices();
-		idxIndices[0] = m_lpTetMesh->getVertexIndex(i, 0);
-		idxIndices[1] = m_lpTetMesh->getVertexIndex(i, 1);
-		idxIndices[2] = m_lpTetMesh->getVertexIndex(i, 2);
-		idxIndices[3] = m_lpTetMesh->getVertexIndex(i, 3);
+		indices[0] = m_lpTetMesh->getVertexIndex(i, 0);
+		indices[1] = m_lpTetMesh->getVertexIndex(i, 1);
+		indices[2] = m_lpTetMesh->getVertexIndex(i, 2);
+		indices[3] = m_lpTetMesh->getVertexIndex(i, 3);
 
-		elemVertices[0] = m_lpDeformableMesh->GetMesh()->getPosition(idxIndices[0]);
-		elemVertices[1] = m_lpDeformableMesh->GetMesh()->getPosition(idxIndices[1]);
-		elemVertices[2] = m_lpDeformableMesh->GetMesh()->getPosition(idxIndices[2]);
-		elemVertices[3] = m_lpDeformableMesh->GetMesh()->getPosition(idxIndices[3]);
+		vertices[0] = m_lpDeformableMesh->GetMesh()->getPosition(indices[0]);
+		vertices[1] = m_lpDeformableMesh->GetMesh()->getPosition(indices[1]);
+		vertices[2] = m_lpDeformableMesh->GetMesh()->getPosition(indices[2]);
+		vertices[3] = m_lpDeformableMesh->GetMesh()->getPosition(indices[3]);
 
-		double cur = m_lpTetMesh->getTetVolume(&elemVertices[0], &elemVertices[1], &elemVertices[2], &elemVertices[3]);
+		double cur = m_lpTetMesh->getTetVolume(&vertices[0], &vertices[1], &vertices[2], &vertices[3]);
 		vol += cur;
 		//if(cur != m_arrElementVolumes[i])
 			//printf("Element vol changed! ELEM = %d \n", i);
@@ -944,4 +953,160 @@ void Deformable::draw()
 		glPopAttrib();
 	}
 */
+}
+
+
+void Deformable::drawTetMesh(const vec3d& avatarCenter,
+		   	   	   	   	   	     const vec3d& avatarHalfLength,
+		   	   	   	   	   	     double maxDist) {
+
+	if(!m_lpDeformableMesh)
+		return;
+
+	ObjMesh* lpObjMesh = m_lpDeformableMesh->GetMesh();
+	U32 ctFaces = lpObjMesh->getNumFaces();
+	if(ctFaces == 0 || lpObjMesh->getNumGroups() == 0)
+		return;
+
+	double tri[3][3];
+	double center[3];
+	double halfLengths[3];
+	U32 ctCrossed = 0;
+
+	//Crossed Faces
+	vector<U32> crossedFaces;
+	crossedFaces.reserve(128);
+
+	//Maps vertex to face index
+	std::tr1::unordered_map<U32, U32> mapCrossedVertices;
+
+
+	//1.Find all faces intersected with avatar
+	for(U32 iface=0; iface < ctFaces; iface++) {
+
+		const ObjMesh::Face* face = lpObjMesh->getGroupHandle(0)->getFaceHandle(iface);
+		if(face->getNumVertices() != 3) {
+			LogErrorArg1("Face %d does not have 3 vertices!", iface);
+			continue;
+		}
+
+		//Copy Face Pos
+		for(int i=0; i < 3; i++) {
+			Vec3d p = lpObjMesh->getPosition(face->getVertexHandle(i)->getPositionIndex());
+			for(int j=0; j < 3; j++) {
+				tri[i][j] = p[j];
+			}
+		}
+
+
+		avatarCenter.store(center);
+		avatarHalfLength.store(halfLengths);
+		int isCrossed = IntersectBoxTriangle<double>(center, halfLengths, tri);
+		ctCrossed += isCrossed;
+		if(isCrossed) {
+			crossedFaces.push_back(iface);
+			for(int i=0; i < 3; i++) {
+
+				//Maps vertices to faces
+				if(mapCrossedVertices.find(face->getVertexHandle(i)->getPositionIndex() ) == mapCrossedVertices.end())
+					mapCrossedVertices.insert(std::make_pair(face->getVertexHandle(i)->getPositionIndex(), iface));
+			}
+		}
+
+		if(isCrossed) {
+			glPushAttrib(GL_ALL_ATTRIB_BITS);
+			glLineWidth(2.0f);
+			glColor3f(0.0f, 1.0f, 0.0f);
+			glBegin(GL_LINE_LOOP);
+				glVertex3dv(&tri[0][0]);
+				glVertex3dv(&tri[1][0]);
+				glVertex3dv(&tri[2][0]);
+			glEnd();
+			glPopAttrib();
+		}
+	}
+
+	//Log number of crossed faces
+	if(ctCrossed > 0)
+		LogInfoArg1("Crossed faces count = %d", ctCrossed);
+
+	//Nearby Tet elements:
+	if(!m_lpTetMesh || ctCrossed == 0)
+		return;
+
+	//2.Find all intersecting tetrahedra
+	int ctElements = m_lpTetMesh->getNumElements();
+	int indices[4];
+	Vec3d a,b,c,d;
+
+	//Loop Over Elements
+	for(int i=0; i<ctElements; i++)
+	{
+		indices[0] = m_lpTetMesh->getVertexIndex(i, 0);
+		indices[1] = m_lpTetMesh->getVertexIndex(i, 1);
+		indices[2] = m_lpTetMesh->getVertexIndex(i, 2);
+		indices[3] = m_lpTetMesh->getVertexIndex(i, 3);
+
+		int ctUsedVertex = 0;
+		for(int i=0; i<4; i++) {
+			if(mapCrossedVertices.find(indices[i]) != mapCrossedVertices.end()) {
+				ctUsedVertex++;
+			}
+		}
+
+		if(ctUsedVertex == 0)
+			continue;
+
+		a = lpObjMesh->getPosition(indices[0]);
+		b = lpObjMesh->getPosition(indices[1]);
+		c = lpObjMesh->getPosition(indices[2]);
+		d = lpObjMesh->getPosition(indices[3]);
+
+		/*
+		Vec3d sum;
+		vec3d centroid;
+		vec3d avatarPos = avatarCenter + avatarHalfLength;
+
+		sum = a + b + c + d;
+
+		centroid.x = 0.25 * sum[0];
+		centroid.y = 0.25 * sum[1];
+		centroid.z = 0.25 * sum[2];
+
+		double dist = vec3d::distance(avatarPos, centroid);
+		if(dist > maxDist)
+			dist = maxDist;
+
+		if(dist > 0.2f)
+			continue;
+
+		float alpha = 1.0f - (float)dist / (float)maxDist;
+		 */
+		vec4f black(0,0,0,1);
+		vec4f white(1,1,1,1);
+		vec4f color = black;
+
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+		glColor4fv(color.ptr());
+		glBegin(GL_LINES);
+			glVertex3dv(&a[0]);
+			glVertex3dv(&b[0]);
+
+			glVertex3dv(&b[0]);
+			glVertex3dv(&d[0]);
+
+			glVertex3dv(&a[0]);
+			glVertex3dv(&d[0]);
+
+			glVertex3dv(&a[0]);
+			glVertex3dv(&c[0]);
+
+			glVertex3dv(&b[0]);
+			glVertex3dv(&c[0]);
+
+			glVertex3dv(&c[0]);
+			glVertex3dv(&d[0]);
+		glEnd();
+		glPopAttrib();
+	}
 }

@@ -38,7 +38,7 @@
 #include "PS_Deformable/MassSpringSystem.h"
 #include "volumetricMeshLoader.h"
 #include "generateSurfaceMesh.h"
-
+#include "PS_Graphics/PS_Particles.h"
 
 using namespace std;
 using namespace PS;
@@ -66,7 +66,7 @@ using namespace PS::HPC;
 
 
 enum HAPTICMODES {hmDynamic, hmSceneEdit};
-enum DRAWISOSURFACE {disNone, disWireFrame, disFull, disCount};
+enum DRAWISOSURFACE {disNone, disWireFrame, disFull, disTetMesh, disCount};
 
 //Application Settings
 class AppSettings{
@@ -79,7 +79,7 @@ public:
 		this->appWidth = WINDOW_WIDTH;
 		this->appHeight = WINDOW_HEIGHT;
 		this->hapticNeighborhoodPropagationRadius = DEFAULT_FORCE_NEIGHBORHOOD_SIZE;
-		this->currentCollisionFaceModelDist = this->initialCollisionFaceModelDist = 0;
+		this->collisionDist = 0;
 		this->groundLevel = 0.0f;
 		this->drawIsoSurface = disFull;
 		this->bEditConstrainedNodes = false;
@@ -90,6 +90,7 @@ public:
 		this->bDrawTetMesh = true;
 		this->bDrawAffineWidgets = true;
 		this->bDrawGround = true;
+		this->bDrawAvatar = true;
 
 		this->bLogSql = true;
 		this->bGravity = true;
@@ -114,6 +115,7 @@ public:
 	string strSimFilePath;
 	string strModelFilePath;
 	int  drawIsoSurface;
+	bool bDrawAvatar;
 	bool bDrawGround;
 	bool bPanCamera;
 	bool bDrawAABB;
@@ -125,9 +127,10 @@ public:
 	bool bEditConstrainedNodes;
 
 	int idxCollisionFace;
-	double initialCollisionFaceModelDist;
-	double currentCollisionFaceModelDist;
+	double collisionDist;
+	vec3d collisionClosestPoint;
 	double hapticForceCoeff;
+
 
 	//AppSettings
 	int appWidth;
@@ -168,7 +171,6 @@ void AdvanceHapticPosition();
 
 
 std::map<int, vec3d> g_hashVertices;
-LerpedVector<vec2f> g_hapticPosLerp(vec2f(0,0), Loki::Functor<void>(AdvanceHapticPosition));
 
 //Visual Cues
 AvatarCube* g_lpAvatarCube = NULL;
@@ -176,9 +178,9 @@ AbstractWidget*	g_lpAffineWidget = NULL;
 GLMeshBuffer* g_lpGroundMatrix = NULL;
 GLMeshBuffer* g_lpSceneBox = NULL;
 GLMeshBuffer* g_lpDrawNormals = NULL;
-MeshRenderer* g_lpDrawMesh = NULL;
-Cube* g_lpCube = NULL;
 
+//SpringDumble* g_lpMassSpring = NULL;
+//Particles* g_lpParticles = NULL;
 
 //SimulationObjects
 PS::ArcBallCamera 	g_arcBallCam;
@@ -256,9 +258,6 @@ void Draw()
 	//Render
 	g_arcBallCam.look();
 
-	if(g_lpCube)
-		g_lpCube->draw();
-
 	//Draw Box
 	if(g_lpSceneBox) {
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
@@ -279,11 +278,13 @@ void Draw()
 	}
 
 	//Draw Deformable Mesh
-	if(g_lpDeformable && g_appSettings.bDrawTetMesh)
-		g_lpDeformable->draw();
+	if(g_lpDeformable && g_appSettings.bDrawTetMesh) {
+		vec3f t = TheUITransform::Instance().translate;
+		vec3d center = vec3d(t.x, t.y, t.z);
+		vec3d halfLen = (g_lpAvatarCube->upper() - g_lpAvatarCube->lower()) * 0.5;
 
-	if(g_lpDrawMesh)
-		g_lpDrawMesh->draw();
+		g_lpDeformable->drawTetMesh(center, halfLen);
+	}
 
 	if(g_lpFastRBF && (g_appSettings.drawIsoSurface != disNone)) {
 		g_lpFastRBF->setWireFrameMode(g_appSettings.drawIsoSurface == disWireFrame);
@@ -306,7 +307,7 @@ void Draw()
 	}
 
 	//Draw Interaction Avatar
-	if(g_lpAvatarCube)
+	if(g_lpAvatarCube && g_appSettings.bDrawAvatar)
 	{
 		vec3f wpos = TheUITransform::Instance().translate;
 		glPushMatrix();
@@ -465,13 +466,13 @@ void MousePress(int button, int state, int x, int y)
 	//Set Values
 	g_appSettings.screenDragStart = vec2i(x, y);
 	g_appSettings.screenDragEnd = vec2i(x, y);
-	g_hapticPosLerp.setValue(vec2f(x, y));
-	g_hapticPosLerp.setTarget(vec2f(x, y));
 
 	if (button == GLUT_LEFT_BUTTON)
 	{
 		if (state == GLUT_DOWN)
 		{
+			//g_lpMassSpring->force();
+
 			if(g_lpAffineWidget->selectAxis(x, y) != uiaFree)
 			{
 				LogInfoArg1("Affine Widget changed axis to: %d", TheUITransform::Instance().axis);
@@ -530,7 +531,6 @@ void MousePassiveMove(int x, int y)
 		dx *= 0.001f;
 		dy *= 0.001f;
 		g_appSettings.screenDragStart = vec2i(x, y);
-		g_hapticPosLerp.bumpTarget(vec2f(dx, dy));
 
 		string strAxis;
 		vec3f worldAvatarPos = TheUITransform::Instance().translate;
@@ -709,10 +709,11 @@ void MousePassiveMove(int x, int y)
 					if (dot < minDot) {
 						minDot = dot;
 						idxMin = j;
+						g_appSettings.collisionClosestPoint = p;
 					}
 
 					g_appSettings.idxCollisionFace = idxMin;
-					g_appSettings.initialCollisionFaceModelDist = minDot;
+					g_appSettings.collisionDist = minDot;
 				}
 			}
 		} else {
@@ -724,7 +725,8 @@ void MousePassiveMove(int x, int y)
 				double dot = vec3d::dot(s[idxFace] - it->second, n[idxFace]);
 				if (dot < minDot) {
 					minDot = dot;
-					g_appSettings.currentCollisionFaceModelDist = minDot;
+					g_appSettings.collisionDist = minDot;
+					g_appSettings.collisionClosestPoint = it->second;
 				}
 			}
 		}
@@ -823,7 +825,7 @@ void Close()
 	SAFE_DELETE(g_lpFastRBF);
 	SAFE_DELETE(g_lpDeformable);
 	SAFE_DELETE(g_lpAvatarCube);
-	SAFE_DELETE(g_lpDrawMesh);
+
 }
 
 string QueryOGL(GLenum name)
@@ -882,6 +884,13 @@ void NormalKey(unsigned char key, int x, int y)
 		g_appSettings.cellsize -= 0.01;
 		LogInfoArg1("Changed cellsize to: %.2f", g_appSettings.cellsize);
 //		g_lpBlobRender->runPolygonizer(g_appSettings.cellsize);
+		break;
+	}
+
+	case('a'): {
+		g_appSettings.bDrawAvatar = !g_appSettings.bDrawAvatar;
+		LogInfoArg1("Draw avatar: %d", g_appSettings.bDrawAvatar);
+		glutPostRedisplay();
 		break;
 	}
 
@@ -1074,11 +1083,12 @@ void SpecialKey(int key, int x, int y)
 void TimeStep(int t)
 {
 	tbb::tick_count tkStart = tbb::tick_count::now();
-	g_lpDeformable->timestep();
-	g_appSettings.msAnimationTimeAcc += (tbb::tick_count::now() - tkStart).seconds() * 1000.0;
 
+	g_appSettings.msAnimationTimeAcc += (tbb::tick_count::now() - tkStart).seconds() * 1000.0;
 	g_appSettings.ctAnimFrame ++;
-	g_hapticPosLerp.advance();
+
+	//Advance timestep in scenegraph
+	TheSceneGraph::Instance().timestep();
 
 	//Sample For Logs and Info
 	if(g_appSettings.ctAnimFrame - g_appSettings.ctAnimLogger > ANIMATION_TIME_SAMPLE_INTERVAL) {
@@ -1122,7 +1132,7 @@ void TimeStep(int t)
 	glutPostRedisplay();
 
 	//Set Timer for next frame
-	glutTimerFunc(g_appSettings.animTimerInterval, TimeStep, 0);
+	glutTimerFunc(g_appSettings.animTimerInterval, TimeStep, g_appSettings.ctAnimFrame);
 }
 
 bool LoadSettings(const std::string& strSimFP)
@@ -1282,7 +1292,7 @@ int main(int argc, char* argv[])
 	
 	//Initialize app
 	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH | GLUT_STENCIL);
+	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH | GLUT_STENCIL);
 	glutInitWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
 	glutCreateWindow("Deformable Tissue Modeling - PhD Project - Pourya Shirazian");
 	glutDisplayFunc(Draw);
@@ -1357,9 +1367,10 @@ int main(int argc, char* argv[])
 	g_lpSceneBox = reinterpret_cast<GLMeshBuffer*>(TheSceneGraph::Instance().last());
 	g_lpSceneBox->setShaderEffectProgram(TheShaderManager::Instance().get("phong"));
 	g_lpAvatarCube->setShaderEffectProgram(TheShaderManager::Instance().get("phong"));
-	g_lpCube = new Cube();
 
+	//Check the model file extension
 	DAnsiStr strFileExt = ExtractFileExt(DAnsiStr(g_appSettings.strModelFilePath.c_str()));
+
 	//Mesh
 	U32 ctVertices = 0;
 	U32 ctTriangles = 0;
@@ -1455,7 +1466,6 @@ int main(int argc, char* argv[])
 		ObjMesh * objMesh = generateSurfaceMesh.ComputeMesh(mesh, true);
 		objMesh->save(string(strModelTetMeshObjFile.cptr()));
 
-		int ctFixed = g_appSettings.vFixedVertices.size();
 		//Setup Deformable object
 		g_lpDeformable = new Deformable(strModelTetMeshVegFile.cptr(),
 										strModelTetMeshObjFile.cptr(),
@@ -1468,23 +1478,18 @@ int main(int argc, char* argv[])
 		g_lpDeformable->setGravity(g_appSettings.bGravity);
 		g_lpDeformable->setDeformCallback(ApplyDeformations);
 		g_lpDeformable->setHapticForceRadius(g_appSettings.hapticNeighborhoodPropagationRadius);
+		g_lpDeformable->setName("tissue");
+
+		//Add to scene graph
+		TheSceneGraph::Instance().add(g_lpDeformable);
 	}
 
+	//Particles
 	/*
-	PS::HPC::RayTracer* lpTracer = new RayTracer(128, 128);
-	lpTracer->run();
-	SAFE_DELETE(lpTracer);
-	 */
-
-	//Surface
-	/*
-    glDisable(GL_TEXTURE_2D);
-	g_lpSurface = new GLSurface(WINDOW_WIDTH, WINDOW_HEIGHT);
-	g_lpSurface->attach();
-    g_lpSurface->testDrawTriangle();
-    g_lpSurface->detach();
-    */
-   // g_lpSurface->saveAsPPM("/home/pourya/Desktop/110.ppm");
+	g_lpParticles = new Particles();
+	g_lpParticles->setName("blood");
+	TheSceneGraph::Instance().add(g_lpParticles);
+	*/
 
 
 	//Draw the first time

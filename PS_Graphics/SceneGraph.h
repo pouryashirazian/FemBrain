@@ -56,7 +56,7 @@ public:
 
 
 
-	EffectType getEffectType() const {return m_effectType;}
+	EffectType etype() const {return m_effectType;}
 private:
 	EffectType m_effectType;
 	PS::SHADER::GLShaderProgram* m_lpShader;
@@ -64,12 +64,28 @@ private:
 };
 
 //SmartPtrSceneNodeTransform
-typedef Loki::SmartPtr< SceneNodeTransform, RefCounted, DisallowConversion,
-    AssertCheck, DefaultSPStorage, PropagateConst > SmartPtrSceneNodeTransform;
-
+typedef Loki::SmartPtr<
+		SceneNodeTransform,
+		RefCounted,
+		AllowConversion,
+		AssertCheck,
+		DefaultSPStorage > SmartPtrSceneNodeTransform;
+/*
+typedef Loki::SmartPtr<
+  MyClass,
+  Loki::RefCounted,
+  Loki::AllowConversion,
+  Loki::AssertCheck,          // Loki::RejectNull,
+  Loki::DefaultSPStorage      // Loki::MallocSPStorage
+> MyClassPtr;
+*/
 //SmartPtrSceneEffect
-typedef Loki::SmartPtr< SceneNodeEffect, RefCounted, DisallowConversion,
-	AssertCheck, DefaultSPStorage, PropagateConst > SmartPtrSceneNodeEffect;
+typedef Loki::SmartPtr<
+		SceneNodeEffect,
+		RefCounted,
+		AllowConversion,
+		AssertCheck,
+		DefaultSPStorage > SmartPtrSceneNodeEffect;
 
 /*!
  * \brief The SceneNode class is an element in the scenegraph can have
@@ -85,15 +101,14 @@ public:
 	virtual void drawBBox() const;
 
     //Advances animation
-    virtual void timestep(U64 timer) {
-        PS_UNUSED(timer);
-    }
+    virtual void timestep() { }
 
     //Computes the bounding box of the model
 	void setBBox(const AABB& box) { m_bbox = box;}
-    virtual AABB bbox() const {
-        return m_bbox;
-    }
+    virtual AABB bbox() const { return m_bbox;}
+
+    //Selection
+    virtual bool select(const Ray& ray) const;
 
     //TODO: Method for marshalling this node in a compact data-structure
     //The compact structure will serve as input to high performance rendering
@@ -117,6 +132,7 @@ public:
     void setTransform(const SmartPtrSceneNodeTransform& spTransform) {
     	m_spTransform = spTransform;
     }
+    void resetTransform();
 
     //TODO: IO to be able to read and write scene nodes to disk in very fast binary format
     bool read() {return false;}
@@ -147,7 +163,7 @@ public:
     //nodes and calling individual draw methods
     void draw();
     void drawBBoxes();
-    void timestep(U64 timer);
+    void timestep();
 
     //Nodes
     void add(SceneNode* aNode);

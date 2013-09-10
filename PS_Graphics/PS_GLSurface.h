@@ -2,7 +2,7 @@
 #define PS_GLSURFACE_H
 
 #include "../PS_Base/PS_MathBase.h"
-#include "PS_PixelMap.h"
+#include "PS_Pixmap.h"
 //#include <GL/glew.h>
 
 #define DEFAULT_SURFACE_WIDTH 512
@@ -30,11 +30,6 @@ public:
 
 	//Draw a triangle in orthographic projects for testing the surface
 	void testDrawTriangle();
-
-	/*!
-	 * Save the surface as a ppm image
-	 */
-	void saveAsPPM(const char* lpFilePath);
 
 	/*!
 	*  Draws the output texture as a quad

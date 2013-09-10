@@ -1,3 +1,4 @@
+==============================================================================================
 Research Problems:
 1. Modeling and animating has a large gap between them. 
 2. The collision between avatar and the deformable model is only detected when avatar hits a vertex of model.
@@ -6,6 +7,7 @@ Research Problems:
 5. GPU-Solver for finite elements
 ==============================================================================================
 Framework Todos:
+
 Output Triangle mesh obj
 Per cellsize fixed nodes
 Print blobtree with correct range kids

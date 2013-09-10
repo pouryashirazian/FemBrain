@@ -488,7 +488,7 @@ bool FastRBF::testWithVoxelGridSamples(GPUPoly* lpGPUPoly) {
 	{
 		vec4f xyzf = vec4f(&arrXYZF[i * 4]);
 
-		float interpolatedField = fieldRBF(xyzf.getVec3());
+		float interpolatedField = fieldRBF(xyzf.xyz());
 		error += Absolutef(interpolatedField - xyzf.w);
 	}
 

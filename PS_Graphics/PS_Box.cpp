@@ -1,8 +1,8 @@
 #include "PS_Box.h"
 
 namespace PS{
-
 namespace MATH{
+
 
 
 bool AABB::contains(const vec3& p) const {
@@ -57,6 +57,9 @@ void AABB::getVertices(vector<vec3f>& vertices) const {
 		vertices[i] = m_lower + vec3f::mul(vec3f((i & 0x04) >> 2, (i & 0x02) >> 1, i & 0x01), dims);
 	}
 }
+
+
+
 
 }
 }

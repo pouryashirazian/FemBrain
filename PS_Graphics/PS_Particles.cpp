@@ -1,25 +1,14 @@
 #include "PS_Particles.h"
 #include <GL/glew.h>
-
+#include "PS_Vector.h"
+#include "PS_Matrix.h"
 #include "../PS_Base/PS_FileDirectory.h"
+#include <stdio.h>
 
 using namespace PS::FILESTRINGUTILS;
 
 namespace PS{
 	namespace HPC{
-
-		//Cleanup Mesh Buffer Objects
-		void MESH_BUFFER_OBJECTS::cleanup()
-		{	
-			if(bIsValid)
-			{
-				glDeleteBuffers(1, &vboVertex);
-				glDeleteBuffers(1, &vboColor);
-				glDeleteBuffers(1, &vboNormal);
-				glDeleteBuffers(1, &iboFaces);
-				bIsValid = false;
-			}
-		}
 
 		//Particles Setup and Animation
 		Particles::Particles(const U32 maxParticles):m_maxParticles(maxParticles)
@@ -29,6 +18,10 @@ namespace PS{
 
 		Particles::~Particles()
 		{
+			cleanup();
+		}
+
+		void Particles::cleanup() {
 			SAFE_DELETE(m_lpDevice);
 			m_vPos.resize(0);
 			m_vVel.resize(0);
@@ -38,202 +31,150 @@ namespace PS{
 		//Setup Kernels for running
 		bool Particles::setup()
 		{
-			m_vPos.resize(3 * m_maxParticles);
-			m_vVel.resize(3 * m_maxParticles);
-			m_vColor.resize(3 * m_maxParticles);
+			//Fill and initialize
+			m_vPos.resize(4 * m_maxParticles);
+			m_vVel.resize(4 * m_maxParticles);
+			m_vColor.resize(4 * m_maxParticles);
+
+			//Loop over particles
 			for(U32 i=0; i < m_maxParticles; i++)
 			{							
 				float angle = DEGTORAD(RandRangeT<float>(0.0f, 360.0f));				
-				svec3f v;
+				vec3f v;
 				if(i % 3 == 0)
-					v = svec3f(0.0f, cos(angle), sin(angle));
+					v = vec3f(0.0f, cos(angle), sin(angle));
 				else if(i % 3 == 1)
-					v = svec3f(cos(angle), 0.0f, sin(angle));
+					v = vec3f(cos(angle), 0.0f, sin(angle));
 				else if(i % 3 == 2)
-					v = svec3f(0.0f, cos(angle), sin(angle));
-				vnormalize3f(v);
+					v = vec3f(0.0f, cos(angle), sin(angle));
+				v.normalize();
 
-				U32 i3 = i*3;
-				m_vVel[i3] = v.x; 
-				m_vVel[i3 + 1] = v.y; 
-				m_vVel[i3 + 2] = v.z;
+				U32 i4 = i*4;
+				m_vPos[i4] = 0.0f;
+				m_vPos[i4 + 1] = 0.0f;
+				m_vPos[i4 + 2] = 0.0f;
+				m_vPos[i4 + 3] = 1.0f;
 
-				m_vPos[i3] = RandRangeT<float>(-1.0f, 1.0f);
-				m_vPos[i3 + 1] = RandRangeT<float>(-1.0f, 1.0f);
-				m_vPos[i3 + 2] = RandRangeT<float>(-1.0f, 1.0f);
+				m_vVel[i4] = v.x;
+				m_vVel[i4 + 1] = v.y;
+				m_vVel[i4 + 2] = v.z;
+				m_vVel[i4 + 3] = 1.0f;
 
-				m_vColor[i3] = 1.0f;
-				m_vColor[i3 + 1] = 0.0f;
-				m_vColor[i3 + 2] = 0.0f;
+				m_vColor[i4] = 1.0f;
+				m_vColor[i4 + 1] = 0.0f;
+				m_vColor[i4 + 2] = 0.0f;
+				m_vColor[i4 + 3] = 0.4f;
 			}
 
-			//Buffers
-			glGenBuffers(1, &m_meshBO.vboVertex);
-			glBindBuffer(GL_ARRAY_BUFFER, m_meshBO.vboVertex);
-			glBufferData(GL_ARRAY_BUFFER, m_maxParticles * 3 * sizeof(float), &m_vPos[0], GL_DYNAMIC_DRAW);
+			//OpenCL
+			DAnsiStr strCodePath = ExtractOneLevelUp(ExtractFilePath(GetExePath()));
+			DAnsiStr strParticleFP = strCodePath + DAnsiStr("PS_Shaders/ParticleSystem.cl");
 
-			glGenBuffers(1, &m_meshBO.vboColor);
-			glBindBuffer(GL_ARRAY_BUFFER, m_meshBO.vboColor);
-			glBufferData(GL_ARRAY_BUFFER, m_maxParticles * 3 * sizeof(float), &m_vColor[0], GL_DYNAMIC_DRAW);
+			//Create compute device
+			m_lpDevice = new ComputeDevice(ComputeDevice::dtGPU, true, false, "AMD");
+			ComputeProgram* lpProgram = m_lpDevice->tryLoadBinaryThenCompile(strParticleFP.cptr());
+			assert(lpProgram != NULL);
 
-			/*
-			glGenBuffers(1, &m_meshBO.vboNormal);
-			glBindBuffer(GL_ARRAY_BUFFER, m_meshBO.vboNormal);
-			glBufferData(GL_ARRAY_BUFFER, ctVertices*3 * sizeof(float), arrNormals, GL_DYNAMIC_DRAW);
+			//Kernel: particleMove
+			m_lpKernelMove = lpProgram->addKernel("particleMove");
+			m_lpDevice->getKernelWorkgroupSize(m_lpKernelMove);
+			assert(m_lpKernelMove != NULL);
 
+			//MEM Buffer
+			m_inoutMemVelocity = m_lpDevice->createMemBuffer(sizeof(float) * m_vVel.size(), ComputeDevice::memReadWrite);
 
-			glGenBuffers(1, &m_meshBO.iboFaces);
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_meshBO.iboFaces);
-			glBufferData(GL_ELEMENT_ARRAY_BUFFER, ctTriangles *3 * sizeof(U32), arrFaces, GL_DYNAMIC_DRAW);
-			*/
-			m_meshBO.bIsValid = true;
+			//Mesh Attributes
+			this->setupVertexAttribs(m_vPos, 4, vatPosition);
+			this->setupVertexAttribs(m_vColor, 4, vatColor);
+			this->setFaceMode(ftPoints);
 
 			return true;
+		}
+
+
+		void Particles::timestep()
+		{
+			if(!m_isValidVertex || !m_isValidColor)
+				return;
+
+			const float dt = 0.01f;
+
 			/*
-			m_meshBO.bIsValid = false;
-			m_lpDevice = new ComputeDevice(PS::HPC::ComputeDevice::dtGPU, true, "AMD");
-			if(!m_lpDevice)
-				return false;
+			vec3f pos;
+			vec3f vel;
+			for(U32 i=0; i<m_maxParticles; i++) {
 
-			DAnsiStr strPath = ExtractOneLevelUp(ExtractFilePath(GetExePath()));
-			strPath += DAnsiStr("PS_OpenCLKernels\\ParticleSystem.cl");
+				U32 i4 = i * 4;
+				m_vPos[i4] += dt * m_vVel[i4];
+				m_vPos[i4 + 1] += dt * m_vVel[i4 + 1];
+				m_vPos[i4 + 2] += dt * m_vVel[i4 + 2];
 
-			ComputeProgram* lpProgram = m_lpDevice->addProgramFromFile(strPath.cptr());
-			if(lpProgram == NULL)
-			{
-				SAFE_DELETE(m_lpDevice);
-				return false;
+				pos = vec3f(&m_vPos[i4]);
+				vel = vec3f(&m_vVel[i4]);
+
+				if(pos.x > 1.0f)
+					vel = vel * (-1.0f);
+				else if(pos.x < -1.0f)
+					vel = vel * (-1.0f);
+
+				if(pos.y > 1.0f)
+					vel = vel * (-1.0f);
+				else if(pos.y < -1.0f)
+					vel = vel * (-1.0f);
+
+				if(pos.z > 1.0f)
+					vel = vel * (-1.0f);
+				else if(pos.z < -1.0f)
+					vel = vel * (-1.0f);
+
+				vel.store(&m_vVel[i4]);
 			}
 
+			glBindBuffer(GL_ARRAY_BUFFER, m_vboVertex);
+			glBufferData(GL_ARRAY_BUFFER, m_vPos.size() * sizeof(float), &m_vPos[0], GL_DYNAMIC_DRAW);
 
-			//Add Kernel from Program
-			m_lpKernelMove = lpProgram->addKernel("particleMove");
+			glBindBuffer(GL_ARRAY_BUFFER, m_vboColor);
+			glBufferData(GL_ARRAY_BUFFER, m_vColor.size() * sizeof(float), &m_vColor[0], GL_DYNAMIC_DRAW);
+	*/
 
-			//Input mem buffers
-			cl_mem inMemPos;
-			cl_mem inMemVelocity;
-			cl_mem inMemColor;
-			U32 szVec4 = sizeof(svec4f);
-			inMemPos = m_lpDevice->createMemBuffer(sizeof(svec4f) * m_maxParticles, ComputeDevice::memReadOnly);
-			inMemVelocity = m_lpDevice->createMemBuffer(sizeof(svec4f) * m_maxParticles, ComputeDevice::memReadOnly);
-			inMemColor = m_lpDevice->createMemBuffer(sizeof(svec4f) * m_maxParticles, ComputeDevice::memReadOnly);		
-		
-			//Out Buffers
-			glGenBuffers(1, &m_meshBO.vboVertex);
-			glBindBuffer(GL_ARRAY_BUFFER, m_meshBO.vboVertex);
-			glBufferData(GL_ARRAY_BUFFER, m_maxParticles * 4 * sizeof(float), 0, GL_DYNAMIC_DRAW);
-			cl_mem outMemMeshVertex = clCreateFromGLBuffer(m_lpDevice->getContext(), CL_MEM_WRITE_ONLY, m_meshBO.vboVertex, NULL);
 
-			glGenBuffers(1, &m_meshBO.vboColor);
-			glBindBuffer(GL_ARRAY_BUFFER, m_meshBO.vboColor);
-			glBufferData(GL_ARRAY_BUFFER, m_maxParticles * 4 * sizeof(float), 0, GL_DYNAMIC_DRAW);
-			cl_mem outMemMeshColor = clCreateFromGLBuffer(m_lpDevice->getContext(), CL_MEM_WRITE_ONLY, m_meshBO.vboColor, NULL);
 
-			//Fill all values
-			m_vPos.resize(m_maxParticles);
-			m_vVel.resize(m_maxParticles);
-			m_vColor.resize(m_maxParticles);
-			for(U32 i=0; i < m_maxParticles; i++)
-			{							
-				float angle = DEGTORAD(RandRangeT<float>(0.0f, 360.0f));				
-				svec3f v;
-				if(i % 3 == 0)
-					v = svec3f(0.0f, cos(angle), sin(angle));
-				else if(i % 3 == 1)
-					v = svec3f(cos(angle), 0.0f, sin(angle));
-				else if(i % 3 == 2)
-					v = svec3f(0.0f, cos(angle), sin(angle));
-				vnormalize3f(v);
-				m_vVel[i] = svec4f(v.x, v.y, v.z, 0.0f);
-				m_vPos[i] = svec4f(0, 0, 0, 0);
-				m_vColor[i] = svec4f(1, 0, 0, 1);
-			}
+			//Solution space
+			size_t arrLocalIndex[3];
+			size_t arrGlobalIndex[3];
+			arrGlobalIndex[0] = m_maxParticles;
+			arrGlobalIndex[1] = 0;
+			arrGlobalIndex[2] = 0;
+			ComputeKernel::ComputeLocalIndexSpace(3, m_lpKernelMove->getKernelWorkGroupSize(), arrLocalIndex);
+			ComputeKernel::ComputeGlobalIndexSpace(3, arrLocalIndex, arrGlobalIndex);
 
-			// Transfer the input vector into device memory.			
-			//Position
-			if(!m_lpDevice->enqueueWriteBuffer(inMemPos, sizeof(svec4f) * m_maxParticles, &m_vPos[0].x))
-				return false;
+			cl_mem inoutMemVertexBuffer = m_lpDevice->createMemBufferFromGL(m_vboVertex, ComputeDevice::memReadWrite);
+			cl_mem inoutMemColorBuffer = m_lpDevice->createMemBufferFromGL(m_vboColor, ComputeDevice::memReadWrite);
+			m_lpDevice->enqueueAcquireGLObject(1, &inoutMemVertexBuffer);
+			m_lpDevice->enqueueAcquireGLObject(1, &inoutMemColorBuffer);
 
-			//Velocity
-			if(!m_lpDevice->enqueueWriteBuffer(inMemVelocity, sizeof(svec4f) * m_maxParticles, &m_vVel[0].x))
-				return false;
 
-			//Color
-			if(!m_lpDevice->enqueueWriteBuffer(inMemColor, sizeof(svec4f) * m_maxParticles, &m_vColor[0].x))
-				return false;
+			/*
+			__kernel void particleMove(__global float4* arrInOutPosition,
+									   __global float4* arrInOutVelocity,
+									   __global float4* arrInMeshColor,
+									   const unsigned int count,
+									   const float deltaT)
+			*/
+			m_lpKernelMove->setArg(0, sizeof(cl_mem), &inoutMemVertexBuffer);
+			m_lpKernelMove->setArg(1, sizeof(cl_mem), &m_inoutMemVelocity);
+			m_lpKernelMove->setArg(2, sizeof(cl_mem), &inoutMemColorBuffer);
+			m_lpKernelMove->setArg(3, sizeof(U32), &m_maxParticles);
+			m_lpKernelMove->setArg(4, sizeof(float), &dt);
+			m_lpDevice->enqueueNDRangeKernel(m_lpKernelMove, 1, arrGlobalIndex, arrLocalIndex);
 
-			// Set the arguments to the compute kernel
-			m_lpKernelMove->setArg(0, sizeof(cl_mem), &outMemMeshVertex);
-			m_lpKernelMove->setArg(1, sizeof(cl_mem), &outMemMeshColor);
-			m_lpKernelMove->setArg(2, sizeof(cl_mem), &inMemPos);
-			m_lpKernelMove->setArg(3, sizeof(cl_mem), &inMemVelocity);
-			m_lpKernelMove->setArg(4, sizeof(cl_mem), &inMemColor);
-			m_lpKernelMove->setArg(5, sizeof(U32), &m_maxParticles);
-			m_lpKernelMove->setArg(6, sizeof(float), &deltaT);
+			m_lpDevice->enqueueReleaseGLObject(1, &inoutMemVertexBuffer);
+			m_lpDevice->enqueueReleaseGLObject(1, &inoutMemColorBuffer);
 
-			//Acquire Mesh for Writing
-			clEnqueueAcquireGLObjects(m_lpDevice->getCommandQ(), 1, &outMemMeshVertex, 0, 0, 0);
-			clEnqueueAcquireGLObjects(m_lpDevice->getCommandQ(), 1, &outMemMeshColor, 0, 0, 0);
-
-			size_t local;
-			size_t global;
-			// Get the maximum work group size for executing the kernel on the device
-			cl_int err = clGetKernelWorkGroupInfo(m_lpKernelMove->getKernel(),
-				m_lpDevice->getDevice(),
-				CL_KERNEL_WORK_GROUP_SIZE,
-				sizeof(local), &local, NULL);
-			if (err != CL_SUCCESS) {
-				cerr << "Error: Failed to retrieve kernel work group info! "
-					<<  err << endl;
-				exit(1);
-			}
-
-			// Execute the kernel over the vector using the
-			// maximum number of work group items for this device
-			global = m_maxParticles;
-			err = clEnqueueNDRangeKernel(m_lpDevice->getCommandQ(), m_lpKernelMove->getKernel(),
-				1, NULL, &global, &local,
-				0, NULL, NULL);
-			if (err) {
-				cerr << "Error: Failed to execute kernel!" << endl;
-				return false;
-			}
-
-			// Wait for all commands to complete
 			m_lpDevice->finishAllCommands();
 
-			//Release Mesh for Writing
-			clEnqueueReleaseGLObjects(m_lpDevice->getCommandQ(), 1, &outMemMeshVertex, 0, 0, 0);
-			clEnqueueReleaseGLObjects(m_lpDevice->getCommandQ(), 1, &outMemMeshColor, 0, 0, 0);
-
-			m_meshBO.bIsValid = true;
-
-			return true;
-			*/
-		}
-
-
-		void Particles::render()
-		{	
-			if(!m_meshBO.bIsValid)	return;
-
-			glBindBuffer(GL_ARRAY_BUFFER, m_meshBO.vboColor);
-			glColorPointer(3, GL_FLOAT, 0, 0);
-			glEnableClientState(GL_COLOR_ARRAY);
-
-			glBindBuffer(GL_ARRAY_BUFFER, m_meshBO.vboVertex);
-			glVertexPointer(3, GL_FLOAT, 0, 0);
-			glEnableClientState(GL_VERTEX_ARRAY);
-
-			//Draw Elements
-			glDrawArrays(GL_POINTS, 0, m_maxParticles);
-
-			glDisableClientState(GL_COLOR_ARRAY);
-			glDisableClientState(GL_VERTEX_ARRAY);
-		}
-
-		void Particles::animate()
-		{
+			clReleaseMemObject(inoutMemVertexBuffer);
+			clReleaseMemObject(inoutMemColorBuffer);
 
 		}
 	}

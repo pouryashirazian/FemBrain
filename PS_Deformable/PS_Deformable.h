@@ -10,7 +10,6 @@
 
 #include <vector>
 #include "loki/Functor.h"
-#include "../PS_Base/PS_MathBase.h"
 #include "../PS_Base/PS_String.h"
 #include "../PS_Graphics/PS_GLMeshBuffer.h"
 #include "../PS_Graphics/PS_Vector.h"
@@ -40,7 +39,7 @@ typedef void (*FOnApplyDeformations)(U32 dof, double* displacements);
 /*!
  *	Deformable model
  */
-class Deformable {
+class Deformable : public SceneNode {
 public:
 	Deformable();
 
@@ -68,6 +67,9 @@ public:
 
 	//Draw
 	void draw();
+	void drawTetMesh(const vec3d& avatarCenter,
+					   const vec3d& avatarHalfLength,
+					   double maxDist = 2.0);
 
 	//TimeStep
 	void timestep();

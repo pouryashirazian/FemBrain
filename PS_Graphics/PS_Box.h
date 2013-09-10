@@ -40,6 +40,7 @@ public:
     bool contains(const vec3& p) const;
     bool intersect(const AABB& rhs) const;
     bool intersect(const Ray& ray, float t0, float t1) const;
+
     AABB united(const AABB& rhs) const{
     	AABB result;
     	result.m_lower = vec3::minP(this->m_lower, rhs.m_lower);
@@ -55,8 +56,8 @@ public:
     void tranform(const mat44f& mtx){
     	vec4f lo(m_lower, 1.0);
     	vec4f hi(m_upper, 1.0);
-    	m_lower = mtx.map(lo).getVec3();
-    	m_upper = mtx.map(hi).getVec3();
+    	m_lower = mtx.map(lo).xyz();
+    	m_upper = mtx.map(hi).xyz();
     }
 
     //dimensions

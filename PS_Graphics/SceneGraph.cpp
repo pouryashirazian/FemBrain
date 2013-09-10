@@ -21,7 +21,16 @@ void SceneNode::drawBBox() const
 	DrawAABB(m_bbox.lower(), m_bbox.upper(), vec3f(0,0,1), 1.0f);
 }
 
+bool SceneNode::select(const Ray& ray) const {
+	return m_bbox.intersect(ray, 0.0f, FLT_MAX);
+}
 
+void SceneNode::resetTransform() {
+	if(m_spTransform == NULL)
+		m_spTransform = SmartPtrSceneNodeTransform(new SceneNodeTransform());
+	else
+		m_spTransform->reset();
+}
 ////////////////////////////////////////////////////////
 SceneGraph::SceneGraph(){
 	m_stkModelView.top().identity();
@@ -98,9 +107,9 @@ void SceneGraph::drawBBoxes() {
     }
 }
 
-void SceneGraph::timestep(U64 timer) {
+void SceneGraph::timestep() {
     for(U32 i=0; i < m_vSceneNodes.size(); i++) {
-        m_vSceneNodes[i]->timestep(timer);
+        m_vSceneNodes[i]->timestep();
     }
 }
 

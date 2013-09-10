@@ -11,57 +11,37 @@
 #define RED {1.0f, 0.0f, 0.0f, 1.0f}
 
 //Kernel Function to compute distances to sphere at origin 
-__kernel void particleMove(__global float4* arrMeshVertex,
-						   __global float4* arrMeshColor,
-						   __global float4* arrPos,
-						   __global float4* arrVel,
-						   __global float4* arrColor,
+__kernel void particleMove(__global float4* arrInOutPosition,
+						   __global float4* arrInOutVelocity,
+						   __global float4* arrInMeshColor,
 						   const unsigned int count,
 						   const float deltaT)
 {
 	int idx = get_global_id(0);
-	if(idx < count)
-	{			
-		float4 v = arrVel[idx];
-		float4 p = arrPos[idx] + deltaT * v;
-
-		if(p.x > 1.0f)
-		{
-			float4 xMinus = XMINUS;
-			v = v + 2 * dot(-v, xMinus);
-		}
-		else if(p.x < -1.0f)
-		{
-			float4 xPlus = XPLUS;
-			v = v + 2 * dot(-v, xPlus);
-		}
+	if(idx >= count)
+		return;
 	
-		if(p.y > 1.0f)
-		{
-			float4 yMinus = YMINUS;
-			v = v + 2 * dot(-v, yMinus);
-		}
-		else if(p.y < -1.0f)
-		{
-			float4 yPlus = YPLUS;
-			v = v + 2 * dot(-v, yPlus);
-		}
+	float4 p = arrInOutPosition[idx];
+	float4 v = arrInOutVelocity[idx];
+	p = p + deltaT * v;
+	p.w = 1.0f;
+	
+	if(isgreater(p.x, 1.0f))
+		v = v * -1.0f;
+	else if(isless(p.x, -1.0f))
+		v = v * -1.0f;
+		
+	if(isgreater(p.y, 1.0f))
+		v = v * -1.0f;
+	else if(isless(p.y, -1.0f))
+		v = v * -1.0f;
 
-		if(p.z > 1.0f)
-		{	
-			float4 zMinus = ZMINUS;
-			v = v + 2 * dot(-v, zMinus);
-		}
-		else if(p.z < -1.0f)
-		{
-			float4 zPlus = ZPLUS;
-			v = v + 2 * dot(-v, zPlus);
-		}
-
-		float4 red = RED;
-		arrVel[idx] = v;
-		arrColor[idx] = red;
-		arrMeshVertex[idx] = arrPos[idx];
-		arrMeshColor[idx] = arrColor[idx];
-	}	
-};
+	if(isgreater(p.z, 1.0f))
+		v = v * -1.0f;
+	else if(isless(p.z, -1.0f))
+		v = v * -1.0f;
+	v.w = 1.0f;
+			
+	arrInOutPosition[idx] = p;
+	arrInOutVelocity[idx] = v;
+}

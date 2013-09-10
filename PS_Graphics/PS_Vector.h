@@ -43,10 +43,12 @@ public:
     inline void normalize();
     inline Vec2 normalized() const;
     inline T length() const;
+    inline T length2() const;
 
     inline T element(int i) const;
     inline void setElement(int i, T v);
     T* ptr() {return &e[0];}
+    const T* cptr() {return &e[0];}
 
 
     //Static Functions
@@ -95,6 +97,11 @@ inline Vec2<T> Vec2<T>::normalized() const{
 template<typename T>
 inline T Vec2<T>::length() const{
     return sqrt(x*x + y*y);
+}
+
+template<typename T>
+inline T Vec2<T>::length2() const{
+    return (x*x + y*y);
 }
 
 template<typename T>
@@ -264,11 +271,12 @@ public:
     inline void normalize();
     inline Vec3 normalized() const;
     inline T length() const;
+    inline T length2() const;
 
     inline T element(int i) const;
     inline void setElement(int i, T v);
     T* ptr() {return &e[0];}
-
+    const T* cptr() {return &e[0];}
 
     //Static Functions
     static T dot(const Vec3& a, const Vec3& b);
@@ -310,15 +318,20 @@ inline void Vec3<T>::normalize(){
 }
 
 template<typename T>
-inline Vec3<T> Vec3<T>::normalized() const{
+inline Vec3<T> Vec3<T>::normalized() const {
     Vec3<T> result = (*this);
     result.normalize();
     return result;
 }
 
 template<typename T>
-inline T Vec3<T>::length() const{
+inline T Vec3<T>::length() const {
     return sqrt(x*x + y*y + z*z);
+}
+
+template<typename T>
+inline T Vec3<T>::length2() const {
+	return (x*x + y*y + z*z);
 }
 
 template<typename T>
@@ -512,6 +525,7 @@ public:
     inline T element(int i) const;
     inline void setElement(int i, T v);
     T* ptr() {return &e[0];}
+    const T* cptr() {return &e[0];}
 
     /*!
       * The dot product of two 4D vectors

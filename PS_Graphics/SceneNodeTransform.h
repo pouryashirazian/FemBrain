@@ -14,7 +14,7 @@ using namespace PS::MATH;
  */
 class SceneNodeTransform {
 public:
-    SceneNodeTransform();
+    SceneNodeTransform(bool bAutoUpdateBackward = false);
     SceneNodeTransform(const SceneNodeTransform* other);
     virtual ~SceneNodeTransform();
 
@@ -24,11 +24,24 @@ public:
     void rotate(float angleDeg, const vec3f& axis);
     void translate(const vec3f& t);
 
+    //Get Transform
+    vec3f getScale() const { return m_mtxForward.getDiag().xyz();}
+    vec3f getTranslate() const {
+    	vec4f t = m_mtxForward.getCol(3);
+    	return vec3f(t.x/t.w, t.y/t.w, t.z/t.w);
+    }
 
-    mat44f forward() const {return m_mtxForward;}
+    void reset();
+    void updateBackward();
+
+
+    const mat44f& forward() const {return m_mtxForward;}
+    const mat44f& backward() const {return m_mtxBackward;}
 
 protected:
     mat44f m_mtxForward;
+    mat44f m_mtxBackward;
+    bool m_bAutoUpdate;
 };
 
 #endif // SCENENODETRANSFORM_H

@@ -31,15 +31,8 @@ namespace HPC{
 class ComputeKernel
 {
 public:
-    ComputeKernel(cl_kernel kernel, const string& strTitle)
-    {
-        m_clKernel = kernel;
-        m_strTitle = strTitle;
-    }
-
-    virtual ~ComputeKernel() {
-        clReleaseKernel(m_clKernel);
-    }
+    ComputeKernel(cl_kernel kernel, const string& strTitle);
+    virtual ~ComputeKernel();
 
     /*!
      * sets kernel argument at the specified index position.
@@ -75,10 +68,7 @@ private:
 class ComputeProgram
 {
 public:
-    ComputeProgram(cl_program program)
-    {
-        m_clProgram = program;
-    }
+    ComputeProgram(cl_program program);
     virtual ~ComputeProgram();
 
     ComputeKernel* addKernel(const char* chrKernelTitle);
@@ -137,7 +127,7 @@ public:
     ComputeProgram* addProgramFromPtxBinary(const U8* binary, size_t length);
 
     /*!
-     * First tries to load bin file is failed then loads compiles
+     * First tries to load the bin file if it failed then it will compile
      */
     ComputeProgram* tryLoadBinaryThenCompile(const char* chrFilePath);
 

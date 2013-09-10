@@ -73,7 +73,7 @@ public:
 
   virtual int save(char * filename) const;
 
- // === misc queries ===
+  // === misc queries ===
 
   static const VolumetricMesh::elementType elementType() { return elementType_; }
   virtual VolumetricMesh::elementType getElementType() const { return elementType(); }
@@ -90,8 +90,7 @@ public:
   virtual int getNumElementEdges() const;
   virtual void getElementEdges(int el, int * edgeBuffer) const;
 
- // === interpolation ===
-
+  // === interpolation ===
   virtual void computeBarycentricWeights(int el, Vec3d pos, double * weights) const;
 
 protected:

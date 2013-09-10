@@ -1,5 +1,4 @@
 #include "PS_ComputeDevice.h"
-#include "../PS_Base/PS_ErrorManager.h"
 #include "../PS_Base/PS_Logger.h"
 #include <iostream>
 #include <fstream>
@@ -13,6 +12,17 @@ using namespace PS;
 namespace PS{
 namespace HPC{
 /////////////////////////////////////////////////////////////////////////////////////
+ComputeKernel::ComputeKernel(cl_kernel kernel, const string& strTitle)
+{
+	m_szWorkGroupSize = 0;
+    m_clKernel = kernel;
+    m_strTitle = strTitle;
+}
+
+ComputeKernel::~ComputeKernel() {
+	clReleaseKernel(m_clKernel);
+}
+
 bool ComputeKernel::setArg(U32 idxArg, U32 size, const void * lpArg)
 {
 	cl_int err  = clSetKernelArg(m_clKernel, idxArg, size, lpArg);
@@ -53,6 +63,10 @@ void ComputeKernel::ComputeGlobalIndexSpace(int dim, size_t* arrInLocalIndex, si
 }
 
 /////////////////////////////////////////////////////////////////////////////////////
+ComputeProgram::ComputeProgram(cl_program program) {
+	m_clProgram = program;
+}
+
 ComputeProgram::~ComputeProgram()
 {
 	for(size_t i=0; i<m_lstKernels.size(); i++)
@@ -430,7 +444,7 @@ void ComputeDevice::oclLogPtx(cl_program cpProgram, cl_device_id cdDevice, const
         // if a separate filename is supplied, dump ptx there
         if (NULL != cPtxFileName)
         {
-            ReportErrorExt("\nWriting ptx to separate file: %s ...\n\n", cPtxFileName);
+            LogErrorArg1("Writing ptx to separate file: %s ...", cPtxFileName);
             FILE* pFileStream = NULL;
             #ifdef _WIN32
                 fopen_s(&pFileStream, cPtxFileName, "wb");
@@ -441,10 +455,8 @@ void ComputeDevice::oclLogPtx(cl_program cpProgram, cl_device_id cdDevice, const
             fwrite(ptx_code[idx], binary_sizes[idx], 1, pFileStream);
             fclose(pFileStream);
         }
-        else // log to logfile and console if no ptx file specified
-        {
-           //ReportErrorExt("\n%s\nProgram Binary:\n%s\n%s\n", HDASHLINE, ptx_code[idx], HDASHLINE);
-        }
+        else
+           LogErrorArg1("Program Binary:%s ", ptx_code[idx]);
     }
 
     // Cleanup

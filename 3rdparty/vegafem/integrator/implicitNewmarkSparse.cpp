@@ -179,206 +179,203 @@ int ImplicitNewmarkSparse::SetState(double * q_, double * qvel_)
   return 0;
 }
  
-int ImplicitNewmarkSparse::DoTimestep()
-{
-  int numIter = 0;
 
-  double error0 = 0; // error after the first step
-  double errorQuotient;
+int ImplicitNewmarkSparse::DoTimestep() {
+	int numIter = 0;
 
-  // store current amplitudes and set initial guesses for qaccel, qvel
-  for(int i=0; i<r; i++)
-  {
-    q_1[i] = q[i]; 
-    qvel_1[i] = qvel[i];
-    qaccel_1[i] = qaccel[i];
+	double error0 = 0; // error after the first step
+	double errorQuotient;
 
-    qaccel[i] = alpha1 * (q[i] - q_1[i]) - alpha2 * qvel_1[i] - alpha3 * qaccel_1[i];
-    qvel[i] = alpha4 * (q[i] - q_1[i]) + alpha5 * qvel_1[i] + alpha6 * qaccel_1[i];
-  }
+	// store current amplitudes and set initial guesses for qaccel, qvel
+	for (int i = 0; i < r; i++) {
+		q_1[i] = q[i];
+		qvel_1[i] = qvel[i];
+		qaccel_1[i] = qaccel[i];
 
-  do
-  {
-    int i;
+		qaccel[i] = alpha1 * (q[i] - q_1[i]) - alpha2 * qvel_1[i]
+				- alpha3 * qaccel_1[i];
+		qvel[i] = alpha4 * (q[i] - q_1[i]) + alpha5 * qvel_1[i]
+				+ alpha6 * qaccel_1[i];
+	}
 
-/*
-    printf("q:\n");
-    for(int i=0; i<r; i++)
-      printf("%G ", q[i]);
-    printf("\n");
+	do {
+		int i;
 
-    printf("Internal forces:\n");
-    for(int i=0; i<r; i++)
-      printf("%G ", internalForces[i]);
-    printf("\n");
-*/
+		/*
+		 printf("q:\n");
+		 for(int i=0; i<r; i++)
+		 printf("%G ", q[i]);
+		 printf("\n");
 
-    PerformanceCounter counterForceAssemblyTime;
-    forceModel->GetForceAndMatrix(q, internalForces, tangentStiffnessMatrix);
-    counterForceAssemblyTime.StopCounter();
-    forceAssemblyTime = counterForceAssemblyTime.GetElapsedTime();
+		 printf("Internal forces:\n");
+		 for(int i=0; i<r; i++)
+		 printf("%G ", internalForces[i]);
+		 printf("\n");
+		 */
 
-    //tangentStiffnessMatrix->Print();
-    //tangentStiffnessMatrix->Save("K");
+		PerformanceCounter counterForceAssemblyTime;
+		forceModel->GetForceAndMatrix(q, internalForces,
+				tangentStiffnessMatrix);
+		counterForceAssemblyTime.StopCounter();
+		forceAssemblyTime = counterForceAssemblyTime.GetElapsedTime();
 
-    // scale internal forces
-    for(i=0; i<r; i++)
-      internalForces[i] *= internalForceScalingFactor;
+		//tangentStiffnessMatrix->Print();
+		//tangentStiffnessMatrix->Save("K");
 
-    *tangentStiffnessMatrix *= internalForceScalingFactor;
+		// scale internal forces
+		for (i = 0; i < r; i++)
+			internalForces[i] *= internalForceScalingFactor;
 
-    memset(qresidual,0,sizeof(double)*r);
+		*tangentStiffnessMatrix *= internalForceScalingFactor;
 
-    if (useStaticSolver)
-    {
-      // no operation
-    }
-    else
-    {
-      // build effective stiffness: add mass matrix and damping matrix to tangentStiffnessMatrix
-      tangentStiffnessMatrix->ScalarMultiply(dampingStiffnessCoef, rayleighDampingMatrix);
-      rayleighDampingMatrix->AddSubMatrix(dampingMassCoef, *massMatrix);
+		memset(qresidual, 0, sizeof(double) * r);
 
-      rayleighDampingMatrix->ScalarMultiplyAdd(alpha4, tangentStiffnessMatrix);
-      //*tangentStiffnessMatrix += alpha4 * *rayleighDampingMatrix;
-      tangentStiffnessMatrix->AddSubMatrix(alpha4, *dampingMatrix, 1);
+		if (useStaticSolver) {
+			// no operation
+		} else {
+			// build effective stiffness: add mass matrix and damping matrix to tangentStiffnessMatrix
+			tangentStiffnessMatrix->ScalarMultiply(dampingStiffnessCoef,
+					rayleighDampingMatrix);
+			rayleighDampingMatrix->AddSubMatrix(dampingMassCoef, *massMatrix);
 
-      tangentStiffnessMatrix->AddSubMatrix(alpha1, *massMatrix);
-      
-      // compute force residual, store it into aux variable qresidual
-      // qresidual = M * qaccel + C * qvel - externalForces + internalForces
+			rayleighDampingMatrix->ScalarMultiplyAdd(alpha4,
+					tangentStiffnessMatrix);
+			//*tangentStiffnessMatrix += alpha4 * *rayleighDampingMatrix;
+			tangentStiffnessMatrix->AddSubMatrix(alpha4, *dampingMatrix, 1);
 
-      massMatrix->MultiplyVector(qaccel, qresidual);
-      rayleighDampingMatrix->MultiplyVectorAdd(qvel, qresidual);
-      dampingMatrix->MultiplyVectorAdd(qvel, qresidual);
-    }
+			tangentStiffnessMatrix->AddSubMatrix(alpha1, *massMatrix);
 
-    // add externalForces, internalForces
-    for(i=0; i<r; i++)
-    {
-      qresidual[i] += internalForces[i] - externalForces[i];
-      qresidual[i] *= -1;
-      qdelta[i] = qresidual[i];
-    }
+			// compute force residual, store it into aux variable qresidual
+			// qresidual = M * qaccel + C * qvel - externalForces + internalForces
 
-/*
-    printf("internal forces:\n");
-    for(int i=0; i<r; i++)
-      printf("%G ", internalForces[i]);
-    printf("\n");
+			massMatrix->MultiplyVector(qaccel, qresidual);
+			rayleighDampingMatrix->MultiplyVectorAdd(qvel, qresidual);
+			dampingMatrix->MultiplyVectorAdd(qvel, qresidual);
+		}
 
-    printf("external forces:\n");
-    for(int i=0; i<r; i++)
-      printf("%G ", externalForces[i]);
-    printf("\n");
+		// add externalForces, internalForces
+		for (i = 0; i < r; i++) {
+			qresidual[i] += internalForces[i] - externalForces[i];
+			qresidual[i] *= -1;
+			qdelta[i] = qresidual[i];
+		}
 
-    printf("residual:\n");
-    for(int i=0; i<r; i++)
-      printf("%G ", -qresidual[i]);
-    printf("\n");
-*/
+		/*
+		 printf("internal forces:\n");
+		 for(int i=0; i<r; i++)
+		 printf("%G ", internalForces[i]);
+		 printf("\n");
 
-    double error = 0;
-    for(i=0; i<r; i++)
-      error += qresidual[i] * qresidual[i];
+		 printf("external forces:\n");
+		 for(int i=0; i<r; i++)
+		 printf("%G ", externalForces[i]);
+		 printf("\n");
 
-    // on the first iteration, compute initial error
-    if (numIter == 0) 
-    {
-      error0 = error;
-      errorQuotient = 1.0;
-    }
-    else
-    {
-      // rel error wrt to initial error before performing this iteration
-      errorQuotient = error / error0; 
-    }
+		 printf("residual:\n");
+		 for(int i=0; i<r; i++)
+		 printf("%G ", -qresidual[i]);
+		 printf("\n");
+		 */
 
-    if (errorQuotient < epsilon * epsilon)
-    {
-      break;
-    }
+		double error = 0;
+		for (i = 0; i < r; i++)
+			error += qresidual[i] * qresidual[i];
 
-    //tangentStiffnessMatrix->Save("Keff");
-    RemoveRows(r, bufferConstrained, qdelta, numConstrainedDOFs, constrainedDOFs);
-    systemMatrix->AssignSuperMatrix(tangentStiffnessMatrix);
+		// on the first iteration, compute initial error
+		if (numIter == 0) {
+			error0 = error;
+			errorQuotient = 1.0;
+		} else {
+			// rel error wrt to initial error before performing this iteration
+			errorQuotient = error / error0;
+		}
 
-    // solve: systemMatrix * qdelta = qresidual
+		if (errorQuotient < epsilon * epsilon) {
+			break;
+		}
 
-    PerformanceCounter counterSystemSolveTime;
+		//tangentStiffnessMatrix->Save("Keff");
+		RemoveRows(r, bufferConstrained, qdelta, numConstrainedDOFs,
+				constrainedDOFs);
+		systemMatrix->AssignSuperMatrix(tangentStiffnessMatrix);
 
-    #ifdef SPOOLES
-      SPOOLESSolver solver(systemMatrix);
-      int info = solver.SolveLinearSystem(buffer, bufferConstrained);
-      char solverString[16] = "SPOOLES";
-    #endif
+		// solve: systemMatrix * qdelta = qresidual
 
-    #ifdef PARDISO
-      int info = pardisoSolver->ComputeCholeskyDecomposition(systemMatrix);
-      if (info == 0)
-        info = pardisoSolver->SolveLinearSystem(buffer, bufferConstrained);
-      char solverString[16] = "PARDISO";
-    #endif
+		PerformanceCounter counterSystemSolveTime;
 
-    #ifdef PCG
-      int info = jacobiPreconditionedCGSolver->SolveLinearSystemWithJacobiPreconditioner(buffer, bufferConstrained, 1e-6, 10000);
-      if (info > 0)
-        info = 0;
-      char solverString[16] = "PCG";
-    #endif
+#ifdef SPOOLES
+		SPOOLESSolver solver(systemMatrix);
+		int info = solver.SolveLinearSystem(buffer, bufferConstrained);
+		char solverString[16] = "SPOOLES";
+#endif
 
-    if (info != 0)
-    {
-      printf("Error: %s sparse solver returned non-zero exit status %d.\n", solverString, (int)info);
-      return 1;
-    }
+#ifdef PARDISO
+		int info = pardisoSolver->ComputeCholeskyDecomposition(systemMatrix);
+		if (info == 0)
+			info = pardisoSolver->SolveLinearSystem(buffer, bufferConstrained);
+		char solverString[16] = "PARDISO";
+#endif
 
-    counterSystemSolveTime.StopCounter();
-    systemSolveTime = counterSystemSolveTime.GetElapsedTime();
+#ifdef PCG
+		int info = jacobiPreconditionedCGSolver->SolveLinearSystemWithJacobiPreconditioner(buffer, bufferConstrained, 1e-6, 10000);
+		if (info > 0)
+		info = 0;
+		char solverString[16] = "PCG";
+#endif
 
-    InsertRows(r, buffer, qdelta, numConstrainedDOFs, constrainedDOFs);
+		if (info != 0) {
+			printf(
+					"Error: %s sparse solver returned non-zero exit status %d.\n",
+					solverString, (int) info);
+			return 1;
+		}
 
-/*
-    printf("qdelta:\n");
-    for(int i=0; i<r; i++)
-      printf("%G ", qdelta[i]);
-    printf("\n");
-    exit(1);
-*/
-    // update state
-    for(i=0; i<r; i++)
-    {
-      q[i] += qdelta[i];
-      qaccel[i] = alpha1 * (q[i] - q_1[i]) - alpha2 * qvel_1[i] - alpha3 * qaccel_1[i];
-      qvel[i] = alpha4 * (q[i] - q_1[i]) + alpha5 * qvel_1[i] + alpha6 * qaccel_1[i];
-    }
+		counterSystemSolveTime.StopCounter();
+		systemSolveTime = counterSystemSolveTime.GetElapsedTime();
 
-    for(int i=0; i<numConstrainedDOFs; i++)
-      q[constrainedDOFs[i]] = qvel[constrainedDOFs[i]] = qaccel[constrainedDOFs[i]] = 0.0;
+		InsertRows(r, buffer, qdelta, numConstrainedDOFs, constrainedDOFs);
 
-    numIter++;
-  }
-  while (numIter < maxIterations);
+		/*
+		 printf("qdelta:\n");
+		 for(int i=0; i<r; i++)
+		 printf("%G ", qdelta[i]);
+		 printf("\n");
+		 exit(1);
+		 */
+		// update state
+		for (i = 0; i < r; i++) {
+			q[i] += qdelta[i];
+			qaccel[i] = alpha1 * (q[i] - q_1[i]) - alpha2 * qvel_1[i]
+					- alpha3 * qaccel_1[i];
+			qvel[i] = alpha4 * (q[i] - q_1[i]) + alpha5 * qvel_1[i]
+					+ alpha6 * qaccel_1[i];
+		}
 
-/*
-  printf("qvel:\n");
-  for(int i=0; i<r; i++)
-    printf("%G ", qvel[i]);
-  printf("\n");
+		for (int i = 0; i < numConstrainedDOFs; i++)
+			q[constrainedDOFs[i]] = qvel[constrainedDOFs[i]] =
+					qaccel[constrainedDOFs[i]] = 0.0;
 
-  printf("qaccel:\n");
-  for(int i=0; i<r; i++)
-    printf("%G ", qaccel[i]);
-  printf("\n");
-*/
+		numIter++;
+	} while (numIter < maxIterations);
 
-  //printf("Num iterations performed: %d\n",numIter);
-  //if ((numIter >= maxIterations) && (maxIterations > 1))
-  //{
-    //printf("Warning: method did not converge in max number of iterations.\n");
-  //}
+	/*
+	 printf("qvel:\n");
+	 for(int i=0; i<r; i++)
+	 printf("%G ", qvel[i]);
+	 printf("\n");
 
-  return 0;
+	 printf("qaccel:\n");
+	 for(int i=0; i<r; i++)
+	 printf("%G ", qaccel[i]);
+	 printf("\n");
+	 */
+
+	//printf("Num iterations performed: %d\n",numIter);
+	//if ((numIter >= maxIterations) && (maxIterations > 1))
+	//{
+	//printf("Warning: method did not converge in max number of iterations.\n");
+	//}
+	return 0;
 }
 
 void ImplicitNewmarkSparse::UseStaticSolver(bool useStaticSolver_)
