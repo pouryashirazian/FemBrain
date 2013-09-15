@@ -1,6 +1,8 @@
 //#include "stdafx.h"
 #include "PS_ArcBallCamera.h"
 #include <GL/glew.h>
+//#include <stdio.h>
+
 
 namespace PS
 {
@@ -34,6 +36,15 @@ ArcBallCamera::ArcBallCamera(float roll, float tilt, float zoom)
 //Set our horizontal angle can be any value (m_omega)
 void ArcBallCamera::setRoll(float rollHDeg)
 {
+	int deg = (int)rollHDeg;
+	float frac = rollHDeg - deg;
+	deg = deg % 360;
+	rollHDeg = (float)deg + frac;
+	if(rollHDeg < 0.0f)
+		rollHDeg += 360.0f;
+	//printf("ROLL IS= %.3f\n", rollHDeg);
+
+	//Modulo 360 degrees
     m_omega = DEGTORAD(rollHDeg);
 }
 

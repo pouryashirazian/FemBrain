@@ -174,6 +174,8 @@ std::map<int, vec3d> g_hashVertices;
 
 //Visual Cues
 AvatarCube* g_lpAvatarCube = NULL;
+//AvatarScalpel* g_lpAvatarScalpel = NULL;
+
 AbstractWidget*	g_lpAffineWidget = NULL;
 GLMeshBuffer* g_lpGroundMatrix = NULL;
 GLMeshBuffer* g_lpSceneBox = NULL;
@@ -523,244 +525,188 @@ void MousePress(int button, int state, int x, int y)
  */
 void MousePassiveMove(int x, int y)
 {
-	if(g_lpDeformable->isHapticInProgress() && g_appSettings.hapticMode == hmDynamic)
+	if(!(g_lpDeformable->isHapticInProgress() && g_appSettings.hapticMode == hmDynamic))
+		return;
+
+	float dx = x - g_appSettings.screenDragStart.x;
+	float dy = g_appSettings.screenDragStart.y - y;
+
+	dx *= 0.001f;
+	dy *= 0.001f;
+	g_appSettings.screenDragStart = vec2i(x, y);
+
+	string strAxis;
+	vec3f worldAvatarPos = TheUITransform::Instance().translate;
+
+	switch (TheUITransform::Instance().axis) {
+	case uiaX:
+		worldAvatarPos.x += dx;
+		strAxis = "X";
+		break;
+	case uiaY:
+		worldAvatarPos.y += dy;
+		strAxis = "Y";
+		break;
+	case uiaZ:
+		worldAvatarPos.z += dx;
+		strAxis = "Z";
+		break;
+
+	case uiaFree:
+		worldAvatarPos = worldAvatarPos + vec3f(dx, dy, 0.0);
+		strAxis = "FREE";
+		break;
+	}
+
+	//World Avatar Pos
+	TheUITransform::Instance().translate = worldAvatarPos;
+	vec3d wpos = vec3d(worldAvatarPos.x, worldAvatarPos.y, worldAvatarPos.z);
+
+	char buffer[1024];
+	sprintf(buffer,
+			"HAPTIC DELTA=(%.4f, %.4f), AVATAR=(%.4f, %0.4f, %.4f), AXIS=%s PRESS F4 To Change.",
+			dx, dy, wpos.x, wpos.y, wpos.z, strAxis.c_str());
+	g_infoLines[INDEX_HAPTIC_INFO] = string(buffer);
+
+	//Avatar corners
+	vec3d lower = g_lpAvatarCube->lower() + wpos;
+	vec3d upper = g_lpAvatarCube->upper() + wpos;
+
+	//Avatar Box
+	AABB aabbAvatar(vec3(lower.x, lower.y, lower.z),
+			vec3(upper.x, upper.y, upper.z));
+
+	//1.If boxes donot intersect return
+	if (!g_lpFastRBF->bbox().intersect(aabbAvatar)) {
+		g_appSettings.idxCollisionFace = -1;
+		g_hashVertices.clear();
+		return;
+	}
+
+	//2.Compute Collision using RBF Interpolation Function
+	/*
+	 vector<vec3f> avatarVertices;
+	 vector<bool> flags;
+	 vector<float> penetrations;
+	 int idxMaxPenetration;
+	 aabbAvatar.getVertices(avatarVertices);
+	 g_lpFastRBF->resetCollision();
+	 int ctIntersected = g_lpFastRBF->intersects(avatarVertices, flags, penetrations, idxMaxPenetration);
+	 if(ctIntersected == 0) {
+	 return;
+	 }
+	 */
+
+	//List all the vertices in the model impacted
 	{
-		float dx = x - g_appSettings.screenDragStart.x;
-		float dy = g_appSettings.screenDragStart.y - y;
-
-		dx *= 0.001f;
-		dy *= 0.001f;
-		g_appSettings.screenDragStart = vec2i(x, y);
-
-		string strAxis;
-		vec3f worldAvatarPos = TheUITransform::Instance().translate;
-
-		switch(TheUITransform::Instance().axis)
-		{
-		case uiaX:
-			worldAvatarPos.x += dx;
-			strAxis = "X";
-			break;
-		case uiaY:
-			worldAvatarPos.y += dy;
-			strAxis = "Y";
-			break;
-		case uiaZ:
-			worldAvatarPos.z += dx;
-			strAxis = "Z";
-			break;
-
-		case uiaFree:
-			worldAvatarPos = worldAvatarPos + vec3f(dx, dy, 0.0);
-			strAxis = "FREE";
-			break;
-		}
-
-		//World Avatar Pos
-		TheUITransform::Instance().translate = worldAvatarPos;
-		vec3d wpos = vec3d(worldAvatarPos.x, worldAvatarPos.y, worldAvatarPos.z);
-
-		char buffer[1024];
-		sprintf(buffer, "HAPTIC DELTA=(%.4f, %.4f), AVATAR=(%.4f, %0.4f, %.4f), AXIS=%s PRESS F4 To Change.",
-				 dx, dy, wpos.x, wpos.y, wpos.z, strAxis.c_str());
-		g_infoLines[INDEX_HAPTIC_INFO] = string(buffer);
-
-		//Avatar corners
-		vec3d lower = g_lpAvatarCube->lower() + wpos;
-		vec3d upper = g_lpAvatarCube->upper() + wpos;
-
-
-		//Avatar Box
-		AABB aabbAvatar(vec3(lower.x, lower.y, lower.z), vec3(upper.x, upper.y, upper.z));
-
-
-		//1.If boxes donot intersect return
-		if(!g_lpFastRBF->bbox().intersect(aabbAvatar)) {
-			g_appSettings.idxCollisionFace = -1;
-			g_hashVertices.clear();
-			return;
-		}
-
-		//2.Compute Collision using RBF Interpolation Function
-		/*
-		vector<vec3f> avatarVertices;
-		vector<bool> flags;
-		vector<float> penetrations;
-		int idxMaxPenetration;
-		aabbAvatar.getVertices(avatarVertices);
-		g_lpFastRBF->resetCollision();
-		int ctIntersected = g_lpFastRBF->intersects(avatarVertices, flags, penetrations, idxMaxPenetration);
-		if(ctIntersected == 0) {
-			return;
-		}
-		*/
-
-		//List all the vertices in the model impacted
-		{
-			vector<vec3d> arrVertices;
-			vector<int> arrIndices;
-			g_lpDeformable->pickVertices(lower, upper, arrVertices, arrIndices);
-
-
-			//Add new vertices
-			for(U32 i=0; i<arrIndices.size(); i++)
-			{
-				//If it does not have the vertex then add it. If we have it then the original vertex is used.
-				if(g_hashVertices.find(arrIndices[i]) == g_hashVertices.end())
-					g_hashVertices.insert(std::pair<int, vec3d>(arrIndices[i], arrVertices[i]));
-			}
-		}
-
-		//If no vertices impacted then return. If we return here then gaps cannot be filled.
-		if(g_hashVertices.size() == 0)
-			return;
-
-
-		//Compute Center of vertices
-		/*
-		vector<vec3f> collisions;
-		vec3f c = vec3f(0,0,0);
-		collisions.reserve(ctIntersected);
-		for(U32 i=0; i< avatarVertices.size(); i++) {
-			if(flags[i]) {
-				collisions.push_back(avatarVertices[i]);
-				c = c + avatarVertices[i];
-			}
-		}
-		c = c * (1.0f / (float)avatarVertices.size());
-		vec3f n = (c - aabbAvatar.center());
-		printf("ctIntersected: %d, Avatar normal is [%.2f, %.2f, %.2f]\n", ctIntersected, n.x, n.y, n.z);
-
-		vec3d avatarNormal = vec3d(n.x, n.y, n.z);
-		vec3d avatarCollisionFaceCenter = vec3d(c.x, c.y, c.z);
-
-		//List all the vertices in the model impacted
-		{
-			vector<vec3d> arrVertices;
-			vector<int> arrIndices;
-			g_lpDeformable->pickVertices(lower, upper, arrVertices, arrIndices);
-
-
-			//Add new vertices
-			for(U32 i=0; i<arrIndices.size(); i++)
-			{
-				//If it does not have the vertex then add it. If we have it then the original vertex is used.
-				if(g_hashVertices.find(arrIndices[i]) == g_hashVertices.end())
-					g_hashVertices.insert(std::pair<int, vec3d>(arrIndices[i], arrVertices[i]));
-			}
-		}
-
-		//If no vertices impacted then return. If we return here then gaps cannot be filled.
-		if(g_hashVertices.size() == 0)
-			return;
-
-		//Process Vertices
-		vector<vec3d> arrForces;
+		vector<vec3d> arrVertices;
 		vector<int> arrIndices;
-		for (map<int, vec3d>::iterator it = g_hashVertices.begin(); it != g_hashVertices.end(); ++it) {
+		g_lpDeformable->pickVertices(lower, upper, arrVertices, arrIndices);
 
-			double dot = vec3d::dot(avatarCollisionFaceCenter - it->second, avatarNormal) * g_appSettings.hapticForceCoeff;
-			dot = MATHMAX(dot, 0);
-
-			arrIndices.push_back(it->first);
-			arrForces.push_back(avatarNormal * dot);
+		//Add new vertices
+		for (U32 i = 0; i < arrIndices.size(); i++) {
+			//If it does not have the vertex then add it. If we have it then the original vertex is used.
+			if (g_hashVertices.find(arrIndices[i]) == g_hashVertices.end())
+				g_hashVertices.insert(
+						std::pair<int, vec3d>(arrIndices[i], arrVertices[i]));
 		}
+	}
 
-		//Apply displacements/forces to the model
-		g_lpDeformable->hapticSetCurrentForces(arrIndices, arrForces);
-*/
-		//Input Arrays
-		vec3d n[6];
-		vec3d s[6];
-		//X. Left and Right
-		n[0] = vec3d(-1, 0, 0);
-		n[1] = vec3d(1, 0, 0);
+	//If no vertices impacted then return. If we return here then gaps cannot be filled.
+	if (g_hashVertices.size() == 0)
+		return;
 
-		//Y. Bottom and Top
-		n[2] = vec3d(0, -1, 0);
-		n[3] = vec3d(0, 1, 0);
+	//Input Arrays
+	vec3d n[6];
+	vec3d s[6];
+	//X. Left and Right
+	n[0] = vec3d(-1, 0, 0);
+	n[1] = vec3d(1, 0, 0);
 
-		//Z. Back and Front
-		n[4] = vec3d(0, 0, -1);
-		n[5] = vec3d(0, 0, 1);
+	//Y. Bottom and Top
+	n[2] = vec3d(0, -1, 0);
+	n[3] = vec3d(0, 1, 0);
 
-		//Sample Point to use
-		s[0] = lower;
-		s[1] = upper;
-		s[2] = lower;
-		s[3] = upper;
-		s[4] = lower;
-		s[5] = upper;
+	//Z. Back and Front
+	n[4] = vec3d(0, 0, -1);
+	n[5] = vec3d(0, 0, 1);
 
-		//Detect Collision Face
-		//Check against six faces of Avatar to find the intersection
-		//Previously Detected Face? If no then detect now
-		if (g_appSettings.idxCollisionFace < 0) {
-			//g_appSettings.hapticForceCoeff = DEFAULT_FORCE_COEFF;
-			double minDot = GetMaxLimit<double>();
-			int idxMin = 0;
+	//Sample Point to use
+	s[0] = lower;
+	s[1] = upper;
+	s[2] = lower;
+	s[3] = upper;
+	s[4] = lower;
+	s[5] = upper;
 
-			//Iterate over vertices in collision
-			for (map<int, vec3d>::iterator it = g_hashVertices.begin();
-					it != g_hashVertices.end(); ++it) {
-				vec3d p = it->second;
-				for (int j = 0; j < 6; j++) {
-					double dot = vec3d::dot(s[j] - p, n[j]);
-					if (dot < minDot) {
-						minDot = dot;
-						idxMin = j;
-						g_appSettings.collisionClosestPoint = p;
-					}
+	//Detect Collision Face
+	//Check against six faces of Avatar to find the intersection
+	//Previously Detected Face? If no then detect now
+	if (g_appSettings.idxCollisionFace < 0) {
+		//g_appSettings.hapticForceCoeff = DEFAULT_FORCE_COEFF;
+		double minDot = GetMaxLimit<double>();
+		int idxMin = 0;
 
-					g_appSettings.idxCollisionFace = idxMin;
-					g_appSettings.collisionDist = minDot;
-				}
-			}
-		} else {
-			double minDot = GetMaxLimit<double>();
-			int idxFace = g_appSettings.idxCollisionFace;
-			//Iterate over vertices in collision
-			for (map<int, vec3d>::iterator it = g_hashVertices.begin();
-					it != g_hashVertices.end(); ++it) {
-				double dot = vec3d::dot(s[idxFace] - it->second, n[idxFace]);
+		//Iterate over vertices in collision
+		for (map<int, vec3d>::iterator it = g_hashVertices.begin();
+				it != g_hashVertices.end(); ++it) {
+			vec3d p = it->second;
+			for (int j = 0; j < 6; j++) {
+				double dot = vec3d::dot(s[j] - p, n[j]);
 				if (dot < minDot) {
 					minDot = dot;
-					g_appSettings.collisionDist = minDot;
-					g_appSettings.collisionClosestPoint = it->second;
+					idxMin = j;
+					g_appSettings.collisionClosestPoint = p;
 				}
+
+				g_appSettings.idxCollisionFace = idxMin;
+				g_appSettings.collisionDist = minDot;
 			}
 		}
-
-		//Compute Displacement
-		vector<vec3d> arrForces;
-		vector<int> arrIndices;
-		int idxCFace = g_appSettings.idxCollisionFace;
-		for (std::map<int, vec3d>::iterator it = g_hashVertices.begin();
+	} else {
+		double minDot = GetMaxLimit<double>();
+		int idxFace = g_appSettings.idxCollisionFace;
+		//Iterate over vertices in collision
+		for (map<int, vec3d>::iterator it = g_hashVertices.begin();
 				it != g_hashVertices.end(); ++it) {
-			vec3d v = it->second;
+			double dot = vec3d::dot(s[idxFace] - it->second, n[idxFace]);
+			if (dot < minDot) {
+				minDot = dot;
+				g_appSettings.collisionDist = minDot;
+				g_appSettings.collisionClosestPoint = it->second;
+			}
+		}
+	}
 
-			//1000000
-			double dot = vec3d::dot(s[idxCFace] - v, n[idxCFace]) *
-						  g_appSettings.hapticForceCoeff;
-			dot = MATHMAX(dot, 0);
+	//Compute Displacement
+	vector<vec3d> arrForces;
+	vector<int> arrIndices;
+	int idxCFace = g_appSettings.idxCollisionFace;
+	for (std::map<int, vec3d>::iterator it = g_hashVertices.begin();
+			it != g_hashVertices.end(); ++it) {
+		vec3d v = it->second;
+
+		//1000000
+		double dot = vec3d::dot(s[idxCFace] - v, n[idxCFace])
+				* g_appSettings.hapticForceCoeff;
+		dot = MATHMAX(dot, 0);
 
 		/*
-			string arrFaces[] = { "LEFT", "RIGHT", "BOTTOM", "TOP", "NEAR",
-					"FAR" };
-			printf("Face[%d] = %s, dot = %.4f, VERTEX USED: [%.4f, %.4f, %.4f], COEFF: %.2f \n",
-					idxCFace, arrFaces[idxCFace].c_str(), dot, v.x, v.y, v.z,
-					g_appSettings.hapticForceCoeff);
-		*/
+		 string arrFaces[] = { "LEFT", "RIGHT", "BOTTOM", "TOP", "NEAR",
+		 "FAR" };
+		 printf("Face[%d] = %s, dot = %.4f, VERTEX USED: [%.4f, %.4f, %.4f], COEFF: %.2f \n",
+		 idxCFace, arrFaces[idxCFace].c_str(), dot, v.x, v.y, v.z,
+		 g_appSettings.hapticForceCoeff);
+		 */
 
-			arrIndices.push_back(it->first);
-			arrForces.push_back(n[idxCFace] * dot);
-		}
-
-		//Apply displacements/forces to the model
-		g_lpDeformable->hapticSetCurrentForces(arrIndices, arrForces);
-
-		glutPostRedisplay();
+		arrIndices.push_back(it->first);
+		arrForces.push_back(n[idxCFace] * dot);
 	}
+
+	//Apply displacements/forces to the model
+	g_lpDeformable->hapticSetCurrentForces(arrIndices, arrForces);
+
+	glutPostRedisplay();
 }
 
 void MouseMove(int x, int y)

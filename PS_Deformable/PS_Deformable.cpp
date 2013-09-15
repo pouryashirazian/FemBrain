@@ -1054,7 +1054,7 @@ void Deformable::drawTetMesh(const vec3d& avatarCenter,
 			}
 		}
 
-		if(ctUsedVertex == 0)
+		if(ctUsedVertex != 3)
 			continue;
 
 		a = lpObjMesh->getPosition(indices[0]);
@@ -1062,26 +1062,6 @@ void Deformable::drawTetMesh(const vec3d& avatarCenter,
 		c = lpObjMesh->getPosition(indices[2]);
 		d = lpObjMesh->getPosition(indices[3]);
 
-		/*
-		Vec3d sum;
-		vec3d centroid;
-		vec3d avatarPos = avatarCenter + avatarHalfLength;
-
-		sum = a + b + c + d;
-
-		centroid.x = 0.25 * sum[0];
-		centroid.y = 0.25 * sum[1];
-		centroid.z = 0.25 * sum[2];
-
-		double dist = vec3d::distance(avatarPos, centroid);
-		if(dist > maxDist)
-			dist = maxDist;
-
-		if(dist > 0.2f)
-			continue;
-
-		float alpha = 1.0f - (float)dist / (float)maxDist;
-		 */
 		vec4f black(0,0,0,1);
 		vec4f white(1,1,1,1);
 		vec4f color = black;
