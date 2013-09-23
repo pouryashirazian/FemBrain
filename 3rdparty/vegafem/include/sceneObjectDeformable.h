@@ -51,8 +51,10 @@ public:
 
   // adds deformations to current dynamicPosition of the vertices
   void AddVertexDeformations(double * u);
-
   void ResetDeformationToRest();
+
+  // Remove vertex
+  void RemoveVertex(int vertex);
 
   inline void GetSingleVertexRestPosition(int vertex, double * x, double * y, double * z);
   inline void SetSingleVertexRestPosition(int vertex, double x, double y, double z);
@@ -63,6 +65,7 @@ public:
 protected:
 
 };
+
 
 inline void SceneObjectDeformable::GetSingleVertexRestPosition(int vertex, double * x, double * y, double * z)
 {

@@ -22,7 +22,7 @@ using namespace PS::MESH;
 #define DEFAULT_START_CENTERS_COUNT 1000
 #define DEFAULT_GREEDY_STEP 50
 #define DEFAULT_FITTING_ACCURACY 0.01f
-#define MAX_GREEDY_ATTEMPTS 3
+#define MAX_GREEDY_ATTEMPTS 1
 
 /*
  * A BlobTree model is defined using implicit primitives and operators.

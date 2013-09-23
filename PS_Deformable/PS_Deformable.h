@@ -15,6 +15,8 @@
 #include "../PS_Graphics/PS_Vector.h"
 #include "../PS_Graphics/PS_Box.h"
 
+#include "SurfaceMesh.h"
+#include "VolumeMesh.h"
 #include "corotationalLinearFEM.h"
 #include "corotationalLinearFEMForceModel.h"
 #include "generateMassMatrix.h"
@@ -28,6 +30,7 @@
 using namespace std;
 using namespace Loki;
 using namespace PS::MATH;
+using namespace PS::FEM;
 
 #define DEFAULT_FORCE_NEIGHBORHOOD_SIZE 5
 
@@ -52,16 +55,6 @@ public:
 						   std::vector<int>& vFixedVertices,
 						   int ctThreads = 0,
 						   const char* lpModelTitle = NULL);
-
-	/*!
-	 * Constructs a deformable model from the BlobTree by performing a round of
-	 * polygonization.
-	 */
-	explicit Deformable(U32 ctVertices, double* lpVertices,
-						   U32 ctElements, int* lpElements,
-						   std::vector<int>& vFixedVertices,
-						   int ctThreads = 0);
-
 	virtual ~Deformable();
 
 
@@ -113,8 +106,6 @@ public:
 
 	bool addFixedVertex(int index);
 	bool removeFixedVertex(int index);
-
-	AABB aabb() const { return m_aabb;}
 
 	double computeVolume() const;
 	bool isVolumeChanged() const { return  !EssentiallyEquald(this->computeVolume(), m_restVolume, 0.0001);}
@@ -168,17 +159,18 @@ private:
 	//Callbacks
 	FOnApplyDeformations m_fOnDeform;
 
-
-	AABB m_aabb;
-
 	double m_dampingStiffnessCoeff;
 	double m_dampingMassCoeff;
 	double m_timeStep;
 	double m_restVolume;
 
+	//Surface Mesh
+	SurfaceMesh* m_lpSurfaceMesh;
+	//SceneObjectDeformable * m_lpDeformableMesh;
+
+
+	//Mesh Graph
 	Graph* m_lpMeshGraph;
-	//double* m_lpHapticForces;
-	//GLMeshBuffer m_meshBuffer;
 
 	//Tetrahedra input mesh
 	TetMesh* m_lpTetMesh;
@@ -192,8 +184,6 @@ private:
 	//Integrator
 	ImplicitNewmarkSparse* m_lpIntegrator;
 
-	//Deformable Mesh
-	SceneObjectDeformable * m_lpDeformableMesh;
 
 	//Mass Matrix
 	SparseMatrix* m_lpMassMatrix;

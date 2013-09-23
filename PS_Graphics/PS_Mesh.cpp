@@ -205,14 +205,14 @@ bool MeshNode::readbackMeshV3T3(U32& ctVertices, vector<float>& vertices,
 }
 
 
-int MeshNode::add(const vec3f& v, VertexAttribType vat, int step)
+int MeshNode::add(const vec3f& v, MemoryBufferType vat, int step)
 {
 	if(step > 3 || step < 0)
 		return -1;
 
 	int idxAdded = -1;
 	switch(vat) {
-	case(vatPosition):
+	case(mbtPosition):
 	{
 		m_szUnitVertex = step;
 		for(int i=0; i<step; i++)
@@ -221,7 +221,7 @@ int MeshNode::add(const vec3f& v, VertexAttribType vat, int step)
 	}
 	break;
 
-	case(vatNormal):
+	case(mbtNormal):
 	{
 		for(int i=0; i<step; i++)
 			m_arrNormals.push_back(v.e[i]);
@@ -229,7 +229,7 @@ int MeshNode::add(const vec3f& v, VertexAttribType vat, int step)
 	}
 	break;
 
-	case(vatTexCoord):
+	case(mbtTexCoord):
 	{
 		m_szUnitTexCoord = step;
 		for(int i=0; i<step; i++)
@@ -246,13 +246,13 @@ int MeshNode::add(const vec3f& v, VertexAttribType vat, int step)
 	return idxAdded;
 }
 
-int MeshNode::add(const vec4f& v, VertexAttribType vat, int step) {
+int MeshNode::add(const vec4f& v, MemoryBufferType vat, int step) {
 	if(step > 4 || step < 0)
 		return -1;
 
 	int idxAdded = -1;
 	switch(vat) {
-	case(vatPosition):
+	case(mbtPosition):
 	{
 		m_szUnitVertex = step;
 		for(int i=0; i<step; i++)
@@ -261,7 +261,7 @@ int MeshNode::add(const vec4f& v, VertexAttribType vat, int step) {
 	}
 	break;
 
-	case(vatNormal):
+	case(mbtNormal):
 	{
 		for(int i=0; i<step; i++)
 			m_arrNormals.push_back(v.e[i]);
@@ -269,7 +269,7 @@ int MeshNode::add(const vec4f& v, VertexAttribType vat, int step) {
 	}
 	break;
 
-	case(vatTexCoord):
+	case(mbtTexCoord):
 	{
 		m_szUnitTexCoord = step;
 		for(int i=0; i<step; i++)
@@ -287,11 +287,11 @@ int MeshNode::add(const vec4f& v, VertexAttribType vat, int step) {
 
 }
 
-int MeshNode::add(const vector<float>& arrValues, VertexAttribType vat, int step) {
+int MeshNode::add(const vector<float>& arrValues, MemoryBufferType vat, int step) {
 
 	int idxAdded = -1;
 	switch(vat) {
-	case(vatPosition):
+	case(mbtPosition):
 	{
 		m_szUnitVertex = step;
 		for(int i=0; i<step; i++)
@@ -300,7 +300,7 @@ int MeshNode::add(const vector<float>& arrValues, VertexAttribType vat, int step
 	}
 	break;
 
-	case(vatNormal):
+	case(mbtNormal):
 	{
 		for(int i=0; i<step; i++)
 			m_arrNormals.push_back(arrValues[i]);
@@ -308,7 +308,7 @@ int MeshNode::add(const vector<float>& arrValues, VertexAttribType vat, int step
 	}
 	break;
 
-	case(vatTexCoord):
+	case(mbtTexCoord):
 	{
 		m_szUnitTexCoord = step;
 		for(int i=0; i<step; i++)
@@ -326,26 +326,26 @@ int MeshNode::add(const vector<float>& arrValues, VertexAttribType vat, int step
 
 }
 
-void MeshNode::setVertexAttrib(const vector<float>& arrAttribs, VertexAttribType vat, int step) {
+void MeshNode::setVertexAttrib(const vector<float>& arrAttribs, MemoryBufferType vat, int step) {
 	switch(vat) {
-	case(vatPosition): {
+	case(mbtPosition): {
 		m_szUnitVertex = step;
 		m_arrVertices.assign(arrAttribs.begin(), arrAttribs.end());
 	}
 	break;
 
-	case(vatColor): {
+	case(mbtColor): {
 		m_szUnitColor = step;
 		m_arrColors.assign(arrAttribs.begin(), arrAttribs.end());
 	}
 	break;
 
-	case(vatNormal): {
+	case(mbtNormal): {
 		m_arrNormals.assign(arrAttribs.begin(), arrAttribs.end());
 	}
 	break;
 
-	case(vatTexCoord): {
+	case(mbtTexCoord): {
 		m_szUnitTexCoord = step;
 		m_arrTexCoords.assign(arrAttribs.begin(), arrAttribs.end());
 	}
@@ -506,26 +506,26 @@ AABB MeshNode::computeBoundingBox() const
 	return oct;
 }
 
-void MeshNode::getVertexAttrib(U32& count, vector<float>& arrAttribs, VertexAttribType vat) const {
+void MeshNode::getVertexAttrib(U32& count, vector<float>& arrAttribs, MemoryBufferType vat) const {
 	switch(vat) {
-	case(vatPosition): {
+	case(mbtPosition): {
 		count = countVertices();
 		arrAttribs.assign(m_arrVertices.begin(), m_arrVertices.end());
 	}
 	break;
 
-	case(vatColor): {
+	case(mbtColor): {
 		count = countColors();
 	}
 	break;
 
-	case(vatTexCoord): {
+	case(mbtTexCoord): {
 		count = countTexCoords();
 		arrAttribs.assign(m_arrTexCoords.begin(), m_arrTexCoords.end());
 	}
 	break;
 
-	case(vatNormal): {
+	case(mbtNormal): {
 		count = countVertices();
 		arrAttribs.assign(m_arrNormals.begin(), m_arrNormals.end());
 	}
@@ -742,7 +742,7 @@ bool Mesh::store(const char* chrFilePath) {
 		U32 ctVertices;
 		U32 szUnitVertex = lpNode->getUnitVertex();
 		vector<float> attribs;
-		lpNode->getVertexAttrib(ctVertices, attribs, vatPosition);
+		lpNode->getVertexAttrib(ctVertices, attribs, mbtPosition);
 		for(U32 i=0; i < ctVertices; i++) {
 			fp << "v";
 			for(U32 j=0; j<szUnitVertex; j++) {
@@ -870,10 +870,10 @@ bool Mesh::loadObj(const char* chrFileName)
 	U32 ctMeshNodes = 0;
 	U32 ctMaterialNodes = 0;
 
-	U8 arrAttribUnit[vatCount];
-	U32 arrAttribCount[vatCount];
-	U32 idxCurrent[vatCount];
-	for(int i=0; i<vatCount; i++) {
+	U8 arrAttribUnit[mbtCount];
+	U32 arrAttribCount[mbtCount];
+	U32 idxCurrent[mbtCount];
+	for(int i=0; i<mbtCount; i++) {
 		arrAttribUnit[i] = 0;
 		arrAttribCount[i] = 0;
 		idxCurrent[i] = 0;
@@ -900,23 +900,23 @@ bool Mesh::loadObj(const char* chrFileName)
 		//Position
 		if(words[0] == "v")
 		{
-			if(arrAttribCount[vatPosition] == 0)
-				arrAttribUnit[vatPosition] = ctWords-1;
-			arrAttribCount[vatPosition] ++;
+			if(arrAttribCount[mbtPosition] == 0)
+				arrAttribUnit[mbtPosition] = ctWords-1;
+			arrAttribCount[mbtPosition] ++;
 		}
 		//Normal
 		else if(words[0] == "vn")
 		{
-			if(arrAttribCount[vatNormal] == 0)
-				arrAttribUnit[vatNormal] = ctWords-1;
-			arrAttribCount[vatNormal] ++;
+			if(arrAttribCount[mbtNormal] == 0)
+				arrAttribUnit[mbtNormal] = ctWords-1;
+			arrAttribCount[mbtNormal] ++;
 		}
 		//TexCoords
 		else if(words[0] == "vt")
 		{
-			if(arrAttribCount[vatTexCoord] == 0)
-				arrAttribUnit[vatTexCoord] = ctWords-1;
-			arrAttribCount[vatTexCoord] ++;
+			if(arrAttribCount[mbtTexCoord] == 0)
+				arrAttribUnit[mbtTexCoord] = ctWords-1;
+			arrAttribCount[mbtTexCoord] ++;
 		}
 		else if(words[0] == "f") {
 			if(ctFaces == 0)
@@ -946,15 +946,15 @@ bool Mesh::loadObj(const char* chrFileName)
 	}
 
 	//Normals
-	if(arrAttribCount[vatPosition] != arrAttribCount[vatNormal]) {
-		LogErrorArg2("Number of normals not match vertices. V# %d, N# %d", arrAttribCount[vatPosition], arrAttribCount[vatNormal]);
-		arrAttribCount[vatNormal] = 0;
+	if(arrAttribCount[mbtPosition] != arrAttribCount[mbtNormal]) {
+		LogErrorArg2("Number of normals not match vertices. V# %d, N# %d", arrAttribCount[mbtPosition], arrAttribCount[mbtNormal]);
+		arrAttribCount[mbtNormal] = 0;
 	}
 
 	//Allocate memory
-	arrVertices.resize(arrAttribCount[vatPosition] * arrAttribUnit[vatPosition]);
-	arrNormals.resize(arrAttribCount[vatNormal] * arrAttribUnit[vatNormal]);
-	arrTexCoords.resize(arrAttribCount[vatTexCoord] * arrAttribUnit[vatTexCoord]);
+	arrVertices.resize(arrAttribCount[mbtPosition] * arrAttribUnit[mbtPosition]);
+	arrNormals.resize(arrAttribCount[mbtNormal] * arrAttribUnit[mbtNormal]);
+	arrTexCoords.resize(arrAttribCount[mbtTexCoord] * arrAttribUnit[mbtTexCoord]);
 
 	//We won't triangulate quad meshes. Might use quad mesh for subdivision or Micropolygon rendering!
 	arrIndices.resize(ctFaces * faceUnit);
@@ -983,41 +983,41 @@ bool Mesh::loadObj(const char* chrFileName)
 
 
 		int ctWords = (int)words.size();
-		if((words[0] == "v") && (arrAttribCount[vatPosition] > 0)) {
-			if(arrAttribUnit[vatPosition] == 3) {
+		if((words[0] == "v") && (arrAttribCount[mbtPosition] > 0)) {
+			if(arrAttribUnit[mbtPosition] == 3) {
 				vec3f v;
 				v.x = static_cast<float>(atof(words[1].ptr()));
 				v.y = static_cast<float>(atof(words[2].ptr()));
 				v.z = static_cast<float>(atof(words[3].ptr()));
 
-				v.store(&arrVertices[idxCurrent[vatPosition] * arrAttribUnit[vatPosition]]);
+				v.store(&arrVertices[idxCurrent[mbtPosition] * arrAttribUnit[mbtPosition]]);
 			}
-			else if(arrAttribUnit[vatPosition] == 4) {
+			else if(arrAttribUnit[mbtPosition] == 4) {
 				vec4f v;
 				v.x = static_cast<float>(atof(words[1].ptr()));
 				v.y = static_cast<float>(atof(words[2].ptr()));
 				v.z = static_cast<float>(atof(words[3].ptr()));
 				v.w = static_cast<float>(atof(words[4].ptr()));
 
-				v.store(&arrVertices[idxCurrent[vatPosition] * arrAttribUnit[vatPosition]]);
+				v.store(&arrVertices[idxCurrent[mbtPosition] * arrAttribUnit[mbtPosition]]);
 			}
 
-			idxCurrent[vatPosition] ++;
+			idxCurrent[mbtPosition] ++;
 		}
-		else if((words[0] == "vn") && (arrAttribCount[vatNormal] > 0)) {
+		else if((words[0] == "vn") && (arrAttribCount[mbtNormal] > 0)) {
 
 			vec3f n;
 			n.x = static_cast<float>(atof(words[1].ptr()));
 			n.y = static_cast<float>(atof(words[2].ptr()));
 			n.z = static_cast<float>(atof(words[3].ptr()));
-			n.store(&arrNormals[idxCurrent[vatNormal] * 3]);
-			idxCurrent[vatNormal] ++;
+			n.store(&arrNormals[idxCurrent[mbtNormal] * 3]);
+			idxCurrent[mbtNormal] ++;
 		}
-		else if((words[0] == "vt" && arrAttribCount[vatTexCoord] > 0)) {
-			U32 idxTex = idxCurrent[vatTexCoord] * arrAttribUnit[vatTexCoord];
-			for(int j=0; j<arrAttribUnit[vatTexCoord]; j++)
+		else if((words[0] == "vt" && arrAttribCount[mbtTexCoord] > 0)) {
+			U32 idxTex = idxCurrent[mbtTexCoord] * arrAttribUnit[mbtTexCoord];
+			for(int j=0; j<arrAttribUnit[mbtTexCoord]; j++)
 				arrTexCoords[idxTex + j] = static_cast<float>(atof(words[j+1].ptr()));
-			idxCurrent[vatTexCoord] ++;
+			idxCurrent[mbtTexCoord] ++;
 		}
 		else if((words[0] == "o")&&(ctWords == 2)) {
 
@@ -1088,14 +1088,14 @@ bool Mesh::loadObj(const char* chrFileName)
 	for(U32 i=0; i < countNodes(); i++) {
 
 		lpCurrentMeshNode = getNode(i);
-		if(arrAttribCount[vatPosition] > 0)
-			lpCurrentMeshNode->setVertexAttrib(arrVertices, vatPosition, arrAttribUnit[vatPosition]);
+		if(arrAttribCount[mbtPosition] > 0)
+			lpCurrentMeshNode->setVertexAttrib(arrVertices, mbtPosition, arrAttribUnit[mbtPosition]);
 
-		if(arrAttribCount[vatNormal] > 0)
-			lpCurrentMeshNode->setVertexAttrib(arrNormals, vatNormal, arrAttribUnit[vatNormal]);
+		if(arrAttribCount[mbtNormal] > 0)
+			lpCurrentMeshNode->setVertexAttrib(arrNormals, mbtNormal, arrAttribUnit[mbtNormal]);
 
-		if(arrAttribCount[vatTexCoord] > 0)
-			lpCurrentMeshNode->setVertexAttrib(arrTexCoords, vatTexCoord, arrAttribUnit[vatTexCoord]);
+		if(arrAttribCount[mbtTexCoord] > 0)
+			lpCurrentMeshNode->setVertexAttrib(arrTexCoords, mbtTexCoord, arrAttribUnit[mbtTexCoord]);
 	}
 
 

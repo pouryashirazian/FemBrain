@@ -78,10 +78,10 @@ public:
 	 * not the position in the float array. The position in the float array can be computed as
 	 * index x szUnitVertex
 	 */
-	int add(const vec3f& v, VertexAttribType vat = vatPosition, int step = 3);
-	int add(const vec4f& v, VertexAttribType vat = vatPosition, int step = 4);
-	int add(const vector<float>& arrValues, VertexAttribType vat = vatPosition, int step = 3);
-	void setVertexAttrib(const vector<float>& arrAttribs, VertexAttribType vat = vatPosition, int step = 3);
+	int add(const vec3f& v, MemoryBufferType vat = mbtPosition, int step = 3);
+	int add(const vec4f& v, MemoryBufferType vat = mbtPosition, int step = 4);
+	int add(const vector<float>& arrValues, MemoryBufferType vat = mbtPosition, int step = 3);
+	void setVertexAttrib(const vector<float>& arrAttribs, MemoryBufferType vat = mbtPosition, int step = 3);
 
 	int addVertex(const vec3f& v);
 	int addNormal(const vec3f& n);
@@ -144,7 +144,7 @@ public:
     void setUnitFace(U8 s) {m_szUnitFace = s;}
 
     //Mesh parts
-    void getVertexAttrib(U32& count, vector<float>& arrAttribs, VertexAttribType vat) const;
+    void getVertexAttrib(U32& count, vector<float>& arrAttribs, MemoryBufferType vat) const;
     void getFaces(U32& count, vector<U32>& faces) const;
 
     //Mesh Parts

@@ -29,7 +29,7 @@ public:
 	 */
 	static bool ReadbackMeshVertexAttribCL(ComputeDevice* lpDevice,
 												const GLMeshBuffer* lpBuffer,
-												VertexAttribType attrib,
+												MemoryBufferType attrib,
 												U32& count, U32& fstep,
 												vector<float>& values);
 

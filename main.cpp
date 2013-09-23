@@ -285,6 +285,7 @@ void Draw()
 		vec3d center = vec3d(t.x, t.y, t.z);
 		vec3d halfLen = (g_lpAvatarCube->upper() - g_lpAvatarCube->lower()) * 0.5;
 
+		g_lpDeformable->draw();
 		g_lpDeformable->drawTetMesh(center, halfLen);
 	}
 
@@ -704,6 +705,7 @@ void MousePassiveMove(int x, int y)
 	}
 
 	//Apply displacements/forces to the model
+	printf("APPLY HAPTIC FORCES\n");
 	g_lpDeformable->hapticSetCurrentForces(arrIndices, arrForces);
 
 	glutPostRedisplay();
@@ -727,18 +729,22 @@ void MouseMove(int x, int y)
 		if(TheUITransform::Instance().type == uitScale)
 		{
 			int axis = TheUITransform::Instance().axis;
-			vec3d lo = g_lpAvatarCube->lower();
-			vec3d hi = g_lpAvatarCube->upper();
-
 			vec3d inc(0,0,0);
 			if(axis < uiaFree)
 				inc.setElement(axis, d[axis]);
 			else
 				inc = vec3d(d);
 			inc = inc * 0.5;
-			SAFE_DELETE(g_lpAvatarCube);
-			g_lpAvatarCube = new AvatarCube(lo - inc, hi + inc);
+			vec3d lo = g_lpAvatarCube->lower() - inc;
+			vec3d hi = g_lpAvatarCube->upper() + inc;
+			lo = vec3d::minP(lo, hi);
+			hi = vec3d::maxP(lo, hi);
+			vec3d sides = hi - lo;
+			LogInfoArg3("New Avatar Size is [%.3f, %.3f, %.3f]", sides.x, sides.y, sides.z);
 
+			//Rebuild avatar
+			SAFE_DELETE(g_lpAvatarCube);
+			g_lpAvatarCube = new AvatarCube(lo, hi);
 		}
 	}
 	glutPostRedisplay();
@@ -1006,6 +1012,7 @@ void SpecialKey(int key, int x, int y)
 		case(GLUT_KEY_F9):
 		{
 			g_appSettings.bDrawAffineWidgets = !g_appSettings.bDrawAffineWidgets;
+			LogInfoArg1("Draw affine widgets: %d", g_appSettings.bDrawAffineWidgets);
 			break;
 		}
 
@@ -1124,6 +1131,7 @@ bool LoadSettings(const std::string& strSimFP)
 
 	//Avatar
 	TheUITransform::Instance().translate = cfg.readVec3f("AVATAR", "POS");
+	TheUITransform::Instance().axis = cfg.readInt("AVATAR", "AXIS");
 	vec3f thickness = cfg.readVec3f("AVATAR", "THICKNESS");
 	vec3d thicknessd = vec3d(thickness.x, thickness.y, thickness.z);
 	g_lpAvatarCube = new AvatarCube(thicknessd * (-0.5), thicknessd * 0.5);
@@ -1175,6 +1183,7 @@ bool SaveSettings(const std::string& strSimFP)
 	vec3d sides = g_lpAvatarCube->upper() - g_lpAvatarCube->lower();
 	cfg.writeVec3f("AVATAR", "POS", TheUITransform::Instance().translate);
 	cfg.writeVec3f("AVATAR", "THICKNESS", vec3f(sides.x, sides.y, sides.z));
+	cfg.writeInt("AVATAR", "AXIS", TheUITransform::Instance().axis);
 
 	//DISPLAY SETTINGS
 	cfg.writeBool("DISPLAY", "AABB", g_appSettings.bDrawAABB);
@@ -1369,6 +1378,7 @@ int main(int argc, char* argv[])
 		tsStart = tbb::tick_count::now();
 		g_lpFastRBF = new FastRBF(lpBlobRender);
 		g_appSettings.msRBFCreation = (tbb::tick_count::now() - tsStart).seconds() * 1000.0;
+
 
 		g_lpFastRBF->setShaderEffectProgram(g_uiPhongShader);
 		g_lpDrawNormals = g_lpFastRBF->prepareMeshBufferNormals();

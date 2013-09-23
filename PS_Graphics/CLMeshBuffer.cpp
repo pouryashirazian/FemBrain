@@ -16,7 +16,7 @@ namespace HPC {
 
 bool CLMeshBuffer::ReadbackMeshVertexAttribCL(ComputeDevice* lpDevice,
 												const GLMeshBuffer* lpBuffer,
-												VertexAttribType attrib,
+												MemoryBufferType attrib,
 												U32& count, U32& fstep,
 												vector<float>& values)  {
 	if(lpDevice == NULL || lpBuffer == NULL)
@@ -90,7 +90,7 @@ bool CLMeshBuffer::CopyMeshBufferCL(ComputeDevice* lpDevice,
 	//1.Vertex and other attribs
 	U32 ctVertices, fstep;
 	vector<float> values;
-	VertexAttribType attribs[] = {vatPosition, vatColor, vatNormal, vatTexCoord};
+	MemoryBufferType attribs[] = {mbtPosition, mbtColor, mbtNormal, mbtTexCoord};
 	int ctAttribs = sizeof(attribs) / sizeof(attribs[0]);
 	for(int i=0; i<ctAttribs; i++) {
 		if(lpSource->isVertexBufferValid(attribs[i])) {
@@ -128,7 +128,7 @@ bool CLMeshBuffer::StoreAsObjMesh(const char* chrFilePath,
 	//1.Vertex and other attribs
 	U32 ctVertices, fstep;
 	vector<float> values;
-	VertexAttribType attribs[] = {vatPosition, vatColor, vatNormal, vatTexCoord};
+	MemoryBufferType attribs[] = {mbtPosition, mbtColor, mbtNormal, mbtTexCoord};
 	int ctAttribs = sizeof(attribs) / sizeof(attribs[0]);
 	for(int i=0; i<ctAttribs; i++) {
 		if(lpBuffer->isVertexBufferValid(attribs[i])) {
@@ -171,8 +171,8 @@ GLMeshBuffer* CLMeshBuffer::PrepareMeshBufferNormals(ComputeDevice* lpDevice, GL
 	U32 fstepVertex, fstepNormal;
 	vector<float> vertices;
 	vector<float> normals;
-	ReadbackMeshVertexAttribCL(lpDevice, lpBuffer, vatPosition, ctVertices, fstepVertex, vertices);
-	ReadbackMeshVertexAttribCL(lpDevice, lpBuffer, vatNormal, ctVertices, fstepNormal, normals);
+	ReadbackMeshVertexAttribCL(lpDevice, lpBuffer, mbtPosition, ctVertices, fstepVertex, vertices);
+	ReadbackMeshVertexAttribCL(lpDevice, lpBuffer, mbtNormal, ctVertices, fstepNormal, normals);
 
 	//Produce new MeshBuffer
 	vector<float> allvertices;
@@ -191,7 +191,7 @@ GLMeshBuffer* CLMeshBuffer::PrepareMeshBufferNormals(ComputeDevice* lpDevice, GL
 	//Create scene node
 	GLMeshBuffer* lpDrawNormal = new GLMeshBuffer();
 	lpDrawNormal->setupPerVertexColor(vec4f(0,0,1,1), ctVertices*2, 4);
-	lpDrawNormal->setupVertexAttribs(allvertices, 3, vatPosition);
+	lpDrawNormal->setupVertexAttribs(allvertices, 3, mbtPosition);
 	lpDrawNormal->setFaceMode(ftLines);
 
 	return lpDrawNormal;

@@ -66,6 +66,7 @@ public:
     vec3f extent() const { return (m_upper - m_lower);}
     vec3f center() const { return (m_upper + m_lower) * 0.5f;}
     void getVertices(vector<vec3f>& vertices) const;
+    void print() const;
 
     AABB operator=(const AABB& other) {
     	m_lower = other.m_lower;

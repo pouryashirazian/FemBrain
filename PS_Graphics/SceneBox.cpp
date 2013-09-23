@@ -96,9 +96,9 @@ void SceneBox::setup(const vec3f& lo, const vec3f& hi) {
 	}
 
 	//Setup Mesh
-	setupVertexAttribs(arrVertices, 3, vatPosition);
-	setupVertexAttribs(arrNormals, 3, vatNormal);
-	setupVertexAttribs(arrColors, 4, vatColor);
+	setupVertexAttribs(arrVertices, 3, mbtPosition);
+	setupVertexAttribs(arrNormals, 3, mbtNormal);
+	setupVertexAttribs(arrColors, 4, mbtColor);
 	//setupPerVertexColor(vec4f(1,0,0,1), m_ctVertices, 4);
 	m_ctFaceElements = m_ctVertices;
 	m_faceMode = ftQuads;

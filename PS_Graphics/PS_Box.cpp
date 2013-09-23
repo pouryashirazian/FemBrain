@@ -1,4 +1,6 @@
 #include "PS_Box.h"
+#include <stdio.h>
+
 
 namespace PS{
 namespace MATH{
@@ -56,6 +58,14 @@ void AABB::getVertices(vector<vec3f>& vertices) const {
 	for(int i=0; i<8; i++) {
 		vertices[i] = m_lower + vec3f::mul(vec3f((i & 0x04) >> 2, (i & 0x02) >> 1, i & 0x01), dims);
 	}
+}
+
+void AABB::print() const {
+
+	vec3f side = m_upper - m_lower;
+	printf("LO: [%.3f, %.3f, %.3f]\n", m_lower.x, m_lower.y, m_lower.z);
+	printf("HI: [%.3f, %.3f, %.3f]\n", m_upper.x, m_upper.y, m_upper.z);
+	printf("SIDES: [%.3f, %.3f, %.3f]\n", side.x, side.y, side.z);
 }
 
 

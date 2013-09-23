@@ -41,10 +41,10 @@ bool MeshRenderer::setup(const Mesh* aMesh, int iNode) {
 	MeshNode* aNode = aMesh->getNode(iNode);
 
 	if(aNode->countVertices() > 0)
-		this->setupVertexAttribs(aNode->vertices(), aNode->getUnitVertex(), vatPosition);
+		this->setupVertexAttribs(aNode->vertices(), aNode->getUnitVertex(), mbtPosition);
 
 	if(aNode->countNormals() > 0)
-		this->setupVertexAttribs(aNode->normals(), aNode->getUnitNormal(), vatNormal);
+		this->setupVertexAttribs(aNode->normals(), aNode->getUnitNormal(), mbtNormal);
 
 	if(aNode->countFaces() > 0)
 		this->setupIndexBufferObject(aNode->faceElements(), ftTriangles);

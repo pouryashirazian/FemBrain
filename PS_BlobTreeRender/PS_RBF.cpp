@@ -332,14 +332,14 @@ bool FastRBF::setupFromMesh(Mesh* lpMesh) {
 		ctVertices = GLMeshBuffer::ConvertFloat3ToFloat4(lpNode->vertices(), vSurfXYZW);
 	else {
 		assert(lpNode->getUnitVertex() == 4);
-		lpNode->getVertexAttrib(ctVertices, vSurfXYZW, vatPosition);
+		lpNode->getVertexAttrib(ctVertices, vSurfXYZW, mbtPosition);
 	}
 
 	if(lpNode->countVertices() > 0)
-		this->setupVertexAttribs(vSurfXYZW, 4, vatPosition);
+		this->setupVertexAttribs(vSurfXYZW, 4, mbtPosition);
 
 	if(lpNode->countNormals() > 0)
-		this->setupVertexAttribs(lpNode->normals(), lpNode->getUnitNormal(), vatNormal);
+		this->setupVertexAttribs(lpNode->normals(), lpNode->getUnitNormal(), mbtNormal);
 
 	if(lpNode->countFaces() > 0)
 		this->setupIndexBufferObject(lpNode->faceElements(), ftTriangles);
@@ -354,7 +354,7 @@ bool FastRBF::setupFromMesh(Mesh* lpMesh) {
 	U32 ctNormals = 0;
 
 	vOffSurfXYZF.resize(2 * ctVertices * 4);
-	lpNode->getVertexAttrib(ctNormals, normals, vatNormal);
+	lpNode->getVertexAttrib(ctNormals, normals, mbtNormal);
 
 	//Loop over vertices
 	for (U32 i = 0; i < ctVertices; i++) {
@@ -589,7 +589,7 @@ bool FastRBF::readbackMeshV3T3(U32& ctVertices, vector<float>& vertices,
 
 	U32 fstep;
 	vector<float> arrTemp;
-	CLMeshBuffer::ReadbackMeshVertexAttribCL(m_lpGPU, this, vatPosition, ctVertices, fstep, arrTemp);
+	CLMeshBuffer::ReadbackMeshVertexAttribCL(m_lpGPU, this, mbtPosition, ctVertices, fstep, arrTemp);
 	if(fstep > 3) {
 		vertices.resize(ctVertices * 3);
 		for(U32 i=0; i<ctVertices; i++) {

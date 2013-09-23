@@ -74,8 +74,8 @@ GroundMatrix::GroundMatrix(int rows, int cols, float step) {
 	}
 
 	//Setup Mesh Buffers
-	setupVertexAttribs(arrVertices, 3, vatPosition);
-	setupVertexAttribs(arrColors, 3, vatColor);
+	setupVertexAttribs(arrVertices, 3, mbtPosition);
+	setupVertexAttribs(arrColors, 3, mbtColor);
 	m_ctFaceElements = m_ctVertices;
 	m_faceMode = ftLines;
 }

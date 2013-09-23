@@ -494,7 +494,7 @@ namespace HPC{
 		//Create scene node
 		GLMeshBuffer* lpDrawNormal = new GLMeshBuffer();
 		lpDrawNormal->setupPerVertexColor(vec4f(0,0,1,1), ctVertices*2, 4);
-		lpDrawNormal->setupVertexAttribs(allvertices, 3, vatPosition);
+		lpDrawNormal->setupVertexAttribs(allvertices, 3, mbtPosition);
 		lpDrawNormal->setFaceMode(ftLines);
 
 		return lpDrawNormal;

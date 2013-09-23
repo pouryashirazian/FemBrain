@@ -9,6 +9,155 @@
 #include "GL/glew.h"
 #include "PS_DebugUtils.h"
 
+GLMemoryBuffer::GLMemoryBuffer() {
+	m_isValid = false;
+	m_step = 0;
+	m_dataType = GL_FLOAT;
+	m_szBuffer = 0;
+	m_handle = INVALID_GLBUFFER;
+	m_bufferType = mbtPosition;
+}
+
+
+GLMemoryBuffer::GLMemoryBuffer(MemoryBufferType type, int usage, int step,
+		   	   	   	   	   	   	   int datatype, U32 szTotal, const void* lpData) {
+	m_isValid = false;
+	m_step 	  = 0;
+	m_dataType = GL_FLOAT;
+	m_szBuffer = 0;
+	m_handle   = INVALID_GLBUFFER;
+	m_bufferType = mbtPosition;
+
+	this->setup(type, usage, step, datatype, szTotal, lpData);
+}
+
+GLMemoryBuffer::~GLMemoryBuffer() {
+	cleanup();
+}
+
+void GLMemoryBuffer::cleanup() {
+	if(m_isValid)
+		glDeleteBuffers(1, &m_handle);
+	m_handle = 0;
+	m_isValid = false;
+}
+
+bool GLMemoryBuffer::setup(MemoryBufferType type, int usage, int step,
+							   int datatype, U32 szTotal, const void* lpData) {
+	if(lpData == NULL)
+		return false;
+	m_bufferType = type;
+	m_step = step;
+	m_dataType = datatype;
+	m_szBuffer = szTotal;
+
+
+	glGenBuffers(1, &m_handle);
+	glBindBuffer(GL_ARRAY_BUFFER, m_handle);
+	glBufferData(GL_ARRAY_BUFFER, m_szBuffer, lpData, usage);
+	m_isValid = true;
+	return true;
+}
+
+bool GLMemoryBuffer::readBackBuffer(U32 szOutBuffer, void* lpOutBuffer) {
+	if(!m_isValid || szOutBuffer < m_szBuffer)
+		return false;
+
+	glBindBuffer( GL_ARRAY_BUFFER, m_handle);
+	float* lpMappedData = (float *) glMapBuffer( GL_ARRAY_BUFFER, GL_READ_ONLY );
+	if(lpMappedData == NULL) {
+		return false;
+	}
+
+	memcpy(lpOutBuffer, lpMappedData, m_szBuffer);
+	glUnmapBuffer( GL_ARRAY_BUFFER );
+
+	return true;
+}
+
+void GLMemoryBuffer::attach() {
+	if(!m_isValid)
+		return;
+
+	//Bind Buffer
+	if(m_bufferType == mbtFaceIndices)
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_handle);
+	else
+		glBindBuffer(GL_ARRAY_BUFFER, m_handle);
+
+	switch(m_bufferType) {
+	case(mbtColor):
+		glColorPointer(m_step, m_dataType, 0, 0);
+		glEnableClientState(GL_COLOR_ARRAY);
+		break;
+	case(mbtTexCoord):
+		glTexCoordPointer(m_step, m_dataType, 0, 0);
+		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+		break;
+	case(mbtNormal):
+		glNormalPointer(m_dataType, 0, 0);
+		glEnableClientState(GL_NORMAL_ARRAY);
+		break;
+	case(mbtPosition):
+		glVertexPointer(m_step, m_dataType, 0, 0);
+		glEnableClientState(GL_VERTEX_ARRAY);
+		break;
+	case(mbtFaceIndices):
+		glEnableClientState(GL_ELEMENT_ARRAY_BUFFER);
+		break;
+	}
+
+}
+
+void GLMemoryBuffer::detach() {
+	if(!m_isValid)
+		return;
+
+	switch(m_bufferType) {
+	case(mbtColor):
+		glDisableClientState(GL_COLOR_ARRAY);
+		break;
+	case(mbtTexCoord):
+		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+		break;
+	case(mbtNormal):
+		glDisableClientState(GL_NORMAL_ARRAY);
+		break;
+	case(mbtPosition):
+		glDisableClientState(GL_VERTEX_ARRAY);
+		break;
+	case(mbtFaceIndices):
+		glDisableClientState(GL_ELEMENT_ARRAY_BUFFER);
+		break;
+	}
+}
+
+void GLMemoryBuffer::drawElements(int faceMode, int ctElements) {
+	glDrawElements(faceMode, ctElements, m_dataType, (GLvoid*)0);
+}
+
+bool GLMemoryBuffer::modify(U32 offset, U32 szTotal, const void* lpData) {
+	if(!m_isValid)
+		return false;
+
+	if(szTotal != m_szBuffer || lpData == NULL)
+		return false;
+
+	//Bind Buffer
+	if(m_bufferType == mbtFaceIndices) {
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_handle);
+		glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, offset, szTotal, lpData);
+	}
+	else {
+		glBindBuffer(GL_ARRAY_BUFFER, m_handle);
+		glBufferSubData(GL_ARRAY_BUFFER, offset, szTotal, lpData);
+	}
+
+
+	return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////
 GLMeshBuffer::GLMeshBuffer():SceneNode()
 {
 	m_vboColor = m_vboNormal = m_vboTexCoord = m_vboVertex = m_iboFaces = INVALID_GLBUFFER;
@@ -45,7 +194,7 @@ void GLMeshBuffer::cleanup()
 	m_isValidColor = m_isValidIndex = m_isValidNormal = m_isValidTexCoord = m_isValidVertex = false;
 }
 
-void GLMeshBuffer::setupVertexAttribs(const vector<float>& arrAttribs, int step, VertexAttribType attribKind)
+void GLMeshBuffer::setupVertexAttribs(const vector<float>& arrAttribs, int step, MemoryBufferType attribKind)
 {
 	/*
 	glGenBuffers(1, &m_outputMesh.vboVertex);
@@ -66,7 +215,7 @@ void GLMeshBuffer::setupVertexAttribs(const vector<float>& arrAttribs, int step,
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, ctTriangles *3 * sizeof(U32), arrFaces, GL_DYNAMIC_DRAW);
 	*/
 
-	if(attribKind == vatPosition)
+	if(attribKind == mbtPosition)
 	{
 		m_isValidVertex = true;
 		m_stepVertex = step;
@@ -75,7 +224,7 @@ void GLMeshBuffer::setupVertexAttribs(const vector<float>& arrAttribs, int step,
 		glBindBuffer(GL_ARRAY_BUFFER, m_vboVertex);
 		glBufferData(GL_ARRAY_BUFFER, arrAttribs.size() * sizeof(float), &arrAttribs[0], GL_STATIC_DRAW);
 	}
-	else if(attribKind == vatNormal)
+	else if(attribKind == mbtNormal)
 	{
 		m_isValidNormal = true;
 		vector<float> arrNormalizedNormals;
@@ -94,7 +243,7 @@ void GLMeshBuffer::setupVertexAttribs(const vector<float>& arrAttribs, int step,
 		glBindBuffer(GL_ARRAY_BUFFER, m_vboNormal);
 		glBufferData(GL_ARRAY_BUFFER, arrAttribs.size() * sizeof(float), &arrAttribs[0], GL_STATIC_DRAW);
 	}
-	else if(attribKind == vatColor)
+	else if(attribKind == mbtColor)
 	{
 		m_isValidColor = true;
 		m_stepColor = step;
@@ -103,7 +252,7 @@ void GLMeshBuffer::setupVertexAttribs(const vector<float>& arrAttribs, int step,
 		glBindBuffer(GL_ARRAY_BUFFER, m_vboColor);
 		glBufferData(GL_ARRAY_BUFFER, arrAttribs.size() * sizeof(float), &arrAttribs[0], GL_STATIC_DRAW);
 	}
-	else if(attribKind == vatTexCoord)
+	else if(attribKind == mbtTexCoord)
 	{
 		m_isValidTexCoord = true;
 		m_stepTexCoord = step;
@@ -153,23 +302,23 @@ void GLMeshBuffer::setShaderEffectProgram(U32 glEffect)
 	}
 }
 
-bool GLMeshBuffer::readbackMeshVertexAttribGL(VertexAttribType attrib, U32& count, vector<float>& values) const {
+bool GLMeshBuffer::readbackMeshVertexAttribGL(MemoryBufferType attrib, U32& count, vector<float>& values) const {
 	U32 vbo = 0;
 	U32 szRead = 0;
 	count = 0;
-	if(attrib == vatPosition) {
+	if(attrib == mbtPosition) {
 		vbo = m_vboVertex;
 		szRead = m_ctVertices * m_stepVertex;
 	}
-	else if(attrib == vatNormal) {
+	else if(attrib == mbtNormal) {
 		vbo = m_vboNormal;
 		szRead = m_ctVertices * 3;
 	}
-	else if(attrib == vatColor) {
+	else if(attrib == mbtColor) {
 		vbo = m_vboColor;
 		szRead = m_ctVertices * m_stepColor;
 	}
-	else if(attrib == vatTexCoord) {
+	else if(attrib == mbtTexCoord) {
 		vbo = m_vboTexCoord;
 		szRead = m_ctVertices * m_stepTexCoord;
 	}
@@ -191,15 +340,15 @@ bool GLMeshBuffer::readbackMeshVertexAttribGL(VertexAttribType attrib, U32& coun
 	return true;
 }
 
-bool GLMeshBuffer::isVertexBufferValid(VertexAttribType attribType) const {
+bool GLMeshBuffer::isVertexBufferValid(MemoryBufferType attribType) const {
 	switch(attribType) {
-	case(vatPosition):
+	case(mbtPosition):
 		return m_isValidVertex;
-	case(vatNormal):
+	case(mbtNormal):
 		return m_isValidNormal;
-	case(vatColor):
+	case(mbtColor):
 		return m_isValidColor;
-	case(vatTexCoord):
+	case(mbtTexCoord):
 		return m_isValidTexCoord;
 	default:
 		return m_isValidVertex;
@@ -207,15 +356,15 @@ bool GLMeshBuffer::isVertexBufferValid(VertexAttribType attribType) const {
 }
 
 //Steps
-U32 GLMeshBuffer::vertexAttribStep(VertexAttribType attribType) const {
+U32 GLMeshBuffer::vertexAttribStep(MemoryBufferType attribType) const {
 	switch(attribType) {
-	case(vatPosition):
+	case(mbtPosition):
 		return m_stepVertex;
-	case(vatNormal):
+	case(mbtNormal):
 		return 3;
-	case(vatColor):
+	case(mbtColor):
 		return m_stepColor;
-	case(vatTexCoord):
+	case(mbtTexCoord):
 		return m_stepTexCoord;
 	default:
 		return m_stepVertex;
@@ -224,15 +373,15 @@ U32 GLMeshBuffer::vertexAttribStep(VertexAttribType attribType) const {
 }
 
 //Buffer Objects
-U32 GLMeshBuffer::vertexBufferObjectGL(VertexAttribType attribType) const {
+U32 GLMeshBuffer::vertexBufferObjectGL(MemoryBufferType attribType) const {
 	switch(attribType) {
-	case(vatPosition):
+	case(mbtPosition):
 		return m_vboVertex;
-	case(vatNormal):
+	case(mbtNormal):
 		return m_vboNormal;
-	case(vatColor):
+	case(mbtColor):
 		return m_vboColor;
-	case(vatTexCoord):
+	case(mbtTexCoord):
 		return m_vboTexCoord;
 	default:
 		return m_vboVertex;
@@ -380,7 +529,7 @@ GLMeshBuffer* GLMeshBuffer::PrepareMeshBufferForDrawingNormals(float len, U32 ct
     //Create scene node
     GLMeshBuffer* lpDrawNormal = new GLMeshBuffer();
     lpDrawNormal->setupPerVertexColor(vec4f(0,0,1,1), ctVertices*2, 4);
-    lpDrawNormal->setupVertexAttribs(allvertices, 3, vatPosition);
+    lpDrawNormal->setupVertexAttribs(allvertices, 3, mbtPosition);
     lpDrawNormal->setFaceMode(ftLines);
 
     return lpDrawNormal;

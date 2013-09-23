@@ -33,14 +33,6 @@ Deformable::Deformable(const char* lpVegFilePath,
 	this->setup(lpVegFilePath, lpObjFilePath, vFixedVertices, ctThreads, lpModelTitle);
 }
 
-Deformable::Deformable(U32 ctVertices, double* lpVertices,
-						  U32 ctElements, int* lpElements,
-						  std::vector<int>& vFixedVertices,
-						  int ctThreads)
-{
-	this->setup(ctVertices, lpVertices, ctElements, lpElements, vFixedVertices, ctThreads);
-}
-
 Deformable::~Deformable()
 {
 	this->cleanup();
@@ -57,7 +49,9 @@ void Deformable::cleanup()
 
 	SAFE_DELETE(m_lpMeshGraph);
 
-	SAFE_DELETE(m_lpDeformableMesh);
+	SAFE_DELETE(m_lpSurfaceMesh);
+
+	//SAFE_DELETE(m_lpDeformableMesh);
 
 	SAFE_DELETE(m_lpDeformableForceModel);
 
@@ -78,30 +72,35 @@ void Deformable::setup(const char* lpVegFilePath,
 						  int ctThreads,
 						  const char* lpModelTitle)
 {
-	m_fOnDeform = NULL;
-
-	m_lpDeformableMesh = new SceneObjectDeformable(const_cast<char*>(lpObjFilePath));
-	//m_lpDeformableMesh->EnableVertexSelection();
-	m_lpDeformableMesh->ResetDeformationToRest();
-	m_lpDeformableMesh->BuildNeighboringStructure();
-	m_lpDeformableMesh->BuildNormals();
-	m_lpDeformableMesh->SetMaterialAlpha(0.5);
-	m_idxPulledVertex = -1;
-	m_bRenderFixedVertices = true;
-	m_bRenderVertices = false;
-
+	//Set Model Name
 	if(lpModelTitle == NULL)
 		m_strModelName = PS::FILESTRINGUTILS::ExtractFileTitleOnly(DAnsiStr(lpVegFilePath)).cptr();
 	else
 		m_strModelName = string(lpModelTitle);
 
-	//m_hapticCompliance = 1.0;
+	//Init Vars
+	m_fOnDeform = NULL;
 	m_hapticCompliance = 1.0;
+	m_idxPulledVertex = -1;
 	m_hapticForceNeighorhoodSize = DEFAULT_FORCE_NEIGHBORHOOD_SIZE;
+	m_bRenderFixedVertices = true;
+	m_bRenderVertices = false;
 	m_bHapticInProgress = false;
 
 
-	//Load the volumetric mesh
+	//Setup Boundary Mesh
+	m_lpSurfaceMesh = new SurfaceMesh(lpObjFilePath);
+	m_lpSurfaceMesh->resetToRest();
+
+	//m_lpDeformableMesh = new SceneObjectDeformable(const_cast<char*>(lpObjFilePath));
+	//m_lpDeformableMesh->EnableVertexSelection();
+//	m_lpDeformableMesh->ResetDeformationToRest();
+//	m_lpDeformableMesh->BuildNeighboringStructure();
+//	m_lpDeformableMesh->BuildNormals();
+//	m_lpDeformableMesh->SetMaterialAlpha(0.5);
+
+
+	//Setup Volumetric Mesh
 	VolumetricMesh * lpVolMesh = VolumetricMeshLoader::load(const_cast<char*>(lpVegFilePath));
 	if (lpVolMesh == NULL)
 		LogError("Failed to load veg format mesh.");
@@ -161,111 +160,9 @@ void Deformable::setup(const char* lpVegFilePath,
 
 
 	//Compute AABB
-	Vec3d lo, up;
-	m_lpDeformableMesh->GetMesh()->getBoundingBox(1.0, &lo, &up);
-	m_aabb.set(vec3(lo[0], lo[1], lo[2]), vec3(up[0], up[1], up[2]));
+	this->setBBox(m_lpSurfaceMesh->bbox());
 
-	//Compute model rest volume
-	/*
-	int ctVertices = m_lpTetMesh->getNumVertices();
-	if(ctVertices == m_lpDeformableMesh->GetNumVertices())
-	{
-		for(int i=0; i < ctVertices; i++)
-		{
-			Vec3d tetVertex = * m_lpTetMesh->getVertex(i);
-			Vec3d objVertex = m_lpDeformableMesh->GetMesh()->getPosition(i);
-
-			printf("TetVertex [%.2f, %.2f, %.2f], ObjVertex [%.2f, %.2f, %.2f] \n",
-					tetVertex[0], tetVertex[1], tetVertex[2],
-					objVertex[0], objVertex[1], objVertex[2]);
-		}
-	}
-	*/
-
-	U32 ctElems = m_lpTetMesh->getNumElements();
-	m_arrElementVolumes = new double[ctElems];
-	for(U32 i=0; i<ctElems; i++)
-		m_arrElementVolumes[i] = m_lpTetMesh->getElementVolume(i);
-	m_restVolume = this->computeVolume();
-}
-
-/*!
- * Deformable model built from vertices and indices
- */
-void Deformable::setup(U32 ctVertices, double* lpVertices,
-						  U32 ctElements, int* lpElements,
-						  std::vector<int>& vFixedVertices,
-						  int ctThreads)
-{
-	m_bApplyGravity = false;
-	m_fOnDeform = NULL;
-	//m_lpDeformableMesh = new SceneObjectDeformable(const_cast<char*>(lpObjFilePath));
-	//m_lpDeformableMesh->EnableVertexSelection();
-	m_lpDeformableMesh->ResetDeformationToRest();
-	m_lpDeformableMesh->BuildNeighboringStructure();
-	m_lpDeformableMesh->BuildNormals();
-	m_lpDeformableMesh->SetMaterialAlpha(0.5);
-	m_idxPulledVertex = -1;
-	m_bRenderFixedVertices = true;
-	m_bRenderVertices = false;
-	m_strModelName = "MEMORY";
-
-	//m_hapticCompliance = 1.0;
-	m_hapticCompliance = 1.0;
-	m_hapticForceNeighorhoodSize = DEFAULT_FORCE_NEIGHBORHOOD_SIZE;
-	m_bHapticInProgress = false;
-
-
-	//Load the volumetric mesh
-	m_lpTetMesh = new TetMesh(ctVertices, lpVertices, ctElements, lpElements);
-
-	//MeshGraph
-	m_lpMeshGraph = GenerateMeshGraph::Generate(m_lpTetMesh);
-
-	//Setup Deformable Model
-	m_lpDeformable = new CorotationalLinearFEM(m_lpTetMesh);
-
-	//Setup Force Model
-	m_lpDeformableForceModel = new CorotationalLinearFEMForceModel(m_lpDeformable);
-
-	//Compute Mass Matrix
-	GenerateMassMatrix::computeMassMatrix(m_lpTetMesh, &m_lpMassMatrix, true);
-
-
-	// This option only affects PARDISO and SPOOLES solvers, where it is best
-	// to keep it at 0, which implies a symmetric, non-PD solve.
-	// With CG, this option is ignored.
-	m_positiveDefiniteSolver = 0;
-
-	//Copy from the input fixed vertices
-	m_vFixedVertices.assign(vFixedVertices.begin(), vFixedVertices.end());
-
-	// (tangential) Rayleigh damping
-	// "underwater"-like damping
-	m_dampingMassCoeff = 0.0;
-
-	// (primarily) high-frequency damping
-	m_dampingStiffnessCoeff = 0.01;
-
-	// total number of DOFs
-	m_dof = 3 * m_lpTetMesh->getNumVertices();
-	m_arrDisplacements = new double[m_dof];
-	m_arrExtForces = new double[m_dof];
-
-	//Time Step the model
-	m_timeStep = 0.0333;
-	m_ctTimeStep = 0;
-	m_lpIntegrator = NULL;
-
-	//Create the integrator
-	this->setupIntegrator(ctThreads);
-
-	//Compute AABB
-	Vec3d lo, up;
-	m_lpDeformableMesh->GetMesh()->getBoundingBox(1.0, &lo, &up);
-	m_aabb.set(vec3(lo[0], lo[1], lo[2]), vec3(up[0], up[1], up[2]));
-
-
+	//Compute Volume
 	U32 ctElems = m_lpTetMesh->getNumElements();
 	m_arrElementVolumes = new double[ctElems];
 	for(U32 i=0; i<ctElems; i++)
@@ -313,26 +210,21 @@ double Deformable::computeVolume() const
 	U32 ctElements = m_lpTetMesh->getNumElements();
 	double vol = 0.0;
 	int indices[4];
-	Vec3d vertices[4];
+	vec3d vertices[4];
 	for(U32 i=0; i<ctElements; i++)
 	{
-		//int ctVertices = m_lpTetMesh->getNumVertices();
-		//int ctV2 = m_lpDeformableMesh->GetNumVertices();
 		indices[0] = m_lpTetMesh->getVertexIndex(i, 0);
 		indices[1] = m_lpTetMesh->getVertexIndex(i, 1);
 		indices[2] = m_lpTetMesh->getVertexIndex(i, 2);
 		indices[3] = m_lpTetMesh->getVertexIndex(i, 3);
 
-		vertices[0] = m_lpDeformableMesh->GetMesh()->getPosition(indices[0]);
-		vertices[1] = m_lpDeformableMesh->GetMesh()->getPosition(indices[1]);
-		vertices[2] = m_lpDeformableMesh->GetMesh()->getPosition(indices[2]);
-		vertices[3] = m_lpDeformableMesh->GetMesh()->getPosition(indices[3]);
+		vertices[0] = m_lpSurfaceMesh->vertexAt(indices[0]);
+		vertices[1] = m_lpSurfaceMesh->vertexAt(indices[1]);
+		vertices[2] = m_lpSurfaceMesh->vertexAt(indices[2]);
+		vertices[3] = m_lpSurfaceMesh->vertexAt(indices[3]);
 
-		double cur = m_lpTetMesh->getTetVolume(&vertices[0], &vertices[1], &vertices[2], &vertices[3]);
+		double cur = TetrahedraMesh::ComputeTetVolume(vertices[0], vertices[1], vertices[2], vertices[3]);
 		vol += cur;
-		//if(cur != m_arrElementVolumes[i])
-			//printf("Element vol changed! ELEM = %d \n", i);
-
 	}
 	return vol;
 }
@@ -391,7 +283,8 @@ void Deformable::timestep()
 
 	m_lpIntegrator->GetqState(m_arrDisplacements);
 
-	m_lpDeformableMesh->SetVertexDeformations(m_arrDisplacements);
+	m_lpSurfaceMesh->applyDisplacements(m_arrDisplacements);
+	//m_lpDeformableMesh->SetVertexDeformations(m_arrDisplacements);
 
 	//Apply deformations
 	if(m_fOnDeform)
@@ -403,11 +296,8 @@ void Deformable::timestep()
 
 int Deformable::pickVertex(const vec3d& wpos, vec3d& vertex)
 {
-	Vec3d world(wpos.x, wpos.y, wpos.z);
 	double dist;
-	double arrVPos[3];
-	int index = m_lpDeformableMesh->FindClosestVertex(world, &dist, &arrVPos[0]);
-	vertex = vec3d(&arrVPos[0]);
+	int index = m_lpSurfaceMesh->findClosestVertex(wpos, dist, vertex);
 	LogInfoArg2("Clicked on vertex: %d (0-indexed). Dist: %.2f", index, dist);
 	return index;
 }
@@ -417,16 +307,14 @@ int Deformable::pickVertices(const vec3d& boxLo, const vec3d& boxHi,
 {
 	arrFoundCoords.resize(0);
 	arrFoundIndices.resize(0);
-	ObjMesh* lpMesh = m_lpDeformableMesh->GetMesh();
-	U32 ctVertices = lpMesh->getNumVertices();
+	U32 ctVertices = m_lpSurfaceMesh->getVertexCount();
 	for(U32 i=0; i<ctVertices;i++)
 	{
-		Vec3d v = lpMesh->getPosition(i);
-		vec3d vv = vec3d(v[0], v[1], v[2]);
+		vec3d v = m_lpSurfaceMesh->vertexAt(i);
 
-		if(Contains<double>(boxLo, boxHi, vv))
+		if(Contains<double>(boxLo, boxHi, v))
 		{
-			arrFoundCoords.push_back(vv);
+			arrFoundCoords.push_back(v);
 			arrFoundIndices.push_back(i);
 		}
 	}
@@ -439,12 +327,10 @@ int Deformable::pickVertices(const vec3d& boxLo, const vec3d& boxHi)
 	m_vHapticIndices.resize(0);
 	m_vHapticDisplacements.resize(0);
 
-	ObjMesh* lpMesh = m_lpDeformableMesh->GetMesh();
-	U32 ctVertices = lpMesh->getNumVertices();
+	U32 ctVertices = m_lpSurfaceMesh->getVertexCount();
 	for(U32 i=0; i<ctVertices;i++)
 	{
-		Vec3d v = lpMesh->getPosition(i);
-		vec3d vv = vec3d(v[0], v[1], v[2]);
+		vec3d vv = m_lpSurfaceMesh->vertexAt(i);
 
 		if(Contains<double>(boxLo, boxHi, vv))
 		{
@@ -766,193 +652,10 @@ void Deformable::hapticSetCurrentDisplacements(const vector<int>& indices,
 	m_vHapticDisplacements.assign(displacements.begin(), displacements.end());
 }
 
-/*!
- * Draw deformable model
- */
 void Deformable::draw()
 {
-	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-
-	glStencilFunc(GL_ALWAYS, 0, ~(0u));
-	// render embedded triangle mesh
-	//if (renderSecondaryDeformableObject)
-		//secondaryDeformableObjectRenderingMesh->Render();
-
-	glStencilFunc(GL_ALWAYS, 1, ~(0u));
-
-	// render the main deformable object (surface of volumetric mesh)
-	{
-		{
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-			glEnable(GL_BLEND);
-
-			glEnable(GL_POLYGON_OFFSET_FILL);
-			glPolygonOffset(1.0, 1.0);
-			glDrawBuffer(GL_NONE);
-			m_lpDeformableMesh->Render();
-			glDisable(GL_POLYGON_OFFSET_FILL);
-			glDrawBuffer(GL_BACK);
-			glEnable(GL_LIGHTING);
-			glDisable(GL_BLEND);
-		}
-
-		glColor3f(0.0, 0.0, 0.0);
-		m_lpDeformableMesh->Render();
-
-		//Vertices
-		if(m_bRenderVertices)
-		{
-			glDisable(GL_LIGHTING);
-			glColor3f(0.5, 0, 0);
-			glPointSize(8.0);
-			m_lpDeformableMesh->RenderVertices();
-			glEnable(GL_LIGHTING);
-		}
-	}
-
-
-
-	// render any extra scene geometry
-	glStencilFunc(GL_ALWAYS, 0, ~(0u));
-
-	/*
-	double groundPlaneHeight = 1.0;
-	double groundPlaneLightHeight = 1.0;
-	double ground[4] = { 0, 1, 0, -groundPlaneHeight - 0.01 };
-	double light[4] = { 0, groundPlaneLightHeight, 0, 1 };
-	*/
-
-	glDisable(GL_TEXTURE_2D);
-
-	// render shadow
-	{
-
-		/*
-		glColor3f(0.1, 0.1, 0.1);
-		glDisable(GL_LIGHTING);
-		m_lpDeformableMesh->RenderShadow(ground, light);
-
-		glEnable(GL_LIGHTING);
-		*/
-	}
-
-	glDisable(GL_LIGHTING);
-
-	glStencilFunc(GL_ALWAYS, 1, ~(0u));
-	glColor3f(0, 0, 0);
-	m_lpDeformableMesh->RenderEdges();
-
-	// disable stencil buffer modifications
-	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
-
-	glColor3f(0, 0, 0);
-
-	// render model fixed vertices
-	if (m_bRenderFixedVertices) {
-		for (int i = 0; i < (int)m_vFixedVertices.size(); i++) {
-			glColor3f(1, 0, 0);
-			double fixedVertexPos[3];
-			m_lpDeformableMesh->GetSingleVertexRestPosition(
-					m_vFixedVertices[i],
-					&fixedVertexPos[0],
-					&fixedVertexPos[1],
-					&fixedVertexPos[2]);
-
-			glEnable(GL_POLYGON_OFFSET_POINT);
-			glPolygonOffset(-1.0, -1.0);
-			glPointSize(12.0);
-			glBegin(GL_POINTS);
-			glVertex3f(fixedVertexPos[0], fixedVertexPos[1], fixedVertexPos[2]);
-			glEnd();
-			glDisable(GL_POLYGON_OFFSET_FILL);
-		}
-	}
-
-	// render the currently pulled vertex
-	if (m_idxPulledVertex >= 0) {
-		glColor3f(0, 1, 0);
-		double pulledVertexPos[3];
-		m_lpDeformableMesh->GetSingleVertexPositionFromBuffer(
-				m_idxPulledVertex,
-				&pulledVertexPos[0],
-				&pulledVertexPos[1],
-				&pulledVertexPos[2]);
-
-		glEnable(GL_POLYGON_OFFSET_POINT);
-		glPolygonOffset(-1.0, -1.0);
-		glPointSize(8.0);
-		glBegin(GL_POINTS);
-		glVertex3f(pulledVertexPos[0], pulledVertexPos[1], pulledVertexPos[2]);
-		glEnd();
-		glDisable(GL_POLYGON_OFFSET_FILL);
-	}
-
-
-/*
-	m_lpDeformableMesh->Render();
-
-	glStencilFunc(GL_ALWAYS, 1, ~(0u));
-	glColor3f(0, 0, 0);
-	//if (renderWireframe)
-	m_lpDeformableMesh->RenderEdges();
-
-	// disable stencil buffer modifications
-	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
-
-
-	glPushAttrib(GL_ALL_ATTRIB_BITS);
-	{
-		glDisable(GL_LIGHTING);
-		glColor3f(0.5, 0, 0);
-		glPointSize(8.0);
-
-		m_lpDeformableMesh->RenderVertices();
-		glEnable(GL_LIGHTING);
-	}
-	glPopAttrib();
-
-	//Render the currently pulled vertex
-	if (m_idxPulledVertex >= 0)
-	{
-		glPushAttrib(GL_ALL_ATTRIB_BITS);
-		glColor3f(0, 1, 0);
-		double pulledVertexPos[3];
-		m_lpDeformableMesh->GetSingleVertexPositionFromBuffer(m_idxPulledVertex,
-				&pulledVertexPos[0], &pulledVertexPos[1], &pulledVertexPos[2]);
-
-		glEnable(GL_POLYGON_OFFSET_POINT);
-		glPolygonOffset(-1.0, -1.0);
-		glPointSize(8.0);
-		glBegin(GL_POINTS);
-		glVertex3f(pulledVertexPos[0], pulledVertexPos[1], pulledVertexPos[2]);
-		glEnd();
-		glDisable(GL_POLYGON_OFFSET_FILL);
-
-		glPopAttrib();
-	}
-
-	// render model fixed vertices
-	if (m_bRenderFixedVertices) {
-		glPushAttrib(GL_ALL_ATTRIB_BITS);
-		for (int i = 0; i < m_vFixedVertices.size(); i++)
-		{
-			glColor3f(1, 0, 0);
-			double fixedVertexPos[3];
-			m_lpDeformableMesh->GetSingleVertexRestPosition(m_vFixedVertices[i],
-					&fixedVertexPos[0], &fixedVertexPos[1], &fixedVertexPos[2]);
-
-			glEnable(GL_POLYGON_OFFSET_POINT);
-			glPolygonOffset(-1.0, -1.0);
-			glPointSize(12.0);
-			glBegin(GL_POINTS);
-			glVertex3f(fixedVertexPos[0], fixedVertexPos[1], fixedVertexPos[2]);
-			glEnd();
-			glDisable(GL_POLYGON_OFFSET_FILL);
-		}
-
-		glPopAttrib();
-	}
-*/
+	if(m_lpSurfaceMesh)
+		m_lpSurfaceMesh->draw();
 }
 
 
@@ -960,12 +663,12 @@ void Deformable::drawTetMesh(const vec3d& avatarCenter,
 		   	   	   	   	   	     const vec3d& avatarHalfLength,
 		   	   	   	   	   	     double maxDist) {
 
-	if(!m_lpDeformableMesh)
+	if(!m_lpSurfaceMesh)
 		return;
 
-	ObjMesh* lpObjMesh = m_lpDeformableMesh->GetMesh();
-	U32 ctFaces = lpObjMesh->getNumFaces();
-	if(ctFaces == 0 || lpObjMesh->getNumGroups() == 0)
+
+	U32 ctFaces = m_lpSurfaceMesh->getFaceCount();
+	if(ctFaces == 0)
 		return;
 
 	double tri[3][3];
@@ -983,18 +686,12 @@ void Deformable::drawTetMesh(const vec3d& avatarCenter,
 
 	//1.Find all faces intersected with avatar
 	for(U32 iface=0; iface < ctFaces; iface++) {
-
-		const ObjMesh::Face* face = lpObjMesh->getGroupHandle(0)->getFaceHandle(iface);
-		if(face->getNumVertices() != 3) {
-			LogErrorArg1("Face %d does not have 3 vertices!", iface);
-			continue;
-		}
-
+		vec3u32 face = m_lpSurfaceMesh->faceAt(iface);
 		//Copy Face Pos
 		for(int i=0; i < 3; i++) {
-			Vec3d p = lpObjMesh->getPosition(face->getVertexHandle(i)->getPositionIndex());
+			vec3d p = m_lpSurfaceMesh->faceVertexAt(iface, i);
 			for(int j=0; j < 3; j++) {
-				tri[i][j] = p[j];
+				tri[i][j] = p.element(j);
 			}
 		}
 
@@ -1008,8 +705,8 @@ void Deformable::drawTetMesh(const vec3d& avatarCenter,
 			for(int i=0; i < 3; i++) {
 
 				//Maps vertices to faces
-				if(mapCrossedVertices.find(face->getVertexHandle(i)->getPositionIndex() ) == mapCrossedVertices.end())
-					mapCrossedVertices.insert(std::make_pair(face->getVertexHandle(i)->getPositionIndex(), iface));
+				if(mapCrossedVertices.find(face.element(i) ) == mapCrossedVertices.end())
+					mapCrossedVertices.insert(std::make_pair(face.element(i), iface));
 			}
 		}
 
@@ -1035,21 +732,23 @@ void Deformable::drawTetMesh(const vec3d& avatarCenter,
 		return;
 
 	//2.Find all intersecting tetrahedra
-	int ctElements = m_lpTetMesh->getNumElements();
+	int ctTetrahedra = m_lpTetMesh->getNumElements();
+	vector<int> elementsToBeRemoved;
+	elementsToBeRemoved.reserve(128);
 	int indices[4];
-	Vec3d a,b,c,d;
+	vec3d a,b,c,d;
 
 	//Loop Over Elements
-	for(int i=0; i<ctElements; i++)
+	for(int iTet=0; iTet<ctTetrahedra; iTet++)
 	{
-		indices[0] = m_lpTetMesh->getVertexIndex(i, 0);
-		indices[1] = m_lpTetMesh->getVertexIndex(i, 1);
-		indices[2] = m_lpTetMesh->getVertexIndex(i, 2);
-		indices[3] = m_lpTetMesh->getVertexIndex(i, 3);
+		indices[0] = m_lpTetMesh->getVertexIndex(iTet, 0);
+		indices[1] = m_lpTetMesh->getVertexIndex(iTet, 1);
+		indices[2] = m_lpTetMesh->getVertexIndex(iTet, 2);
+		indices[3] = m_lpTetMesh->getVertexIndex(iTet, 3);
 
 		int ctUsedVertex = 0;
-		for(int i=0; i<4; i++) {
-			if(mapCrossedVertices.find(indices[i]) != mapCrossedVertices.end()) {
+		for(int j=0; j<4; j++) {
+			if(mapCrossedVertices.find(indices[j]) != mapCrossedVertices.end()) {
 				ctUsedVertex++;
 			}
 		}
@@ -1057,10 +756,12 @@ void Deformable::drawTetMesh(const vec3d& avatarCenter,
 		if(ctUsedVertex != 3)
 			continue;
 
-		a = lpObjMesh->getPosition(indices[0]);
-		b = lpObjMesh->getPosition(indices[1]);
-		c = lpObjMesh->getPosition(indices[2]);
-		d = lpObjMesh->getPosition(indices[3]);
+		//Element tobe removed
+		elementsToBeRemoved.push_back(iTet);
+		a = m_lpSurfaceMesh->vertexAt(indices[0]);
+		b = m_lpSurfaceMesh->vertexAt(indices[1]);
+		c = m_lpSurfaceMesh->vertexAt(indices[2]);
+		d = m_lpSurfaceMesh->vertexAt(indices[3]);
 
 		vec4f black(0,0,0,1);
 		vec4f white(1,1,1,1);
@@ -1089,4 +790,12 @@ void Deformable::drawTetMesh(const vec3d& avatarCenter,
 		glEnd();
 		glPopAttrib();
 	}
+
+	//Update Meshes
+	//Update System Matrices: Mass, Stiffness, Damping
+	/*
+	for(int i=0; i<elementsToBeRemoved; i++) {
+		m_lp
+	}
+	*/
 }

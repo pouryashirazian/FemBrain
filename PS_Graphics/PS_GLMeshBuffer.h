@@ -33,8 +33,9 @@ using namespace PS::MATH;
 #define GL_POLYGON_BIT 0x00000008
 #define GL_POLYGON 0x0009
 */
+#define INVALID_GLBUFFER ~0
 
-enum VertexAttribType {vatPosition, vatNormal, vatColor, vatTexCoord, vatCount};
+enum MemoryBufferType {mbtPosition, mbtNormal, mbtColor, mbtTexCoord, mbtFaceIndices, mbtCount};
 
 enum FaceType {ftPoints = 0x0000, ftLines = 0x0001, ftLineLoop = 0x0002, ftLineStrip = 0x0003,
 			   ftTriangles = 0x0004, ftTriangleStrip = 0x0005, ftTriangleFan = 0x0006,
@@ -42,19 +43,62 @@ enum FaceType {ftPoints = 0x0000, ftLines = 0x0001, ftLineLoop = 0x0002, ftLineS
 
 enum ShaderEffectType {setFixedFunction, setCustom};
 
+
+/*!
+ * OpenGL Memory Buffer
+ */
+class GLMemoryBuffer {
+public:
+	GLMemoryBuffer();
+	GLMemoryBuffer(MemoryBufferType type, int usage, int step,
+			   	     int datatype, U32 szTotal, const void* lpData);
+	virtual ~GLMemoryBuffer();
+
+	bool setup(MemoryBufferType type, int usage, int step,
+			   int datatype, U32 szTotal, const void* lpData);
+	void attach();
+	void detach();
+	void drawElements(int faceMode, int ctElements);
+
+	/*!
+	 * Modifies the buffer for changes
+	 */
+	bool modify(U32 offset, U32 szTotal, const void* lpData);
+
+
+	bool readBackBuffer(U32 szOutBuffer, void* lpOutBuffer);
+
+	//Read Attribs
+	bool isValid() const { return m_isValid;}
+	int step() const {return m_step;}
+	U32 size() const {return m_szBuffer;}
+	U32 handle() const {return m_handle;}
+	MemoryBufferType type() const {return m_bufferType;}
+
+protected:
+	void cleanup();
+private:
+	bool m_isValid;
+	int m_step;
+	int m_dataType;
+	U32 m_szBuffer;
+	U32 m_handle;
+	MemoryBufferType m_bufferType;
+};
+
+
 /*!
  * Synopsis: GLMeshBuffer Simplifies drawing geometries using GPU Buffers.
  * Types of buffer objects are: Vertex, Color, TexCoord, Normal and Index
  */
 class GLMeshBuffer : public SceneNode {
 public:
-	static const U32 INVALID_GLBUFFER = ~0;
 
 	GLMeshBuffer();
 	virtual ~GLMeshBuffer();
 
 	//Setup Buffer Objects
-	void setupVertexAttribs(const vector<float>& arrAttribs, int step = 3, VertexAttribType attribKind = vatPosition);
+	void setupVertexAttribs(const vector<float>& arrAttribs, int step = 3, MemoryBufferType attribKind = mbtPosition);
 	void setupPerVertexColor(const vec4f& color, U32 ctVertices, int step = 4);
 	void setupIndexBufferObject(const vector<U32>& arrIndex, int faceMode = ftTriangles);
 
@@ -81,19 +125,19 @@ public:
 
 	//Validity
 	bool isFaceBufferValid() const { return m_isValidIndex;}
-	bool isVertexBufferValid(VertexAttribType attribType = vatPosition) const;
+	bool isVertexBufferValid(MemoryBufferType attribType = mbtPosition) const;
 
 	//Steps
 	U32 faceStep() const {return m_stepFace;}
-	U32 vertexAttribStep(VertexAttribType attribType = vatPosition) const;
+	U32 vertexAttribStep(MemoryBufferType attribType = mbtPosition) const;
 
 	//Buffer Objects
 	U32 indexBufferObjectGL() const { return m_iboFaces;}
-	U32 vertexBufferObjectGL(VertexAttribType attribType = vatPosition) const;
+	U32 vertexBufferObjectGL(MemoryBufferType attribType = mbtPosition) const;
 
 
 	//Reads Mesh
-	bool readbackMeshVertexAttribGL(VertexAttribType attrib, U32& count, vector<float>& values) const;
+	bool readbackMeshVertexAttribGL(MemoryBufferType attrib, U32& count, vector<float>& values) const;
 	bool readbackMeshFaceGL(U32& count, vector<U32>& elements) const;
 
 

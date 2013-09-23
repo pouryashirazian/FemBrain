@@ -84,8 +84,8 @@ namespace PS{
 			m_inoutMemVelocity = m_lpDevice->createMemBuffer(sizeof(float) * m_vVel.size(), ComputeDevice::memReadWrite);
 
 			//Mesh Attributes
-			this->setupVertexAttribs(m_vPos, 4, vatPosition);
-			this->setupVertexAttribs(m_vColor, 4, vatColor);
+			this->setupVertexAttribs(m_vPos, 4, mbtPosition);
+			this->setupVertexAttribs(m_vColor, 4, mbtColor);
 			this->setFaceMode(ftPoints);
 
 			return true;

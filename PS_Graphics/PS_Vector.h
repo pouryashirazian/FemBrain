@@ -64,12 +64,13 @@ public:
 
 
     //Operators
-    Vec2& operator=(const Vec2& rhs);
-    Vec2 operator*(T s) const;
-
-    Vec2 operator+(const Vec2& rhs) const;
-    Vec2 operator-(const Vec2& rhs) const;
-    bool operator==(const Vec2& rhs) const;
+    inline Vec2& operator=(const Vec2& rhs);
+    inline Vec2 operator*(T s) const;
+    inline Vec2 operator+(const Vec2& rhs) const;
+    inline Vec2 operator-(const Vec2& rhs) const;
+    inline bool operator==(const Vec2& rhs) const;
+    inline T& operator[](int index);
+    inline const T& operator[](int index) const;
 public:
     union{
         struct{
@@ -157,6 +158,16 @@ template<typename T>
 bool Vec2<T>::operator==(const Vec2<T>& rhs) const
 {
     return (x == rhs.x && y == rhs.y);
+}
+
+template<typename T>
+T& Vec2<T>::operator[](int index) {
+	return e[index];
+}
+
+template<typename T>
+const T& Vec2<T>::operator[](int index) const {
+	return e[index];
 }
 
 template<typename T>
@@ -291,10 +302,12 @@ public:
 
     //Operators
     inline Vec3& operator=(const Vec3& rhs);
-    Vec3 operator*(T s) const;
+    inline Vec3 operator*(T s) const;
 
-    Vec3 operator+(const Vec3& rhs) const;
-    Vec3 operator-(const Vec3& rhs) const;
+    inline Vec3 operator+(const Vec3& rhs) const;
+    inline Vec3 operator-(const Vec3& rhs) const;
+    inline T& operator[](int index);
+    inline const T& operator[](int index) const;
 public:
     union{
         struct{
@@ -385,6 +398,16 @@ Vec3<T> Vec3<T>::operator-(const Vec3<T>& rhs) const
     result.y = y - rhs.y;
     result.z = z - rhs.z;
     return result;
+}
+
+template<typename T>
+T& Vec3<T>::operator[](int index) {
+	return e[index];
+}
+
+template<typename T>
+const T& Vec3<T>::operator[](int index) const {
+	return e[index];
 }
 
 template<typename T>
@@ -540,10 +563,11 @@ public:
 
     //Operators
     inline Vec4& operator=(const Vec4& rhs);
-    Vec4 operator*(T s) const;
-
-    Vec4 operator+(const Vec4& rhs) const;
-    Vec4 operator-(const Vec4& rhs) const;
+    inline Vec4 operator*(T s) const;
+    inline Vec4 operator+(const Vec4& rhs) const;
+    inline Vec4 operator-(const Vec4& rhs) const;
+    inline T& operator[](int index);
+    inline const T& operator[](int index) const;
 public:
     union{
         struct{
@@ -680,6 +704,16 @@ Vec4<T> Vec4<T>::operator-(const Vec4<T>& rhs) const
     result.z = z - rhs.z;
     result.w = w - rhs.w;
     return result;
+}
+
+template<typename T>
+T& Vec4<T>::operator[](int index) {
+	return e[index];
+}
+
+template<typename T>
+const T& Vec4<T>::operator[](int index) const {
+	return e[index];
 }
 
 typedef Vec4<double> vec4d;

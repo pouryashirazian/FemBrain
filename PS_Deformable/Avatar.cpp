@@ -100,8 +100,8 @@ void AvatarCube::setup(const vec3d& lo, const vec3d& hi)
 	const vec4f clBlue(0,0,1,1);
 
 	//Setup Buffers
-	setupVertexAttribs(arrVertices, 3, vatPosition);
-	setupVertexAttribs(arrNormals, 3, vatNormal);
+	setupVertexAttribs(arrVertices, 3, mbtPosition);
+	setupVertexAttribs(arrNormals, 3, mbtNormal);
 	setupPerVertexColor(clBlue, ctVertices, 4);
 	setupIndexBufferObject(arrIndices, ftQuads);
 }
@@ -192,8 +192,8 @@ void AvatarScalpel::setup(const vec3d& lo, const vec3d& hi)
 	const vec4f clBlue(0,0,1,1);
 
 	//Setup Buffers
-	setupVertexAttribs(arrVertices, 3, vatPosition);
-	setupVertexAttribs(arrNormals, 3, vatNormal);
+	setupVertexAttribs(arrVertices, 3, mbtPosition);
+	setupVertexAttribs(arrNormals, 3, mbtNormal);
 	setupPerVertexColor(clBlue, ctVertices, 4);
 	setupIndexBufferObject(arrIndices, ftQuads);
 }
