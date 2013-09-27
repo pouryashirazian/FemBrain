@@ -61,7 +61,7 @@ TetMesh::TetMesh(char * filename, int specialFileType): VolumetricMesh(4)
   sprintf(lineBuffer, "%s.node", filename);
   if (parser.open(lineBuffer) != 0)
     throw 2;
-  
+
   parser.getNextLine(lineBuffer, 1);
   int dim;
   sscanf(lineBuffer, "%d %d", &numVertices, &dim);
@@ -80,7 +80,7 @@ TetMesh::TetMesh(char * filename, int specialFileType): VolumetricMesh(4)
       throw 3;
     vertices[i] = new Vec3d(x,y,z);
   }
-  
+
   parser.close();
 
   // next, read the elements
@@ -110,10 +110,10 @@ TetMesh::TetMesh(char * filename, int specialFileType): VolumetricMesh(4)
     for(int j=0; j<4; j++) // vertices are 1-indexed in .ele files
     {
       v[j]--;
-      elements[i][j] = v[j]; 
+      elements[i][j] = v[j];
     }
   }
-  
+
   parser.close();
 
   numMaterials = 0;
@@ -163,7 +163,7 @@ void TetMesh::computeElementMassMatrix(int el, double * massMatrix) const
    Singiresu S. Rao: The finite element method in engineering, 2004)
 */
 
-  const double mtx[16] = { 2, 1, 1, 1, 
+  const double mtx[16] = { 2, 1, 1, 1,
                            1, 2, 1, 1,
                            1, 1, 2, 1,
                            1, 1, 1, 2 } ;
@@ -316,7 +316,7 @@ void TetMesh::getElementEdges(int el, int * edgeBuffer) const
     v[i] = getVertexIndex(el,i);
 
   int edgeMask[6][2] = {
-   { 0, 1 }, { 1, 2 }, { 2, 0 }, 
+   { 0, 1 }, { 1, 2 }, { 2, 0 },
    { 0, 3 }, { 1, 3 }, { 2, 3 } };
 
   for(int edge=0; edge<6; edge++)

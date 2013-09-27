@@ -40,6 +40,8 @@ public:
 
 
 	//Access
+	//bool isVertexIndex(U32 idx);
+
 	vec3d vertexAt(U32 idx) const;
 	vec3d vertexRestPosAt(U32 idx) const;
 	vec3d normalAt(U32 idx) const;
@@ -52,10 +54,15 @@ public:
 	//Finds the closest vertex to a query point
 	int findClosestVertex(const vec3d& query, double& dist, vec3d& outP);
 
+	//Fixed Vertices
+	int getFixedVertices(vector<U32>& fixedVertices);
+	void setFixedVertices(const vector<U32>& fixedVertices);
+
 	//Apply Displacements
 	void applyDisplacements(double * u);
 
 	//Topology Modification
+	void updateFaceBuffer();
 	void resetToRest();
 	bool removeVertices(const vector<U32>& vertices);
 	bool removeTriangles(const vector<U32>& triangles);
@@ -87,6 +94,7 @@ private:
 	//Face Elements (Triangles or Quads)
 	vector<U32> m_faces;
 	vector<U32> m_vFixedVertices;
+
 };
 
 }

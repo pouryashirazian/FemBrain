@@ -39,6 +39,17 @@ using namespace PS::FEM;
 typedef void (*FOnApplyDeformations)(U32 dof, double* displacements);
 //typedef Functor<void,  U32, double*> FOnDeformations;
 
+struct FaceIntersection {
+	int face;
+	vec3d xyz;
+	vec3d uvw;
+};
+
+struct EdgeIntersection {
+	int edge;
+	vec3d xyz;
+};
+
 /*!
  *	Deformable model
  */
@@ -60,9 +71,8 @@ public:
 
 	//Draw
 	void draw();
-	void drawTetMesh(const vec3d& avatarCenter,
-					   const vec3d& avatarHalfLength,
-					   double maxDist = 2.0);
+	void drawCuttingArea();
+	void drawTetElement(U32 el, vec4f& color);
 
 	//TimeStep
 	void timestep();
@@ -76,8 +86,11 @@ public:
 	//Fill Record for
 	void statFillRecord(DBLogger::Record& rec) const;
 
-	//Haptic Interaction
-	void setPulledVertex(int index) { m_idxPulledVertex = index;}
+	//Cutting and Haptics
+	void cleanupCuttingStructures();
+	int  performCuts(const vec3d& s0, const vec3d& s1);
+
+	void setPulledVertex(int index);
 	bool hapticStart(int index);
 	bool hapticStart(const vec3d& wpos);
 	void hapticEnd();
@@ -163,6 +176,24 @@ private:
 	double m_dampingMassCoeff;
 	double m_timeStep;
 	double m_restVolume;
+
+	//Cutting
+	vector<pair<vec3d, vec3d> > m_vCuttingPath;
+	vector<U32> m_vCrossedFaces;
+	vector<U32> m_vCrossedTets;
+	vec3d m_sweptQuad[4];
+	bool m_isSweptQuadValid;
+
+	typedef std::tr1::unordered_map<U32, FaceIntersection*>::iterator MAPFACE_ITER;
+	typedef std::tr1::unordered_map<U32, EdgeIntersection*>::iterator MAPEDGE_ITER;
+	std::tr1::unordered_map<U32, FaceIntersection*> m_mapElementFaceIntersection;
+	std::tr1::unordered_map<U32, EdgeIntersection*> m_mapElementEdgeIntersection;
+	/*
+	vector<vec3d> m_vFaceIntersections;
+	vector<vec3d> m_vFaceIntersectionsBarycoords;
+	vector<vec3d> m_vEdgeIntersections;
+	vector<vec3d> m_vEdgeIntersectionsBarycoords;
+	*/
 
 	//Surface Mesh
 	SurfaceMesh* m_lpSurfaceMesh;

@@ -8,9 +8,15 @@
 #ifndef INTERSECTIONS_H_
 #define INTERSECTIONS_H_
 
+#include "PS_Vector.h"
+
+using namespace PS;
+using namespace PS::MATH;
+
 namespace PS {
 namespace INTERSECTIONS {
 
+#define EPSILON 1E-5
 #define X 0
 #define Y 1
 #define Z 2
@@ -226,6 +232,60 @@ int IntersectBoxTriangle(T boxcenter[3], T boxhalfsize[3], T triverts[3][3]) {
 		return 0;	// -NJMP-
 
 	return 1; /* box and triangle overlaps */
+}
+
+/*!
+ * Segment triangle intersection
+ */
+int IntersectSegmentTriangle(const vec3d& s0, const vec3d& s1, const vec3d p[3], vec3d& uvw, vec3d& xyz);
+
+/*!
+ * Ray triangle intersection
+ */
+int IntersectRayTriangle(const vec3d& ro, const vec3d& rd, const vec3d p[3], vec3d& uvt);
+
+/*!
+ * Compute the intersection between a ray and a triangle
+ */
+template <typename T>
+int IntersectRayTriangle(T rayorigin[3], T raydir[3], T triverts[3][3], T& outU, T& outV, T& outT) {
+	//Set output
+	outU = 0.0;
+	outV = 0.0;
+	outT = 0.0;
+
+	Vec3<T> p0 = Vec3<T>(&triverts[0]);
+	Vec3<T> p1 = Vec3<T>(&triverts[1]);
+	Vec3<T> p2 = Vec3<T>(&triverts[2]);
+	Vec3<T> o = Vec3<T>(&rayorigin[0]);
+	Vec3<T> d = Vec3<T>(&raydir[0]);
+
+	Vec3<T> e1 = p1 - p0;
+	Vec3<T> e2 = p2 - p0;
+	Vec3<T> q = Vec3<T>::cross(d, e2);
+
+	//Test Determinant
+	T a = Vec3<T>::dot(e1, q);
+	if(fabs(a) < EPSILON)
+		return 0;
+
+	//Test U
+	T f = 1.0 / a;
+	Vec3<T> s = o - p0;
+	outU = f * Vec3<T>::dot(s, q);
+	if(outU < 0.0)
+		return 0;
+
+	//Test V
+	Vec3<T> r = Vec3<T>::cross(s, e1);
+	outV = f * Vec3<T>::dot(d, r);
+	if((outV < 0.0) || (outU + outV > 1.0))
+		return 0;
+
+	//Test T
+	outT = f * Vec3<T>::dot(e2, r);
+
+	return 1;
 }
 
 }

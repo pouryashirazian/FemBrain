@@ -1,4 +1,5 @@
 //#include <tr1/unordered_map.h>
+#include "GL/glew.h"
 #include "PS_Deformable.h"
 #include "../PS_Base/PS_Logger.h"
 #include "../PS_Base/PS_FileDirectory.h"
@@ -11,6 +12,7 @@
 #include "generateMeshGraph.h"
 #include <algorithm>
 #include "tbb/task_scheduler_init.h"
+
 
 
 using namespace __gnu_cxx;
@@ -36,6 +38,7 @@ Deformable::Deformable(const char* lpVegFilePath,
 Deformable::~Deformable()
 {
 	this->cleanup();
+	this->cleanupCuttingStructures();
 }
 
 void Deformable::cleanup()
@@ -89,16 +92,14 @@ void Deformable::setup(const char* lpVegFilePath,
 
 
 	//Setup Boundary Mesh
+	vector<U32> arrFixed;
+	arrFixed.resize(vFixedVertices.size());
+	for(U32 i=0; i<vFixedVertices.size(); i++)
+		arrFixed[i] = (U32)vFixedVertices[i];
+
 	m_lpSurfaceMesh = new SurfaceMesh(lpObjFilePath);
 	m_lpSurfaceMesh->resetToRest();
-
-	//m_lpDeformableMesh = new SceneObjectDeformable(const_cast<char*>(lpObjFilePath));
-	//m_lpDeformableMesh->EnableVertexSelection();
-//	m_lpDeformableMesh->ResetDeformationToRest();
-//	m_lpDeformableMesh->BuildNeighboringStructure();
-//	m_lpDeformableMesh->BuildNormals();
-//	m_lpDeformableMesh->SetMaterialAlpha(0.5);
-
+	m_lpSurfaceMesh->setFixedVertices(arrFixed);
 
 	//Setup Volumetric Mesh
 	VolumetricMesh * lpVolMesh = VolumetricMeshLoader::load(const_cast<char*>(lpVegFilePath));
@@ -398,7 +399,7 @@ void Deformable::setupIntegrator(int ctThreads)
 													 m_dampingStiffnessCoeff,
 													 1, 1E-6, ctThreads);
 */
-	int ctFixed = m_vFixedVertices.size();
+
 	m_lpIntegrator = new VolumeConservingIntegrator(m_dof, m_timeStep,
 													 m_lpMassMatrix,
 													 m_lpDeformableForceModel,
@@ -411,12 +412,17 @@ void Deformable::setupIntegrator(int ctThreads)
 
 }
 
+void Deformable::setPulledVertex(int index) {
+	m_idxPulledVertex = index;
+}
+
 bool Deformable::hapticStart(int index)
 {
 	m_idxPulledVertex = index;
 	m_bHapticInProgress = true;
 	m_vHapticIndices.resize(0);
 	m_vHapticDisplacements.resize(0);
+	cleanupCuttingStructures();
 
 	return true;
 }
@@ -442,6 +448,8 @@ void Deformable::hapticEnd()
 	m_idxPulledVertex = -1;
 	m_vHapticIndices.resize(0);
 	m_vHapticDisplacements.resize(0);
+
+	cleanupCuttingStructures();
 }
 
 //Apply External Forces to the integerator
@@ -452,7 +460,6 @@ bool Deformable::applyAllExternalForces()
 
 	//1.Apply Gravity along global y direction: W = mg
 	if(m_bApplyGravity) {
-		//printf("APPLY GRAVITY\n");
 		for(U32 i=0; i < m_dof; i++) {
 			if(i % 3 == 1) {
 				m_arrExtForces[i] = -10;
@@ -652,39 +659,172 @@ void Deformable::hapticSetCurrentDisplacements(const vector<int>& indices,
 	m_vHapticDisplacements.assign(displacements.begin(), displacements.end());
 }
 
-void Deformable::draw()
-{
-	if(m_lpSurfaceMesh)
-		m_lpSurfaceMesh->draw();
+void Deformable::cleanupCuttingStructures() {
+	m_vCrossedFaces.resize(0);
+	m_vCrossedTets.resize(0);
+	m_vCuttingPath.resize(0);
+
+	//Faces
+    for(MAPFACE_ITER it = m_mapElementFaceIntersection.begin(); it != m_mapElementFaceIntersection.end(); it++) {
+        SAFE_DELETE(it->second);
+    }
+    m_mapElementFaceIntersection.clear();
+
+    //Edges
+    for(MAPEDGE_ITER it = m_mapElementEdgeIntersection.begin(); it != m_mapElementEdgeIntersection.end(); it++) {
+        SAFE_DELETE(it->second);
+    }
+    m_mapElementEdgeIntersection.clear();
+    m_isSweptQuadValid = false;
 }
 
-
-void Deformable::drawTetMesh(const vec3d& avatarCenter,
-		   	   	   	   	   	     const vec3d& avatarHalfLength,
-		   	   	   	   	   	     double maxDist) {
-
-	if(!m_lpSurfaceMesh)
-		return;
-
-
+int Deformable::performCuts(const vec3d& s0, const vec3d& s1)
+{
+	if(!m_lpSurfaceMesh || !m_lpTetMesh)
+		return -1;
 	U32 ctFaces = m_lpSurfaceMesh->getFaceCount();
+	U32 ctTets = m_lpTetMesh->getNumElements();
 	if(ctFaces == 0)
-		return;
+		return -1;
 
+	//Select a swept surface for edge cutting test
+	const double minSweptLength = 0.1;
+	m_isSweptQuadValid = false;
+	m_sweptQuad[0] = s0;
+	m_sweptQuad[1] = s1;
+	if(m_vCuttingPath.size() > 1) {
+		for(U32 i=0; i<m_vCuttingPath.size(); i++) {
+			double d = vec3d::distance(m_vCuttingPath[i].first, s0);
+			if(d >= minSweptLength) {
+				m_sweptQuad[2] = m_vCuttingPath[i].first;
+				m_sweptQuad[3] = m_vCuttingPath[i].second;
+				m_isSweptQuadValid = true;
+				break;
+			}
+		}
+	}
+
+	//Insert new scalpal position into buffer
+	const U32 maxNodes = 512;
+	m_vCuttingPath.push_back(make_pair<vec3d>(s0, s1));
+	if(m_vCuttingPath.size() > maxNodes) {
+		m_vCuttingPath.erase(m_vCuttingPath.begin());
+	}
+
+
+
+	//Test for all tetrahedra. Per each tetrahedra test against the 6 edges and 4 faces
+	//6 Edges: Against swept surface
+	//4 Faces: Against cutting tip path
+
+	vec3d vertices[4];
+	int vertexBuffer[4];
+	int edgeBuffer[12];
+	int edgeMask[6][2] = {
+	   { 0, 1 }, { 1, 2 }, { 2, 0 },
+	   { 0, 3 }, { 1, 3 }, { 2, 3 } };
+
+	//Face Mask
+	int faceBuffer[12];
+	int faceMask[4][3] = {
+	   {0, 1, 2}, {1, 2, 3}, {2, 3, 0}, {0, 1, 3}
+	};
+
+	//Loop over elements
+	for(U32 el=0; el<ctTets; el++) {
+		//Get Vertices
+		for(int i=0; i<4; i++) {
+		    vertexBuffer[i] = m_lpTetMesh->getVertexIndex(el,i);
+		    vertices[i] = m_lpSurfaceMesh->vertexAt(vertexBuffer[i]);
+		}
+
+		//Get Edges
+		m_lpTetMesh->getElementEdges(el, &edgeBuffer[0]);
+
+		//Get Face Indices
+		for(int i=0; i<4; i++) {
+			faceBuffer[i*3] = vertexBuffer[faceMask[i][0]];
+			faceBuffer[i*3 + 1] = vertexBuffer[faceMask[i][1]];
+			faceBuffer[i*3 + 2] = vertexBuffer[faceMask[i][2]];
+		}
+
+		//4 Face Intersections
+		vec3d p[3];
+		vec3d uvw;
+		vec3d xyz;
+		for(int i=0; i<4; i++) {
+			p[0] = vertices[faceMask[i][0]];
+			p[1] = vertices[faceMask[i][1]];
+			p[2] = vertices[faceMask[i][2]];
+			int res = IntersectSegmentTriangle(s0, s1, p, uvw, xyz);
+			if(res > 0) {
+				FaceIntersection* fi = new FaceIntersection();
+				fi->face = i;
+				fi->xyz = xyz;
+				fi->uvw = uvw;
+				m_mapElementFaceIntersection.insert(std::make_pair(el, fi));
+			}
+		}
+
+
+		//6 Edge Intersections
+		/*
+		if(m_isSweptQuadValid) {
+
+			vec3d tri1[3];
+			tri1[0] = m_sweptQuad[0];
+			tri1[1] = m_sweptQuad[3];
+			tri1[2] = m_sweptQuad[1];
+
+			vec3d tri2[3];
+			tri2[0] = m_sweptQuad[0];
+			tri2[1] = m_sweptQuad[2];
+			tri2[2] = m_sweptQuad[3];
+
+
+			for(int i=0; i<6; i++) {
+				vec3d edge0 = vertices[ edgeMask[i][0] ];
+				vec3d edge1 = vertices[ edgeMask[i][1] ];
+
+				int res = IntersectSegmentTriangle(edge0, edge1, tri1, uvw, xyz);
+				if(res == 0)
+					res = IntersectSegmentTriangle(edge0, edge1, tri2, uvw, xyz);
+
+				if(res > 0)
+				{
+					EdgeIntersection* ei = new EdgeIntersection();
+					ei->edge = i;
+					ei->xyz = xyz;
+					m_mapElementEdgeIntersection.insert(std::make_pair(el, ei));
+				}
+			}
+		}
+		*/
+	}
+
+	//
+	return m_mapElementFaceIntersection.size() + m_mapElementEdgeIntersection.size();
+
+	//Crossed Faces
+	/*
+	m_vCrossedFaces.resize(0);
+	m_vCrossedFaces.reserve(32);
+	m_vCrossedTets.resize(0);
+	m_vCrossedTets.reserve(32);
+
+	//Maps vertex to face index
 	double tri[3][3];
 	double center[3];
 	double halfLengths[3];
 	U32 ctCrossed = 0;
-
-	//Crossed Faces
-	vector<U32> crossedFaces;
-	crossedFaces.reserve(128);
-
-	//Maps vertex to face index
 	std::tr1::unordered_map<U32, U32> mapCrossedVertices;
 
+	//Center and HalfLength Needed once
+	avatarCenter.store(center);
+	avatarHalfLength.store(halfLengths);
 
-	//1.Find all faces intersected with avatar
+
+	//2.Find all faces intersected with avatar
 	for(U32 iface=0; iface < ctFaces; iface++) {
 		vec3u32 face = m_lpSurfaceMesh->faceAt(iface);
 		//Copy Face Pos
@@ -695,31 +835,15 @@ void Deformable::drawTetMesh(const vec3d& avatarCenter,
 			}
 		}
 
-
-		avatarCenter.store(center);
-		avatarHalfLength.store(halfLengths);
 		int isCrossed = IntersectBoxTriangle<double>(center, halfLengths, tri);
 		ctCrossed += isCrossed;
 		if(isCrossed) {
-			crossedFaces.push_back(iface);
+			m_vCrossedFaces.push_back(iface);
 			for(int i=0; i < 3; i++) {
-
 				//Maps vertices to faces
 				if(mapCrossedVertices.find(face.element(i) ) == mapCrossedVertices.end())
 					mapCrossedVertices.insert(std::make_pair(face.element(i), iface));
 			}
-		}
-
-		if(isCrossed) {
-			glPushAttrib(GL_ALL_ATTRIB_BITS);
-			glLineWidth(2.0f);
-			glColor3f(0.0f, 1.0f, 0.0f);
-			glBegin(GL_LINE_LOOP);
-				glVertex3dv(&tri[0][0]);
-				glVertex3dv(&tri[1][0]);
-				glVertex3dv(&tri[2][0]);
-			glEnd();
-			glPopAttrib();
 		}
 	}
 
@@ -727,19 +851,22 @@ void Deformable::drawTetMesh(const vec3d& avatarCenter,
 	if(ctCrossed > 0)
 		LogInfoArg1("Crossed faces count = %d", ctCrossed);
 
+	//Remove crossed faces
+//	m_lpSurfaceMesh->removeTriangles(crossedFaces);
+//	m_lpSurfaceMesh->updateFaceBuffer();
+
+
 	//Nearby Tet elements:
-	if(!m_lpTetMesh || ctCrossed == 0)
-		return;
+	if(ctCrossed == 0)
+		return -2;
 
 	//2.Find all intersecting tetrahedra
-	int ctTetrahedra = m_lpTetMesh->getNumElements();
-	vector<int> elementsToBeRemoved;
-	elementsToBeRemoved.reserve(128);
+	U32 ctTetrahedra = m_lpTetMesh->getNumElements();
 	int indices[4];
 	vec3d a,b,c,d;
 
 	//Loop Over Elements
-	for(int iTet=0; iTet<ctTetrahedra; iTet++)
+	for(U32 iTet=0; iTet<ctTetrahedra; iTet++)
 	{
 		indices[0] = m_lpTetMesh->getVertexIndex(iTet, 0);
 		indices[1] = m_lpTetMesh->getVertexIndex(iTet, 1);
@@ -757,15 +884,138 @@ void Deformable::drawTetMesh(const vec3d& avatarCenter,
 			continue;
 
 		//Element tobe removed
-		elementsToBeRemoved.push_back(iTet);
-		a = m_lpSurfaceMesh->vertexAt(indices[0]);
-		b = m_lpSurfaceMesh->vertexAt(indices[1]);
-		c = m_lpSurfaceMesh->vertexAt(indices[2]);
-		d = m_lpSurfaceMesh->vertexAt(indices[3]);
+		m_vCrossedTets.push_back(iTet);
+	}
+	*/
+	//Update Meshes
+	//Update System Matrices: Mass, Stiffness, Damping
+	/*
+	for(int i=0; i<elementsToBeRemoved; i++) {
+		m_lp
+	}
 
-		vec4f black(0,0,0,1);
-		vec4f white(1,1,1,1);
-		vec4f color = black;
+	return (int)m_vCrossedTets.size();
+	*/
+}
+
+void Deformable::drawTetElement(U32 el, vec4f& color) {
+	if(m_lpSurfaceMesh == NULL || m_lpTetMesh == NULL)
+		return;
+	if(el >= (U32)m_lpTetMesh->getNumElements())
+		return;
+
+	vec3d a, b, c, d;
+	a = m_lpSurfaceMesh->vertexAt(m_lpTetMesh->getVertexIndex(el, 0));
+	b = m_lpSurfaceMesh->vertexAt(m_lpTetMesh->getVertexIndex(el, 1));
+	c = m_lpSurfaceMesh->vertexAt(m_lpTetMesh->getVertexIndex(el, 2));
+	d = m_lpSurfaceMesh->vertexAt(m_lpTetMesh->getVertexIndex(el, 3));
+
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+	glColor4fv(color.cptr());
+	glBegin(GL_LINES);
+	glVertex3dv(&a[0]);
+	glVertex3dv(&b[0]);
+
+	glVertex3dv(&b[0]);
+	glVertex3dv(&d[0]);
+
+	glVertex3dv(&a[0]);
+	glVertex3dv(&d[0]);
+
+	glVertex3dv(&a[0]);
+	glVertex3dv(&c[0]);
+
+	glVertex3dv(&b[0]);
+	glVertex3dv(&c[0]);
+
+	glVertex3dv(&c[0]);
+	glVertex3dv(&d[0]);
+	glEnd();
+	glPopAttrib();
+
+}
+
+void Deformable::drawCuttingArea() {
+
+	vec4f red(0.4,0,0,1);
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+	glPointSize(5.0f);
+	//FACE POINTS
+	glColor3f(1.0f, 0.0f, 0.0f);
+		glBegin(GL_POINTS);
+		for(MAPFACE_ITER it = m_mapElementFaceIntersection.begin(); it != m_mapElementFaceIntersection.end(); it++ ) {
+			glVertex3dv(it->second->xyz.cptr());
+		}
+		glEnd();
+
+		//Draw Face Tets
+		for(MAPFACE_ITER it = m_mapElementFaceIntersection.begin(); it != m_mapElementFaceIntersection.end(); it++ )
+			drawTetElement(it->first, red);
+
+
+	//Edge POINTS
+	glColor3f(0.0f, 0.0f, 1.0f);
+		glBegin(GL_POINTS);
+		for(MAPEDGE_ITER it = m_mapElementEdgeIntersection.begin(); it != m_mapElementEdgeIntersection.end(); it++ ) {
+			glVertex3dv(it->second->xyz.cptr());
+		}
+		glEnd();
+
+	glPopAttrib();
+
+	//Draw Scalpel history
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+		glLineWidth(1.0f);
+		glColor4d(0.0, 1.0, 0, 0.5);
+		glBegin(GL_LINES);
+		for(U32 i=0; i< m_vCuttingPath.size(); i+=16) {
+			glVertex3dv(m_vCuttingPath[i].first.cptr());
+			glVertex3dv(m_vCuttingPath[i].second.cptr());
+		}
+		glEnd();
+	glPopAttrib();
+
+	//Draw Swept Quad
+	//if(m_isSweptQuadValid)
+	{
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+			glColor3d(0.7, 0.7, 0.7);
+			glBegin(GL_QUADS);
+				glVertex3dv(m_sweptQuad[0].cptr());
+				glVertex3dv(m_sweptQuad[1].cptr());
+				glVertex3dv(m_sweptQuad[3].cptr());
+				glVertex3dv(m_sweptQuad[2].cptr());
+			glEnd();
+		glPopAttrib();
+	}
+
+	/*
+	if(m_vCrossedFaces.size() == 0)
+		return;
+	//Draw Cut Triangles
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+	glLineWidth(2.0f);
+	glColor3f(0.0f, 1.0f, 0.0f);
+	for(U32 i=0; i<m_vCrossedFaces.size(); i++) {
+		vec3u32 t = m_lpSurfaceMesh->faceAt(m_vCrossedFaces[i]);
+		glBegin(GL_LINE_LOOP);
+			glVertex3dv(m_lpSurfaceMesh->vertexAt(t.x).cptr());
+			glVertex3dv(m_lpSurfaceMesh->vertexAt(t.y).cptr());
+			glVertex3dv(m_lpSurfaceMesh->vertexAt(t.z).cptr());
+		glEnd();
+	}
+	glPopAttrib();
+
+	//Draw Cut Tetrahedra
+	vec4f color(0,0,0,1);
+	vec3d a,b,c,d;
+	int indices[4];
+	for(U32 i=0; i<m_vCrossedTets.size(); i++) {
+		U32 itet = m_vCrossedTets[i];
+		a = m_lpSurfaceMesh->vertexAt(m_lpTetMesh->getVertexIndex(itet, 0));
+		b = m_lpSurfaceMesh->vertexAt(m_lpTetMesh->getVertexIndex(itet, 1));
+		c = m_lpSurfaceMesh->vertexAt(m_lpTetMesh->getVertexIndex(itet, 2));
+		d = m_lpSurfaceMesh->vertexAt(m_lpTetMesh->getVertexIndex(itet, 3));
 
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
 		glColor4fv(color.ptr());
@@ -790,12 +1040,24 @@ void Deformable::drawTetMesh(const vec3d& avatarCenter,
 		glEnd();
 		glPopAttrib();
 	}
-
-	//Update Meshes
-	//Update System Matrices: Mass, Stiffness, Damping
-	/*
-	for(int i=0; i<elementsToBeRemoved; i++) {
-		m_lp
-	}
 	*/
+}
+
+void Deformable::draw()
+{
+	if(m_lpSurfaceMesh)
+		m_lpSurfaceMesh->draw();
+
+	if(m_idxPulledVertex >= 0  && m_idxPulledVertex < (int)m_lpSurfaceMesh->getVertexCount() ) {
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+			glEnable(GL_POLYGON_OFFSET_POINT);
+			glPolygonOffset(-1.0f, -1.0f);
+			glColor3f(0.0f, 0.0f, 1.0f);
+			glPointSize(8.0f);
+			glBegin(GL_POINTS);
+				glVertex3dv(m_lpSurfaceMesh->vertexAt(m_idxPulledVertex).cptr());
+			glEnd();
+			glDisable(GL_POLYGON_OFFSET_FILL);
+		glPopAttrib();
+	}
 }

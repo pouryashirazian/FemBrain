@@ -21,7 +21,8 @@ SurfaceMesh::SurfaceMesh() {
 }
 
 SurfaceMesh::SurfaceMesh(const char* chrObjFilePath) {
-	m_drawMode = dtFaces | dtEdges | dtVertices | dtFixedVertices | dtPickedVertices;
+	//m_drawMode = dtFaces | dtEdges | dtVertices | dtFixedVertices | dtPickedVertices;
+	m_drawMode = dtEdges | dtFixedVertices | dtPickedVertices;
 	m_lpMemFaces = m_lpMemNormal = m_lpMemVertices = NULL;
 	assert(readFromDisk(chrObjFilePath));
 	computeAABB();
@@ -59,6 +60,10 @@ void SurfaceMesh::setupDrawBuffers() {
 }
 
 void SurfaceMesh::draw() {
+
+	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+	glStencilFunc(GL_ALWAYS, 1, ~(0u));
+
 	//Draw Faces
 	if((m_drawMode & dtFaces) != 0) {
 	//	glCallList(m_glListFaces);
@@ -80,7 +85,7 @@ void SurfaceMesh::draw() {
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
 
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		glLineWidth(3.0f);
+		glLineWidth(1.0f);
 		glColor4f(0.0, 0.0, 0.0, 1.0);
 		m_lpMemVertices->attach();
 		m_lpMemNormal->attach();
@@ -94,6 +99,7 @@ void SurfaceMesh::draw() {
 		glPopAttrib();
 	}
 
+	//Draw Vertices
 	if((m_drawMode & dtVertices) != 0) {
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
 		glPointSize(5.0f);
@@ -105,6 +111,21 @@ void SurfaceMesh::draw() {
 		m_lpMemVertices->detach();
 		glPopAttrib();
 	}
+
+	//Draw Fixed Vertices
+	if((m_drawMode & dtFixedVertices) != 0) {
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+		glPointSize(8.0f);
+		glColor3f(1.0f, 0.0f, 0.0f);
+
+		glBegin(GL_POINTS);
+			for(U32 i=0; i < m_vFixedVertices.size(); i++)
+				glVertex3dv(&m_vCurPos[m_vFixedVertices[i] * 3]);
+		glEnd();
+		glPopAttrib();
+	}
+
+	glStencilFunc(GL_ALWAYS, 0, ~(0u));
 }
 
 void SurfaceMesh::setDrawMode(int mode) {
@@ -171,12 +192,28 @@ void SurfaceMesh::resetToRest() {
 	m_vCurPos.assign(m_vRestPos.begin(), m_vRestPos.end());
 }
 
+int SurfaceMesh::getFixedVertices(vector<U32>& fixedVertices) {
+	fixedVertices.assign(m_vFixedVertices.begin(), m_vFixedVertices.end());
+	return (int)m_vFixedVertices.size();
+}
+
+void SurfaceMesh::setFixedVertices(const vector<U32>& fixedVertices) {
+	m_vFixedVertices.assign(fixedVertices.begin(), fixedVertices.end());
+}
+
+
 void SurfaceMesh::applyDisplacements(double * u) {
 	for(U32 i=0; i<m_vCurPos.size(); i++)
 		m_vCurPos[i] = m_vRestPos[i] + u[i];
 
 	//Modify vertex buffer
 	m_lpMemVertices->modify(0, m_vCurPos.size() * sizeof(double), &m_vCurPos[0]);
+}
+
+void SurfaceMesh::updateFaceBuffer() {
+	if(m_lpMemFaces == NULL)
+		return;
+	m_lpMemFaces->modify(0, m_faces.size() * sizeof(U32), &m_faces[0]);
 }
 
 int SurfaceMesh::findClosestVertex(const vec3d& query, double& dist, vec3d& outP) {
@@ -222,9 +259,13 @@ bool SurfaceMesh::removeTriangles(const vector<U32>& triangles) {
 	if(triangles.size() == 0)
 		return false;
 
+	//We won't resize the array. We just write zeros at those locations
 	for(U32 i=0; i<triangles.size(); i++) {
 		U32 index = triangles[i];
-		m_faces.erase(m_faces.begin() + index * 3, m_faces.begin() + index * 3 + 3);
+		m_faces[index * 3] = 0;
+		m_faces[index * 3 + 1] = 0;
+		m_faces[index * 3 + 2] = 0;
+		//m_faces.erase(m_faces.begin() + index * 3, m_faces.begin() + index * 3 + 3);
 	}
 
 	return true;

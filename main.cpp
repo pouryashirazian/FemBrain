@@ -279,16 +279,7 @@ void Draw()
 		glPopMatrix();
 	}
 
-	//Draw Deformable Mesh
-	if(g_lpDeformable && g_appSettings.bDrawTetMesh) {
-		vec3f t = TheUITransform::Instance().translate;
-		vec3d center = vec3d(t.x, t.y, t.z);
-		vec3d halfLen = (g_lpAvatarCube->upper() - g_lpAvatarCube->lower()) * 0.5;
-
-		g_lpDeformable->draw();
-		g_lpDeformable->drawTetMesh(center, halfLen);
-	}
-
+	//1.Draw RBF
 	if(g_lpFastRBF && (g_appSettings.drawIsoSurface != disNone)) {
 		g_lpFastRBF->setWireFrameMode(g_appSettings.drawIsoSurface == disWireFrame);
 
@@ -309,7 +300,17 @@ void Draw()
 		glDisable(GL_LIGHTING);
 	}
 
-	//Draw Interaction Avatar
+
+	//2.Draw Deformable Mesh and cuts
+	if(g_lpDeformable) {
+		if(g_appSettings.bDrawTetMesh)
+			g_lpDeformable->draw();
+
+		//Draw Cutting
+		g_lpDeformable->drawCuttingArea();
+	}
+
+	//3.Draw Avatar
 	if(g_lpAvatarCube && g_appSettings.bDrawAvatar)
 	{
 		vec3f wpos = TheUITransform::Instance().translate;
@@ -338,7 +339,7 @@ void Draw()
 	}
 
 
-	//Draw Haptic Line
+	//4.Draw Haptic Line
 	if(g_lpDeformable->isHapticInProgress() && g_appSettings.bDrawAffineWidgets)
 	{
 		GLint vp[4];
@@ -581,8 +582,15 @@ void MousePassiveMove(int x, int y)
 	if (!g_lpFastRBF->bbox().intersect(aabbAvatar)) {
 		g_appSettings.idxCollisionFace = -1;
 		g_hashVertices.clear();
+		g_lpDeformable->cleanupCuttingStructures();
 		return;
 	}
+
+	//Cutting
+	vec3d extent  = (upper - lower);
+	extent.y = 0.0;
+	g_lpDeformable->performCuts(lower, lower + extent);
+
 
 	//2.Compute Collision using RBF Interpolation Function
 	/*
@@ -705,8 +713,8 @@ void MousePassiveMove(int x, int y)
 	}
 
 	//Apply displacements/forces to the model
-	printf("APPLY HAPTIC FORCES\n");
 	g_lpDeformable->hapticSetCurrentForces(arrIndices, arrForces);
+
 
 	glutPostRedisplay();
 }
@@ -1041,7 +1049,7 @@ void TimeStep(int t)
 	g_appSettings.ctAnimFrame ++;
 
 	//Advance timestep in scenegraph
-	TheSceneGraph::Instance().timestep();
+	//TheSceneGraph::Instance().timestep();
 
 	//Sample For Logs and Info
 	if(g_appSettings.ctAnimFrame - g_appSettings.ctAnimLogger > ANIMATION_TIME_SAMPLE_INTERVAL) {
