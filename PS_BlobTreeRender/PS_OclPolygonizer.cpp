@@ -611,6 +611,10 @@ namespace HPC{
 		//Create a GPU Compute Device
 		m_lpGPU = new ComputeDevice(ComputeDevice::dtGPU, true, false, "AMD");
 		m_lpGPU->printInfo();
+		if(m_lpGPU->isDoubleFPSupported())
+			LogInfo("Double Precision is supported");
+		else
+			LogInfo("Double Precision is NOT supported!");
 		
 
 		//Create the OCL Scan Primitive

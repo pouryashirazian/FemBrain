@@ -6,7 +6,20 @@ Research Problems:
 4. Implement Tetrahedralization on the GPU completely.
 5. GPU-Solver for finite elements
 ==============================================================================================
-Framework Todos:
+TODO:
+
+1. Need a Desktop PC with NVIDIA GPU for testing double precision
+2. Kernel code for face intersection
+3. Kernel code for edge intersection
+
+
+
+
+
+
+
+
+
 
 Output Triangle mesh obj
 Per cellsize fixed nodes

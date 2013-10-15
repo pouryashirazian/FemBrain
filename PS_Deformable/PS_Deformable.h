@@ -74,6 +74,10 @@ public:
 	void drawCuttingArea();
 	void drawTetElement(U32 el, vec4f& color);
 
+	//Cutting
+	void cleanupCuttingStructures();
+	int  performCuts(const vec3d& s0, const vec3d& s1);
+
 	//TimeStep
 	void timestep();
 
@@ -86,10 +90,7 @@ public:
 	//Fill Record for
 	void statFillRecord(DBLogger::Record& rec) const;
 
-	//Cutting and Haptics
-	void cleanupCuttingStructures();
-	int  performCuts(const vec3d& s0, const vec3d& s1);
-
+	//Haptics
 	void setPulledVertex(int index);
 	bool hapticStart(int index);
 	bool hapticStart(const vec3d& wpos);
@@ -125,6 +126,7 @@ public:
 
 	//Access TetMesh for stats
 	TetMesh* getTetMesh() const {return m_lpTetMesh;}
+	SurfaceMesh* getSurfMesh() const{return m_lpSurfaceMesh;}
 
 	//ModelName
 	string getModelName() const {return m_strModelName;}

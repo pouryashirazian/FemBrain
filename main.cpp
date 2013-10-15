@@ -13,6 +13,7 @@
 #include <GL/freeglut.h>
 
 #include "PS_Base/PS_Logger.h"
+#include "PS_Base/Profiler.h"
 #include "PS_Base/PS_FileDirectory.h"
 #include "PS_BlobTreeRender/PS_OclPolygonizer.h"
 #include "PS_BlobTreeRender/PS_RBF.h"
@@ -36,6 +37,8 @@
 #include "PS_Deformable/TetGenExporter.h"
 //#include "PS_Deformable/MincReader.h"
 #include "PS_Deformable/MassSpringSystem.h"
+#include "PS_Deformable/Cutting.h"
+
 #include "volumetricMeshLoader.h"
 #include "generateSurfaceMesh.h"
 #include "PS_Graphics/PS_Particles.h"
@@ -188,6 +191,7 @@ GLMeshBuffer* g_lpDrawNormals = NULL;
 PS::ArcBallCamera 	g_arcBallCam;
 PS::HPC::FastRBF*	g_lpFastRBF = NULL;
 Deformable* 		g_lpDeformable = NULL;
+Cutting* 			g_lpCutting = NULL;
 
 //Info Lines
 std::vector<std::string> g_infoLines;
@@ -308,6 +312,9 @@ void Draw()
 
 		//Draw Cutting
 		g_lpDeformable->drawCuttingArea();
+
+		if(g_lpCutting)
+			g_lpCutting->draw();
 	}
 
 	//3.Draw Avatar
@@ -530,6 +537,8 @@ void MousePassiveMove(int x, int y)
 	if(!(g_lpDeformable->isHapticInProgress() && g_appSettings.hapticMode == hmDynamic))
 		return;
 
+	ProfileAuto();
+
 	float dx = x - g_appSettings.screenDragStart.x;
 	float dy = g_appSettings.screenDragStart.y - y;
 
@@ -589,7 +598,11 @@ void MousePassiveMove(int x, int y)
 	//Cutting
 	vec3d extent  = (upper - lower);
 	extent.y = 0.0;
-	g_lpDeformable->performCuts(lower, lower + extent);
+	//g_lpDeformable->performCuts(lower, lower + extent);
+
+	ProfileStartArg("Perform Cut");
+	g_lpCutting->performCut(lower, lower + extent);
+	ProfileEnd();
 
 
 	//2.Compute Collision using RBF Interpolation Function
@@ -605,6 +618,8 @@ void MousePassiveMove(int x, int y)
 	 return;
 	 }
 	 */
+
+	/*
 
 	//List all the vertices in the model impacted
 	{
@@ -700,13 +715,10 @@ void MousePassiveMove(int x, int y)
 				* g_appSettings.hapticForceCoeff;
 		dot = MATHMAX(dot, 0);
 
-		/*
-		 string arrFaces[] = { "LEFT", "RIGHT", "BOTTOM", "TOP", "NEAR",
-		 "FAR" };
-		 printf("Face[%d] = %s, dot = %.4f, VERTEX USED: [%.4f, %.4f, %.4f], COEFF: %.2f \n",
-		 idxCFace, arrFaces[idxCFace].c_str(), dot, v.x, v.y, v.z,
-		 g_appSettings.hapticForceCoeff);
-		 */
+//		 string arrFaces[] = { "LEFT", "RIGHT", "BOTTOM", "TOP", "NEAR", "FAR" };
+//		 printf("Face[%d] = %s, dot = %.4f, VERTEX USED: [%.4f, %.4f, %.4f], COEFF: %.2f \n",
+//		 idxCFace, arrFaces[idxCFace].c_str(), dot, v.x, v.y, v.z,
+//		 g_appSettings.hapticForceCoeff);
 
 		arrIndices.push_back(it->first);
 		arrForces.push_back(n[idxCFace] * dot);
@@ -714,9 +726,10 @@ void MousePassiveMove(int x, int y)
 
 	//Apply displacements/forces to the model
 	g_lpDeformable->hapticSetCurrentForces(arrIndices, arrForces);
-
+	 */
 
 	glutPostRedisplay();
+
 }
 
 void MouseMove(int x, int y)
@@ -784,6 +797,7 @@ void Close()
 	SAFE_DELETE(g_lpDrawNormals);
 	SAFE_DELETE(g_lpFastRBF);
 	SAFE_DELETE(g_lpDeformable);
+	SAFE_DELETE(g_lpCutting);
 	SAFE_DELETE(g_lpAvatarCube);
 
 }
@@ -1251,6 +1265,7 @@ int main(int argc, char* argv[])
 	//Setup the event logger
 	//PS::TheEventLogger::Instance().setWriteFlags(PS_LOG_WRITE_EVENTTYPE | PS_LOG_WRITE_TIMESTAMP | PS_LOG_WRITE_SOURCE | PS_LOG_WRITE_TO_SCREEN);
 	PS::TheEventLogger::Instance().setWriteFlags(PS_LOG_WRITE_EVENTTYPE | PS_LOG_WRITE_SOURCE | PS_LOG_WRITE_TO_SCREEN);
+	PS::TheProfiler::Instance().setWriteFlags(Profiler::pbInjectToLogger);
 	LogInfo("Starting FemBrain");
 	
 	//Initialize app
@@ -1375,9 +1390,13 @@ int main(int argc, char* argv[])
 		}
 
 		LogInfoArg1("Polygonizing BlobTree file with cellsize: %.2f", g_appSettings.cellsize);
+
+
+		ProfileStartArg("Polygonize");
 		tbb::tick_count tsStart = tbb::tick_count::now();
 		lpBlobRender->runPolygonizer(g_appSettings.cellsize);
 		g_appSettings.msPolyTriangleMesh = (tbb::tick_count::now() - tsStart).seconds() * 1000.0;
+		ProfileEnd();
 
 		//Save Mesh
 		//CLMeshBuffer::StoreAsObjMesh("CubeStored.obj", lpBlobRender->computeDevice(), lpBlobRender);
@@ -1444,8 +1463,12 @@ int main(int argc, char* argv[])
 		g_lpDeformable->setHapticForceRadius(g_appSettings.hapticNeighborhoodPropagationRadius);
 		g_lpDeformable->setName("tissue");
 
+		//Setup Cutting system
+		g_lpCutting = new Cutting(g_lpDeformable);
+
 		//Add to scene graph
 		TheSceneGraph::Instance().add(g_lpDeformable);
+		TheSceneGraph::Instance().add(g_lpCutting);
 	}
 
 	//Particles

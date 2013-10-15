@@ -44,8 +44,6 @@ void GLMemoryBuffer::cleanup() {
 
 bool GLMemoryBuffer::setup(MemoryBufferType type, int usage, int step,
 							   int datatype, U32 szTotal, const void* lpData) {
-	if(lpData == NULL)
-		return false;
 	m_bufferType = type;
 	m_step = step;
 	m_dataType = datatype;

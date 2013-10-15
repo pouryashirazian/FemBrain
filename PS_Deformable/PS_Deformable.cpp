@@ -688,12 +688,13 @@ int Deformable::performCuts(const vec3d& s0, const vec3d& s1)
 		return -1;
 
 	//Select a swept surface for edge cutting test
-	const double minSweptLength = 0.1;
+	const double minSweptLength = 0.01;
 	m_isSweptQuadValid = false;
 	m_sweptQuad[0] = s0;
 	m_sweptQuad[1] = s1;
 	if(m_vCuttingPath.size() > 1) {
-		for(U32 i=0; i<m_vCuttingPath.size(); i++) {
+		//Loop over the path from the recently added to the first one
+		for(int i=(int)m_vCuttingPath.size()-1; i>=0; i--) {
 			double d = vec3d::distance(m_vCuttingPath[i].first, s0);
 			if(d >= minSweptLength) {
 				m_sweptQuad[2] = m_vCuttingPath[i].first;
@@ -711,51 +712,47 @@ int Deformable::performCuts(const vec3d& s0, const vec3d& s1)
 		m_vCuttingPath.erase(m_vCuttingPath.begin());
 	}
 
-
+	//Return if not valid quad
+	if(!m_isSweptQuadValid) {
+		LogError("CUT: Swept quad is not valid yet!");
+		return -1;
+	}
 
 	//Test for all tetrahedra. Per each tetrahedra test against the 6 edges and 4 faces
 	//6 Edges: Against swept surface
 	//4 Faces: Against cutting tip path
 
-	vec3d vertices[4];
-	int vertexBuffer[4];
+	vec3d elemVertices[4];
 	int edgeBuffer[12];
 	int edgeMask[6][2] = {
 	   { 0, 1 }, { 1, 2 }, { 2, 0 },
 	   { 0, 3 }, { 1, 3 }, { 2, 3 } };
 
 	//Face Mask
-	int faceBuffer[12];
 	int faceMask[4][3] = {
 	   {0, 1, 2}, {1, 2, 3}, {2, 3, 0}, {0, 1, 3}
 	};
 
+	U32 idxVertex;
 	//Loop over elements
 	for(U32 el=0; el<ctTets; el++) {
 		//Get Vertices
 		for(int i=0; i<4; i++) {
-		    vertexBuffer[i] = m_lpTetMesh->getVertexIndex(el,i);
-		    vertices[i] = m_lpSurfaceMesh->vertexAt(vertexBuffer[i]);
+		    idxVertex = m_lpTetMesh->getVertexIndex(el, i);
+		    elemVertices[i] = m_lpSurfaceMesh->vertexAt(idxVertex);
 		}
 
 		//Get Edges
 		m_lpTetMesh->getElementEdges(el, &edgeBuffer[0]);
-
-		//Get Face Indices
-		for(int i=0; i<4; i++) {
-			faceBuffer[i*3] = vertexBuffer[faceMask[i][0]];
-			faceBuffer[i*3 + 1] = vertexBuffer[faceMask[i][1]];
-			faceBuffer[i*3 + 2] = vertexBuffer[faceMask[i][2]];
-		}
 
 		//4 Face Intersections
 		vec3d p[3];
 		vec3d uvw;
 		vec3d xyz;
 		for(int i=0; i<4; i++) {
-			p[0] = vertices[faceMask[i][0]];
-			p[1] = vertices[faceMask[i][1]];
-			p[2] = vertices[faceMask[i][2]];
+			p[0] = elemVertices[faceMask[i][0]];
+			p[1] = elemVertices[faceMask[i][1]];
+			p[2] = elemVertices[faceMask[i][2]];
 			int res = IntersectSegmentTriangle(s0, s1, p, uvw, xyz);
 			if(res > 0) {
 				FaceIntersection* fi = new FaceIntersection();
@@ -936,12 +933,47 @@ void Deformable::drawTetElement(U32 el, vec4f& color) {
 }
 
 void Deformable::drawCuttingArea() {
+/*
+	//Test
+	vec3d s0 = vec3d(0, -2, 0);
+	vec3d s1 = vec3d(0, 4, 0);
+	vec3d p[3];
+	p[0] = vec3d(-3, 1, 3);
+	p[1] = vec3d(3, 1, 3);
+	p[2] = vec3d(0, 1, -3);
+
+	vec3d xyz, uvw;
+	int res = IntersectSegmentTriangle(s0, s1, p, uvw, xyz);
+	if(res > 0) {
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+			glColor3d(0.0, 1.0, 0.0);
+			glBegin(GL_TRIANGLES);
+			glVertex3dv(p[0].cptr());
+			glVertex3dv(p[1].cptr());
+			glVertex3dv(p[2].cptr());
+			glEnd();
+
+			glLineWidth(1.0f);
+			glColor3d(0,0,0);
+			glBegin(GL_LINES);
+			glVertex3dv(s0.cptr());
+			glVertex3dv(s1.cptr());
+			glEnd();
+
+			glPointSize(4.0f);
+			glColor3d(1.0, 0.0, 0.0);
+			glBegin(GL_POINTS);
+			glVertex3d(xyz.x, xyz.y, xyz.z);
+			glEnd();
+		glPopAttrib();
+	}
+*/
 
 	vec4f red(0.4,0,0,1);
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glPointSize(5.0f);
 	//FACE POINTS
-	glColor3f(1.0f, 0.0f, 0.0f);
+	glColor3f(0.0f, 0.0f, 1.0f);
 		glBegin(GL_POINTS);
 		for(MAPFACE_ITER it = m_mapElementFaceIntersection.begin(); it != m_mapElementFaceIntersection.end(); it++ ) {
 			glVertex3dv(it->second->xyz.cptr());
@@ -966,7 +998,7 @@ void Deformable::drawCuttingArea() {
 	//Draw Scalpel history
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 		glLineWidth(1.0f);
-		glColor4d(0.0, 1.0, 0, 0.5);
+		glColor3d(0.0, 1.0, 0.0);
 		glBegin(GL_LINES);
 		for(U32 i=0; i< m_vCuttingPath.size(); i+=16) {
 			glVertex3dv(m_vCuttingPath[i].first.cptr());

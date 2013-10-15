@@ -469,6 +469,19 @@ void ComputeDevice::oclLogPtx(cl_program cpProgram, cl_device_id cdDevice, const
     free( ptx_code );
 }
 
+bool ComputeDevice::isDoubleFPSupported() const {
+	cl_device_fp_config fp;
+    cl_int err = clGetDeviceInfo(m_clDeviceID, CL_DEVICE_DOUBLE_FP_CONFIG, sizeof(fp), &fp, NULL);
+    if (err != CL_SUCCESS) {
+        cerr << "Error: Failed to get CL_DEVICE_DOUBLE_FP_CONFIG" << endl;
+        return false;
+    }
+    //CL_FP_FMA | CL_FP_ROUND_TO_NEAREST | CL_FP_ROUND_TO_ZERO | CL_FP_ROUND_TO_INF | CL_FP_INF_NAN | CL_FP_DENORM
+    bool bitfield = ((fp & CL_FP_FMA) != 0)&&(fp & CL_FP_ROUND_TO_NEAREST != 0)&&(fp & CL_FP_ROUND_TO_ZERO != 0)&&
+    				 (fp & CL_FP_ROUND_TO_INF != 0)&&(fp & CL_FP_INF_NAN != 0)&&(fp & CL_FP_DENORM != 0);
+    return bitfield;
+}
+
 void ComputeDevice::printInfo()
 {
 	if(!m_bReady) return;

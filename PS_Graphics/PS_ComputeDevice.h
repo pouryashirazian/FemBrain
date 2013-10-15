@@ -107,6 +107,8 @@ public:
 
     bool isReady() const {return m_bReady;}
 
+    bool isDoubleFPSupported() const;
+
     /*!
      * Adds a new ComputeProgram from inline source code.
      * @param chrComputeCode inline source code
