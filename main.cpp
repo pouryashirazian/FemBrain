@@ -537,13 +537,13 @@ void MousePassiveMove(int x, int y)
 	if(!(g_lpDeformable->isHapticInProgress() && g_appSettings.hapticMode == hmDynamic))
 		return;
 
-	ProfileAuto();
+	//ProfileAuto();
 
 	float dx = x - g_appSettings.screenDragStart.x;
 	float dy = g_appSettings.screenDragStart.y - y;
 
-	dx *= 0.001f;
-	dy *= 0.001f;
+	dx *= 0.005f;
+	dy *= 0.005f;
 	g_appSettings.screenDragStart = vec2i(x, y);
 
 	string strAxis;
@@ -599,10 +599,7 @@ void MousePassiveMove(int x, int y)
 	vec3d extent  = (upper - lower);
 	extent.y = 0.0;
 	//g_lpDeformable->performCuts(lower, lower + extent);
-
-	ProfileStartArg("Perform Cut");
 	g_lpCutting->performCut(lower, lower + extent);
-	ProfileEnd();
 
 
 	//2.Compute Collision using RBF Interpolation Function

@@ -21,8 +21,9 @@ GLMemoryBuffer::GLMemoryBuffer() {
 
 GLMemoryBuffer::GLMemoryBuffer(MemoryBufferType type, int usage, int step,
 		   	   	   	   	   	   	   int datatype, U32 szTotal, const void* lpData) {
-	m_isValid = false;
-	m_step 	  = 0;
+	m_isValid  = false;
+	m_usage    = GL_DYNAMIC_DRAW;
+	m_step 	   = 0;
 	m_dataType = GL_FLOAT;
 	m_szBuffer = 0;
 	m_handle   = INVALID_GLBUFFER;
@@ -45,6 +46,7 @@ void GLMemoryBuffer::cleanup() {
 bool GLMemoryBuffer::setup(MemoryBufferType type, int usage, int step,
 							   int datatype, U32 szTotal, const void* lpData) {
 	m_bufferType = type;
+	m_usage = usage;
 	m_step = step;
 	m_dataType = datatype;
 	m_szBuffer = szTotal;
@@ -52,9 +54,18 @@ bool GLMemoryBuffer::setup(MemoryBufferType type, int usage, int step,
 
 	glGenBuffers(1, &m_handle);
 	glBindBuffer(GL_ARRAY_BUFFER, m_handle);
-	glBufferData(GL_ARRAY_BUFFER, m_szBuffer, lpData, usage);
+	glBufferData(GL_ARRAY_BUFFER, m_szBuffer, lpData, m_usage);
 	m_isValid = true;
 	return true;
+}
+
+void GLMemoryBuffer::resize(U32 szTotal, const void* lpData) {
+	if(!m_isValid)
+		return;
+
+	m_szBuffer = szTotal;
+	glBindBuffer(GL_ARRAY_BUFFER, m_handle);
+	glBufferData(GL_ARRAY_BUFFER, m_szBuffer, lpData, m_usage);
 }
 
 bool GLMemoryBuffer::readBackBuffer(U32 szOutBuffer, void* lpOutBuffer) {

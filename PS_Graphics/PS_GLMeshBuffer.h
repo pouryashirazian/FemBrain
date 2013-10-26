@@ -56,6 +56,10 @@ public:
 
 	bool setup(MemoryBufferType type, int usage, int step,
 			   int datatype, U32 szTotal, const void* lpData);
+
+	//Resize buffer
+	void resize(U32 szTotal, const void* lpData);
+
 	void attach();
 	void detach();
 	void drawElements(int faceMode, int ctElements);
@@ -79,6 +83,7 @@ protected:
 	void cleanup();
 private:
 	bool m_isValid;
+	int m_usage;
 	int m_step;
 	int m_dataType;
 	U32 m_szBuffer;

@@ -111,6 +111,9 @@ tick Profiler::GetTickCount() {
 	return tbb::tick_count::now();
 }
 
+/*!
+ * Write profiler events into the text file
+ */
 int Profiler::writeToTextFile() {
 	if(m_vEvents.size() == 0)
 		return 0;
