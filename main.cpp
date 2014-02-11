@@ -38,6 +38,7 @@
 //#include "PS_Deformable/MincReader.h"
 #include "PS_Deformable/MassSpringSystem.h"
 #include "PS_Deformable/Cutting.h"
+#include "PS_Deformable/Cutting_CPU.h"
 
 #include "volumetricMeshLoader.h"
 #include "generateSurfaceMesh.h"
@@ -55,8 +56,6 @@ using namespace PS::HPC;
 #define ZFAR 100.0
 
 #define DEFAULT_FORCE_COEFF 600000
-//#define ANIMATION_TIMER_MILLISEC 33
-#define ANIMATION_TIMER_MILLISEC 1000/60
 #define ANIMATION_TIME_SAMPLE_INTERVAL 5
 
 
@@ -74,7 +73,6 @@ enum DRAWISOSURFACE {disNone, disWireFrame, disFull, disTetMesh, disCount};
 //Application Settings
 class AppSettings{
 public:
-
 	//Set to default values in constructor
 	AppSettings() {
 		//Set the simulation file path
@@ -98,15 +96,15 @@ public:
 		this->bLogSql = true;
 		this->bGravity = true;
 		this->idxCollisionFace = -1;
-		this->animTimerInterval = ANIMATION_TIMER_MILLISEC;
-		this->ctAnimFrame = 0;
+		this->ctFrames = 0;
 		this->ctAnimLogger = 0;
 		this->ctLogsCollected = 0;
 		this->ctSolverThreads = task_scheduler_init::default_num_threads();
 
 		//Animation
-		this->msAnimationTimeAcc = 0;
-		this->animFPS = 0;
+		this->tick = tbb::tick_count::now();
+		this->msFrameTime = 0;
+		this->fps = 0;
 
 
 		this->hapticMode = 0;
@@ -156,18 +154,20 @@ public:
 
 	//Stats
 	U64  ctLogsCollected;
-	U64  ctAnimFrame;
 	U64  ctAnimLogger;
-	U32  animTimerInterval;
-	double msAnimationFrameTime;
-	double msAnimationTimeAcc;
+	U64  ctFrames;
 
+	//FrameTime Stats
+	double fps;
+	double msFrameTime;
+	tbb::tick_count tick;
+
+	//Other timings
 	double msAnimApplyDisplacements;
 	double msPolyTriangleMesh;
 	double msPolyTetrahedraMesh;
 	double msRBFCreation;
 	int ctSolverThreads;
-	int animFPS;
 };
 
 void AdvanceHapticPosition();
@@ -205,7 +205,8 @@ U32 g_uiPhongShader;
 void Close();
 void Draw();
 void Resize(int w, int h);
-void TimeStep(int t);
+
+void TimeStep();
 void MousePress(int button, int state, int x, int y);
 void MouseMove(int x, int y);
 void MousePassiveMove(int x, int y);
@@ -257,6 +258,12 @@ void AdvanceHapticPosition() {
 
 void Draw()
 {
+	tbb::tick_count tkStart = tbb::tick_count::now();
+	g_appSettings.msFrameTime = (tkStart - g_appSettings.tick).seconds() * 1000.0;
+	g_appSettings.fps = 1000.0 / ((g_appSettings.msFrameTime > 1.0) ? g_appSettings.msFrameTime: 1.0);
+	g_appSettings.tick = tkStart;
+
+	//Draw
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
@@ -313,8 +320,8 @@ void Draw()
 		//Draw Cutting
 		g_lpDeformable->drawCuttingArea();
 
-		if(g_lpCutting)
-			g_lpCutting->draw();
+		//if(g_lpCutting)
+			//g_lpCutting->draw();
 	}
 
 	//3.Draw Avatar
@@ -391,9 +398,9 @@ void Draw()
 
 		//Frame Count, Frame Time and FPS, Log Count
 		sprintf(chrMsg, "ANIMATION FRAME# %08llu, TIME# %.2f, FPS# %d, LOGS# %08llu",
-				g_appSettings.ctAnimFrame,
-				g_appSettings.msAnimationFrameTime,
-				g_appSettings.animFPS,
+				g_appSettings.ctFrames,
+				g_appSettings.msFrameTime,
+				(int)g_appSettings.fps,
 				g_appSettings.ctLogsCollected);
 		g_infoLines[INDEX_ANIMATION_INFO] = string(chrMsg);
 
@@ -599,7 +606,7 @@ void MousePassiveMove(int x, int y)
 	vec3d extent  = (upper - lower);
 	extent.y = 0.0;
 	//g_lpDeformable->performCuts(lower, lower + extent);
-	g_lpCutting->performCut(lower, lower + extent);
+	//g_lpCutting->performCut(lower, lower + extent);
 
 
 	//2.Compute Collision using RBF Interpolation Function
@@ -616,7 +623,7 @@ void MousePassiveMove(int x, int y)
 	 }
 	 */
 
-	/*
+
 
 	//List all the vertices in the model impacted
 	{
@@ -723,7 +730,7 @@ void MousePassiveMove(int x, int y)
 
 	//Apply displacements/forces to the model
 	g_lpDeformable->hapticSetCurrentForces(arrIndices, arrForces);
-	 */
+
 
 	glutPostRedisplay();
 
@@ -1052,26 +1059,17 @@ void SpecialKey(int key, int x, int y)
 }
 
 
-void TimeStep(int t)
+void TimeStep()
 {
-	tbb::tick_count tkStart = tbb::tick_count::now();
-
-	g_appSettings.msAnimationTimeAcc += (tbb::tick_count::now() - tkStart).seconds() * 1000.0;
-	g_appSettings.ctAnimFrame ++;
-
 	//Advance timestep in scenegraph
-	//TheSceneGraph::Instance().timestep();
+	TheSceneGraph::Instance().timestep();
+	g_appSettings.ctFrames++;
 
 	//Sample For Logs and Info
-	if(g_appSettings.ctAnimFrame - g_appSettings.ctAnimLogger > ANIMATION_TIME_SAMPLE_INTERVAL) {
+	if(g_appSettings.ctFrames - g_appSettings.ctAnimLogger > ANIMATION_TIME_SAMPLE_INTERVAL) {
 
 		//Store counter
-		g_appSettings.ctAnimLogger = g_appSettings.ctAnimFrame;
-
-		//Compute Time
-		g_appSettings.msAnimationFrameTime = g_appSettings.msAnimationTimeAcc / (double)ANIMATION_TIME_SAMPLE_INTERVAL;
-		g_appSettings.msAnimationTimeAcc = 0.0;
-		g_appSettings.animFPS = 1000 / (g_appSettings.msAnimationFrameTime > 1.0 ? (int)g_appSettings.msAnimationFrameTime : 1);
+		g_appSettings.ctAnimLogger = g_appSettings.ctFrames;
 
 		//Log Database
 		if(g_appSettings.bLogSql)
@@ -1083,9 +1081,9 @@ void TimeStep(int t)
 
 				//StatInfo
 				rec.ctSolverThreads = g_appSettings.ctSolverThreads;
-				rec.animFPS = g_appSettings.animFPS;
+				rec.animFPS = g_appSettings.fps;
 				rec.cellsize = g_appSettings.cellsize;
-				rec.msAnimTotalFrame = g_appSettings.msAnimationFrameTime;
+				rec.msAnimTotalFrame = g_appSettings.msFrameTime;
 				rec.msAnimSysSolver  = g_lpDeformable->getSolverTime() * 1000.0;
 				rec.msAnimApplyDisplacements = g_appSettings.msAnimApplyDisplacements;
 				rec.msPolyTriangleMesh 		 = g_appSettings.msPolyTriangleMesh;
@@ -1102,9 +1100,6 @@ void TimeStep(int t)
 
 	//Animation Frame Prepared now display
 	glutPostRedisplay();
-
-	//Set Timer for next frame
-	glutTimerFunc(g_appSettings.animTimerInterval, TimeStep, g_appSettings.ctAnimFrame);
 }
 
 bool LoadSettings(const std::string& strSimFP)
@@ -1227,11 +1222,11 @@ int main(int argc, char* argv[])
 {
 	//Init Task Schedular
 	tbb::task_scheduler_init init(task_scheduler_init::default_num_threads());
+	//tbb::task_scheduler_init init(1);
 
 	printf("***************************************************************************************\n");
 	printf("FEMBrain - GPU-Accelerated Animation of Implicit Surfaces using Finite Element Methods.\n");
 	printf("[Pourya Shirazian] Email: pouryash@cs.uvic.ca\n");
-
 
 	//SIM files define the simulation parameters
 	//Parse Input Args
@@ -1280,7 +1275,9 @@ int main(int argc, char* argv[])
 	glutKeyboardFunc(NormalKey);
 	glutSpecialFunc(SpecialKey);
 	glutCloseFunc(Close);
-	glutTimerFunc(g_appSettings.animTimerInterval, TimeStep, 0);
+
+	glutIdleFunc(TimeStep);
+	//glutTimerFunc(g_appSettings.animTimerInterval, TimeStep, 0);
 
 	//Print GPU INFO
 	GetGPUInfo();
@@ -1334,6 +1331,9 @@ int main(int argc, char* argv[])
 	if(!LoadSettings(g_appSettings.strSimFilePath))
 		exit(0);
 
+
+	//Init
+	g_appSettings.tick = tbb::tick_count::now();
 
 	//Ground and Room
 	TheSceneGraph::Instance().addGroundMatrix(32, 32, 0.2f);
@@ -1461,11 +1461,11 @@ int main(int argc, char* argv[])
 		g_lpDeformable->setName("tissue");
 
 		//Setup Cutting system
-		g_lpCutting = new Cutting(g_lpDeformable);
+		//g_lpCutting = new Cutting(g_lpDeformable);
 
 		//Add to scene graph
 		TheSceneGraph::Instance().add(g_lpDeformable);
-		TheSceneGraph::Instance().add(g_lpCutting);
+		//TheSceneGraph::Instance().add(g_lpCutting);
 	}
 
 	//Particles

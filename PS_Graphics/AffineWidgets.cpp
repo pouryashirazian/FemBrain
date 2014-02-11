@@ -1,6 +1,6 @@
-#include "AffineWidgets.h"
-#include "PS_Box.h"
 #include <GL/glew.h>
+#include "PS_Box.h"
+#include "AffineWidgets.h"
 
 GLfloat g_vertices[][3] = { { -1.0, -1.0, 1.0 }, { -1.0, 1.0, 1.0 }, { 1.0, 1.0,
 		1.0 }, { 1.0, -1.0, 1.0 }, { -1.0, -1.0, -1.0 }, { -1.0, 1.0, -1.0 }, {
