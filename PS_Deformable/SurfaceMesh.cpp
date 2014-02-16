@@ -76,8 +76,7 @@ bool FaceOrderResolver::operator()(const FaceTopology & x,
 
 ///////////////////////////////////////////////////////////////////////////
 SurfaceMesh::SurfaceMesh() {
-	m_drawMode = dtFaces | dtEdges | dtVertices | dtFixedVertices
-			| dtPickedVertices;
+	m_drawMode = dtFaces | dtEdges | dtFixedVertices | dtPickedVertices;
 	m_lpMemFaces = m_lpMemNormal = m_lpMemVertices = NULL;
 }
 
@@ -114,11 +113,12 @@ void SurfaceMesh::setupDrawBuffers() {
 	bool bHasNormals = (m_vNormals.size() == m_vCurPos.size());
 
 	U32 szTotal = m_vCurPos.size() * sizeof(double);
-	m_lpMemVertices = new GLMemoryBuffer(mbtPosition, GL_DYNAMIC_DRAW, 3,
-	GL_DOUBLE, szTotal, &m_vCurPos[0]);
+	m_lpMemVertices = new GLMemoryBuffer(mbtPosition, GL_DYNAMIC_DRAW, 3, GL_DOUBLE, szTotal, &m_vCurPos[0]);
 	if (bHasNormals)
-		m_lpMemNormal = new GLMemoryBuffer(mbtNormal, GL_DYNAMIC_DRAW, 3,
-		GL_DOUBLE, szTotal, &m_vNormals[0]);
+		m_lpMemNormal = new GLMemoryBuffer(mbtNormal, GL_DYNAMIC_DRAW, 3, GL_DOUBLE, szTotal, &m_vNormals[0]);
+	else
+		m_lpMemNormal = new GLMemoryBuffer();
+
 	m_lpMemFaces = new GLMemoryBuffer(mbtFaceIndices, GL_DYNAMIC_DRAW, 3,
 	GL_UNSIGNED_INT, m_faces.size() * sizeof(U32), &m_faces[0]);
 }

@@ -1417,14 +1417,6 @@ int main(int argc, char* argv[])
 
 
 	{
-		DAnsiStr strModelFP = PS::FILESTRINGUTILS::ChangeFileExt(DAnsiStr(g_appSettings.strModelFilePath.c_str()), "");
-		DAnsiStr strModelTitleOnly = PS::FILESTRINGUTILS::ExtractFileTitleOnly(strModelFP);
-		DAnsiStr strModelMeshV3T3 = strModelFP + "TriMeshV3T3";
-		DAnsiStr strModelTetMesh = strModelFP + "TetMesh";
-		DAnsiStr strModelTetMeshNodes = strModelFP + "TetMesh.node";
-		DAnsiStr strModelTetMeshVegFile = strModelTetMesh + ".veg";
-		DAnsiStr strModelTetMeshObjFile = strModelTetMesh + ".obj";
-
 		//TetMesh
 		vector<U32> tetElements;
 		vector<double> tetVertices;
