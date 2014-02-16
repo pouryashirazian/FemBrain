@@ -147,7 +147,7 @@ public:
 	vec2i screenDragEnd;
 
 	//Fixed Vertices
-	vector<int> vFixedVertices;
+	vector<U32> vFixedVertices;
 
 	//Propagate force to neighborhood
 	int hapticNeighborhoodPropagationRadius;
@@ -1124,7 +1124,7 @@ bool LoadSettings(const std::string& strSimFP)
 
 	int ctFixed = 	cfg.readInt("MODEL", "FIXEDVERTICESCOUNT", 0);
 	if(ctFixed > 0) {
-		if(!cfg.readIntArray("MODEL", "FIXEDVERTICES", ctFixed, g_appSettings.vFixedVertices))
+		if(!cfg.readIntArrayU32("MODEL", "FIXEDVERTICES", ctFixed, g_appSettings.vFixedVertices))
 			LogError("Unable to read specified number of fixed vertices!");
 	}
 
@@ -1210,7 +1210,7 @@ bool SaveSettings(const std::string& strSimFP)
 	//MODEL PROPS
 	if(g_appSettings.bEditConstrainedNodes) {
 		cfg.writeInt("MODEL", "FIXEDVERTICESCOUNT", g_appSettings.vFixedVertices.size());
-		cfg.writeIntArray("MODEL", "FIXEDVERTICES", g_appSettings.vFixedVertices);
+		cfg.writeIntArrayU32("MODEL", "FIXEDVERTICES", g_appSettings.vFixedVertices);
 	}
 
 	return true;
@@ -1425,33 +1425,20 @@ int main(int argc, char* argv[])
 		DAnsiStr strModelTetMeshVegFile = strModelTetMesh + ".veg";
 		DAnsiStr strModelTetMeshObjFile = strModelTetMesh + ".obj";
 
+		//TetMesh
+		vector<U32> tetElements;
+		vector<double> tetVertices;
 
 		//Produce Quality Tetrahedral Mesh using TetGen for now
 		tbb::tick_count tsStart = tbb::tick_count::now();
-		TetGenExporter::tesselate(ctVertices, &vertices[0], ctTriangles, &elements[0],
-								  strModelMeshV3T3.cptr(),
-								  strModelTetMesh.cptr());
+
+		TetGenExporter::tesselate(vertices, elements, tetVertices, tetElements);
 		g_appSettings.msPolyTetrahedraMesh = (tbb::tick_count::now() - tsStart).seconds() * 1000.0;
 
-		//Export a veg file for the Fem Engine
-		VegWriter::WriteVegFile(strModelTetMeshNodes.cptr());
+		//Setup Deformable model
+		g_lpDeformable = new Deformable();
+		g_lpDeformable->setupTetMesh(tetVertices, tetElements, g_appSettings.vFixedVertices);
 
-
-		//Create Deformable Model from: Triangle Mesh and Tetrahedra Mesh
-
-		//Obj mesh is useful though for viewing the boundary tetrahedra produced by tetgen
-		//Produce special obj mesh with the same vertices and surface triangles
-		VolumetricMesh * mesh = VolumetricMeshLoader::load(strModelTetMeshVegFile.ptr());
-		GenerateSurfaceMesh generateSurfaceMesh;
-		ObjMesh * objMesh = generateSurfaceMesh.ComputeMesh(mesh, true);
-		objMesh->save(string(strModelTetMeshObjFile.cptr()));
-
-		//Setup Deformable object
-		g_lpDeformable = new Deformable(strModelTetMeshVegFile.cptr(),
-										strModelTetMeshObjFile.cptr(),
-										g_appSettings.vFixedVertices,
-										g_appSettings.ctSolverThreads,
-										strModelTitleOnly.cptr());
 
 		//Deformations will be applied using opencl kernel
 		LogInfoArg1("GRAVITY is: %d", g_appSettings.bGravity);
@@ -1467,14 +1454,6 @@ int main(int argc, char* argv[])
 		TheSceneGraph::Instance().add(g_lpDeformable);
 		//TheSceneGraph::Instance().add(g_lpCutting);
 	}
-
-	//Particles
-	/*
-	g_lpParticles = new Particles();
-	g_lpParticles->setName("blood");
-	TheSceneGraph::Instance().add(g_lpParticles);
-	*/
-
 
 	//Draw the first time
 	glutPostRedisplay();

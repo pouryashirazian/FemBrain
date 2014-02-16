@@ -63,7 +63,7 @@ public:
 	 */
 	explicit Deformable(const char* lpVegFilePath,
 						   const char* lpObjFilePath,
-						   std::vector<int>& vFixedVertices,
+						   std::vector<U32>& vFixedVertices,
 						   int ctThreads = 0,
 						   const char* lpModelTitle = NULL);
 	virtual ~Deformable();
@@ -121,7 +121,7 @@ public:
 	bool addFixedVertex(int index);
 	bool removeFixedVertex(int index);
 
-	double computeVolume() const;
+	double computeVolume(double* arrStore = NULL, U32 count = 0) const;
 	bool isVolumeChanged() const { return  !EssentiallyEquald(this->computeVolume(), m_restVolume, 0.0001);}
 
 	//Access TetMesh for stats
@@ -146,6 +146,12 @@ public:
 	}
 
 	double getSolverTime() const { return m_lpIntegrator->GetSystemSolveTime();}
+
+	//Setup
+	int setupTetMesh(const vector<double>& inTetVertices,
+					 const vector<U32>& inTetElements,
+					 const vector<U32>& vFixedVertices);
+
 	/*!
 	 * Return: Outputs number of dofs
 	 */
@@ -157,17 +163,13 @@ private:
 	 */
 	void setup(const char* lpVegFilePath,
 			    const char* lpObjFilePath,
-			    std::vector<int>& vFixedVertices,
+			    std::vector<U32>& vFixedVertices,
 			    int ctThreads = 0,
 			    const char* lpModelTitle = NULL);
 
-	void setup(U32 ctVertices, double* lpVertices,
-				U32 ctElements, int* lpElements,
-				std::vector<int>& vFixedVertices,
-				int ctThreads = 0);
-
 	void setupIntegrator(int ctThreads = 8);
 
+	void init();
 	void cleanup();
 
 private:
@@ -178,6 +180,7 @@ private:
 	double m_dampingMassCoeff;
 	double m_timeStep;
 	double m_restVolume;
+
 
 	//Cutting
 	vector<pair<vec3d, vec3d> > m_vCuttingPath;

@@ -68,7 +68,10 @@ namespace PS{
 		void writeBool(DAnsiStr section, DAnsiStr variable, bool val);
 
 		bool readIntArray(DAnsiStr section, DAnsiStr variable, int ctExpected, std::vector<int>& arrayInt);
+		bool readIntArrayU32(DAnsiStr section, DAnsiStr variable, int ctExpected, std::vector<U32>& arrayInt);
+
 		int writeIntArray(DAnsiStr section, DAnsiStr variable, const std::vector<int>& arrayInt);
+		int writeIntArrayU32(DAnsiStr section, DAnsiStr variable, const std::vector<U32>& arrayInt);
 
 	};
 }

@@ -397,6 +397,69 @@ namespace PS{
 		return arrayInt.size();
 	}
 	
+	//====================================================================================
+	bool CAppConfig::readIntArrayU32(DAnsiStr section, DAnsiStr variable, int ctExpected, std::vector<U32>& arrayInt)
+	{
+		DAnsiStr strVal;
+		if(readValue(section, variable, strVal))
+		{
+            int pos;
+			int iComp = 0;
+			DAnsiStr strTemp;
+			if(strVal.firstChar() == '(')
+				strVal = strVal.substr(1);
+			else
+				return false;
+			while(strVal.lfind(',', pos))
+			{
+				strTemp = strVal.substr(0, pos);
+				strVal = strVal.substr(pos + 1);
+				strVal.removeStartEndSpaces();
+				arrayInt.push_back(atoi(strTemp.ptr()));
+				iComp++;
+			}
+
+			if(strVal.length() >= 1)
+			{
+				if(strVal.lastChar() == ')')
+				{
+					strTemp = strVal.substr(0, strVal.length() - 1);
+					strTemp.removeStartEndSpaces();
+					if(strTemp.length() > 0)
+						arrayInt.push_back(atoi(strTemp.ptr()));
+				}
+			}
+		}
+		return ((int)arrayInt.size() == ctExpected);
+	}
+
+	//====================================================================================
+	int CAppConfig::writeIntArrayU32(DAnsiStr section, DAnsiStr variable, const std::vector<U32>& arrayInt)
+	{
+		DAnsiStr strValue, strTemp;
+		if(arrayInt.size() > 1)
+		{
+            for(int i=0; i<(int)arrayInt.size(); i++)
+			{
+				if(i == 0)
+					strTemp = printToAStr("(%u, ", arrayInt[i]);
+                else if(i == (int)arrayInt.size() - 1)
+					strTemp = printToAStr("%u)", arrayInt[i]);
+				else
+					strTemp = printToAStr("%u, ", arrayInt[i]);
+				strValue += strTemp;
+			}
+			writeValue(section, variable, strValue);
+		}
+		else if(arrayInt.size() == 1)
+		{
+			strTemp = printToAStr("(%u)", arrayInt[0]);
+			writeValue(section, variable, strTemp);
+		}
+		else
+			writeValue(section, variable, DAnsiStr("()"));
+		return arrayInt.size();
+	}
 
 	void CAppConfig::clearContentBuffer()
 	{

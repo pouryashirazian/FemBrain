@@ -23,12 +23,15 @@ namespace FEM {
 class SurfaceMesh : public SceneNode {
 public:
 	enum DRAW_TYPE {dtNone = 0, dtFaces = 1, dtEdges = 2, dtVertices = 4, dtFixedVertices = 8, dtPickedVertices = 16};
-
 	SurfaceMesh();
 	SurfaceMesh(const char* chrObjFilePath);
 	virtual ~SurfaceMesh();
 
 	void draw();
+
+	//Extract from tetmesh
+	bool setupFromTetMesh(const vector<double>& inTetVertices,
+							const vector<U32>& inTetElements);
 
 	//Draw Mode
 	void setDrawMode(int mode);

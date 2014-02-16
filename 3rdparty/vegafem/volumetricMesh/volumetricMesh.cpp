@@ -549,6 +549,8 @@ VolumetricMesh::VolumetricMesh(int numVertices_, double * vertices_,
 
   vertices = (Vec3d**) malloc (sizeof(Vec3d*) * numVertices);
   elements = (int**) malloc (sizeof(int*) * numElements);
+  elementMaterial = (int*) malloc (sizeof(int) * numElements);
+
   materials = (Material**) malloc (sizeof(Material*) * numMaterials);
   sets = (Set**) malloc (sizeof(Set*) * numSets);
   regions = (Region**) malloc (sizeof(Region*) * numRegions);

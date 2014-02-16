@@ -24,15 +24,17 @@ using namespace PS::INTERSECTIONS;
 
 Deformable::Deformable()
 {
+	init();
 }
 
 Deformable::Deformable(const char* lpVegFilePath,
 						  const char* lpObjFilePath,
-						  std::vector<int>& vFixedVertices,
+						  std::vector<U32>& vFixedVertices,
 						  int ctThreads,
 						  const char* lpModelTitle)
 {
-	this->setup(lpVegFilePath, lpObjFilePath, vFixedVertices, ctThreads, lpModelTitle);
+	init();
+	setup(lpVegFilePath, lpObjFilePath, vFixedVertices, ctThreads, lpModelTitle);
 }
 
 Deformable::~Deformable()
@@ -55,9 +57,7 @@ void Deformable::cleanup()
 	SAFE_DELETE(m_lpSurfaceMesh);
 
 	//SAFE_DELETE(m_lpDeformableMesh);
-
 	SAFE_DELETE(m_lpDeformableForceModel);
-
 	SAFE_DELETE(m_lpDeformable);
 
 	SAFE_DELETE(m_lpTetMesh);
@@ -68,18 +68,10 @@ void Deformable::cleanup()
 	SAFE_DELETE_ARRAY(m_arrElementVolumes);
 }
 
-//Setup
-void Deformable::setup(const char* lpVegFilePath,
-						  const char* lpObjFilePath,
-						  std::vector<int>& vFixedVertices,
-						  int ctThreads,
-						  const char* lpModelTitle)
-{
-	//Set Model Name
-	if(lpModelTitle == NULL)
-		m_strModelName = PS::FILESTRINGUTILS::ExtractFileTitleOnly(DAnsiStr(lpVegFilePath)).cptr();
-	else
-		m_strModelName = string(lpModelTitle);
+void Deformable::init() {
+	m_strModelName = "FEMBRAIN";
+	m_lpSurfaceMesh = NULL;
+	m_lpTetMesh = NULL;
 
 	//Init Vars
 	m_fOnDeform = NULL;
@@ -90,16 +82,46 @@ void Deformable::setup(const char* lpVegFilePath,
 	m_bRenderVertices = false;
 	m_bHapticInProgress = false;
 
+	// This option only affects PARDISO and SPOOLES solvers, where it is best
+	// to keep it at 0, which implies a symmetric, non-PD solve.
+	// With CG, this option is ignored.
+	m_positiveDefiniteSolver = 0;
 
-	//Setup Boundary Mesh
-	vector<U32> arrFixed;
+	// (tangential) Rayleigh damping
+	// "underwater"-like damping
+	m_dampingMassCoeff = 0.0;
+
+	// (primarily) high-frequency damping
+	m_dampingStiffnessCoeff = 0.01;
+
+	//Time Step the model
+	m_timeStep = 0.0333;
+	m_ctTimeStep = 0;
+	m_lpIntegrator = NULL;
+}
+
+//Setup
+void Deformable::setup(const char* lpVegFilePath,
+						  const char* lpObjFilePath,
+						  std::vector<U32>& vFixedVertices,
+						  int ctThreads,
+						  const char* lpModelTitle)
+{
+	//Set Model Name
+	if(lpModelTitle == NULL)
+		m_strModelName = PS::FILESTRINGUTILS::ExtractFileTitleOnly(DAnsiStr(lpVegFilePath)).cptr();
+	else
+		m_strModelName = string(lpModelTitle);
+
+	//Adapting to VegaFem input
+	vector<int> arrFixed;
 	arrFixed.resize(vFixedVertices.size());
 	for(U32 i=0; i<vFixedVertices.size(); i++)
-		arrFixed[i] = (U32)vFixedVertices[i];
+		arrFixed[i] = (int)vFixedVertices[i];
 
 	m_lpSurfaceMesh = new SurfaceMesh(lpObjFilePath);
 	m_lpSurfaceMesh->resetToRest();
-	m_lpSurfaceMesh->setFixedVertices(arrFixed);
+	m_lpSurfaceMesh->setFixedVertices(vFixedVertices);
 
 	//Setup Volumetric Mesh
 	VolumetricMesh * lpVolMesh = VolumetricMeshLoader::load(const_cast<char*>(lpVegFilePath));
@@ -130,31 +152,13 @@ void Deformable::setup(const char* lpVegFilePath,
 	//Compute Mass Matrix
 	GenerateMassMatrix::computeMassMatrix(m_lpTetMesh, &m_lpMassMatrix, true);
 
-
-	// This option only affects PARDISO and SPOOLES solvers, where it is best
-	// to keep it at 0, which implies a symmetric, non-PD solve.
-	// With CG, this option is ignored.
-	m_positiveDefiniteSolver = 0;
-
 	//Copy from the input fixed vertices
 	m_vFixedVertices.assign(vFixedVertices.begin(), vFixedVertices.end());
-
-	// (tangential) Rayleigh damping
-	// "underwater"-like damping
-	m_dampingMassCoeff = 0.0;
-
-	// (primarily) high-frequency damping
-	m_dampingStiffnessCoeff = 0.01;
 
 	// total number of DOFs
 	m_dof = 3 * m_lpTetMesh->getNumVertices();
 	m_arrDisplacements = new double[m_dof];
 	m_arrExtForces = new double[m_dof];
-
-	//Time Step the model
-	m_timeStep = 0.0333;
-	m_ctTimeStep = 0;
-	m_lpIntegrator = NULL;
 
 	//Create the integrator
 	this->setupIntegrator(ctThreads);
@@ -166,9 +170,77 @@ void Deformable::setup(const char* lpVegFilePath,
 	//Compute Volume
 	U32 ctElems = m_lpTetMesh->getNumElements();
 	m_arrElementVolumes = new double[ctElems];
-	for(U32 i=0; i<ctElems; i++)
-		m_arrElementVolumes[i] = m_lpTetMesh->getElementVolume(i);
-	m_restVolume = this->computeVolume();
+	m_restVolume = this->computeVolume(m_arrElementVolumes, ctElems);
+}
+
+
+int Deformable::setupTetMesh(const vector<double>& inTetVertices,
+		 	 	 	 	 	 const vector<U32>& inTetElements,
+		 	 	 	 	 	 const vector<U32>& vFixedVertices) {
+
+	//Adapting to VegaFem input
+	vector<int> arrFixed;
+	arrFixed.resize(vFixedVertices.size());
+	for(U32 i=0; i<vFixedVertices.size(); i++)
+		arrFixed[i] = (int)vFixedVertices[i];
+
+	vector<int> arrElements;
+	arrElements.resize(inTetElements.size());
+	for(U32 i=0; i<inTetElements.size(); i++)
+		arrElements[i] = (int)inTetElements[i];
+
+
+	//Setup Boundary Mesh
+	if(m_lpSurfaceMesh == NULL)
+		m_lpSurfaceMesh = new SurfaceMesh();
+
+	//Extract from tetmesh
+	m_lpSurfaceMesh->setupFromTetMesh(inTetVertices, inTetElements);
+	m_lpSurfaceMesh->resetToRest();
+	m_lpSurfaceMesh->setFixedVertices(vFixedVertices);
+
+	//Setup Volumetric Mesh
+	int ctVertices = inTetVertices.size() / 3;
+	int ctElements = inTetElements.size() / 4;
+	SAFE_DELETE(m_lpTetMesh);
+	m_lpTetMesh = new TetMesh(ctVertices, const_cast<double*>(&inTetVertices[0]),
+							  ctElements, &arrElements[0]);
+
+	//MeshGraph
+	m_lpMeshGraph = GenerateMeshGraph::Generate(m_lpTetMesh);
+
+	//Setup Deformable Model
+	m_lpDeformable = new CorotationalLinearFEM(m_lpTetMesh);
+
+	//Setup Force Model
+	m_lpDeformableForceModel = new CorotationalLinearFEMForceModel(m_lpDeformable);
+
+	//Compute Mass Matrix
+	GenerateMassMatrix::computeMassMatrix(m_lpTetMesh, &m_lpMassMatrix, true);
+
+	//Copy from the input fixed vertices
+	m_vFixedVertices.assign(vFixedVertices.begin(), vFixedVertices.end());
+
+
+	// total number of DOFs
+	m_dof = 3 * m_lpTetMesh->getNumVertices();
+	m_arrDisplacements = new double[m_dof];
+	m_arrExtForces = new double[m_dof];
+
+
+	//Create the integrator
+	this->setupIntegrator(tbb::task_scheduler_init::default_num_threads());
+
+
+	//Compute AABB
+	this->setBBox(m_lpSurfaceMesh->bbox());
+
+	//Compute Volume
+	U32 ctElems = m_lpTetMesh->getNumElements();
+	m_arrElementVolumes = new double[ctElems];
+	m_restVolume = this->computeVolume(m_arrElementVolumes, ctElems);
+
+	return 1;
 }
 
 /*!
@@ -206,25 +278,22 @@ void Deformable::statFillRecord(DBLogger::Record& rec) const
 	rec.xpTime = DBLogger::timestamp();
 }
 
-double Deformable::computeVolume() const
+double Deformable::computeVolume(double* arrStore, U32 count) const
 {
+	if(!m_lpTetMesh)
+		return 0.0;
+
 	U32 ctElements = m_lpTetMesh->getNumElements();
 	double vol = 0.0;
-	int indices[4];
-	vec3d vertices[4];
+	bool store = false;
+	if(arrStore != NULL && count == ctElements)
+		store = true;
+
 	for(U32 i=0; i<ctElements; i++)
 	{
-		indices[0] = m_lpTetMesh->getVertexIndex(i, 0);
-		indices[1] = m_lpTetMesh->getVertexIndex(i, 1);
-		indices[2] = m_lpTetMesh->getVertexIndex(i, 2);
-		indices[3] = m_lpTetMesh->getVertexIndex(i, 3);
-
-		vertices[0] = m_lpSurfaceMesh->vertexAt(indices[0]);
-		vertices[1] = m_lpSurfaceMesh->vertexAt(indices[1]);
-		vertices[2] = m_lpSurfaceMesh->vertexAt(indices[2]);
-		vertices[3] = m_lpSurfaceMesh->vertexAt(indices[3]);
-
-		double cur = TetrahedraMesh::ComputeTetVolume(vertices[0], vertices[1], vertices[2], vertices[3]);
+		double cur = m_lpTetMesh->getElementVolume(i);
+		if(store)
+			arrStore[i] = cur;
 		vol += cur;
 	}
 	return vol;
