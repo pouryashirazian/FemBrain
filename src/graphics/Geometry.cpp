@@ -431,9 +431,62 @@ bool Geometry::computeNormalsFromFaces()
 	return true;
 }
 
-bool Geometry::addCircle(int sectors,
+    bool Geometry::addLine(const vec3f& start, const vec3f& end) {
+        if(m_faceMode >= ftTriangles) {
+            LogError("The geometry is not setup for a line or point topology!");
+            return false;
+        }
+        
+        addVertex(start);
+        addVertex(end);
+        return true;
+    }
+    
+    bool Geometry::addLines(const vector<vec3f>& vertices) {
+        if(m_faceMode >= ftTriangles) {
+            LogError("The geometry is not setup for a line or point topology!");
+            return false;
+        }
+        
+        for(U32 i=0; i<vertices.size(); i++)
+            addVertex(vertices[i]);
+        assert(checkIndices());
+        return true;
+    }
+    
+    bool Geometry::addCircle2D(int sectors,
+                               float radius,
+                               const vec3f& o) {
+        if(m_faceMode >= ftTriangles) {
+            LogError("The geometry is not setup for a line or point topology!");
+            return false;
+        }
+
+        if(sectors <= 0 || radius < EPSILON)
+            return false;
+        
+        //int idxStart = countVertices();
+        float oneOverSector = 1.0f / static_cast<float>(sectors);
+        for(int i=0; i<sectors; i++) {
+            
+            vec3f v = o + vec3f::mul(radius, vec3f(0.0f, cos(i * (TwoPi * oneOverSector)), sin(i * (TwoPi * oneOverSector))));
+            this->addVertex(v);
+            this->addNormal((v - o).normalized());
+        }
+        this->addVertex(o + vec3f(0.0f, radius, 0.0f));
+        
+        assert(checkIndices());
+        return true;
+    }
+
+bool Geometry::addCircle3D(int sectors,
 							float radius,
 							const vec3f& o) {
+    if(m_faceMode != ftTriangles) {
+        LogError("The geometry is not setup for triangles topology!");
+        return false;
+    }
+
 	if(sectors <= 0 || radius < EPSILON)
 		return false;
 
@@ -456,7 +509,7 @@ bool Geometry::addCone(int sectors,
 				 	 	  const vec3f& o) {
 	addVertex(o + vec3f(width, 0, 0));
 	int idxStart = countVertices()-1;
-	bool res = addCircle(sectors, radius, o);
+	bool res = addCircle3D(sectors, radius, o);
 	if(!res)
 		return false;
 
@@ -468,9 +521,86 @@ bool Geometry::addCone(int sectors,
 	return true;
 }
     
-bool Geometry::addCube(float side, const vec3f& c) {
-    return false;
+void Geometry::addCube(const vec3f& lower, const vec3f& upper) {
+    float l = lower.x; float r = upper.x;
+	float b = lower.y; float t = upper.y;
+	float n = lower.z; float f = upper.z;
+    
+	float vertices [][3] = {{l, b, f}, {l, t, f}, {r, t, f},
+        {r, b, f}, {l, b, n}, {l, t, n},
+        {r, t, n}, {r, b, n}};
+    
+    
+    int indices[24] = {1, 2, 3, 0, 7, 6, 5, 4,
+        7, 4, 0, 3, 5, 6, 2, 1,
+        6, 7, 3, 2, 1, 0, 4, 5};
+    
+    //Offset for triangles
+    int idxStart = countVertices();
+    
+    //Add Vertices
+    vec3f center = (lower + upper) * 0.5f;
+    for(int i=0; i<8; i++) {
+        vec3f v = vec3f(&vertices[i][0]);
+        vec3f n = (v - center).normalized();
+        addVertex(v);
+        addNormal(n);
+    }
+    
+    //Add Face Indices
+    vec4i quad;
+    for(int i=0; i<6; i++) {
+        quad.load(&indices[i*4]);
+        quad = quad + vec4i(idxStart);
+        addTriangle(vec3i(quad.x, quad.z, quad.y));
+        addTriangle(vec3i(quad.x, quad.w, quad.z));
+    }
 }
+    
+    void Geometry::addCube(const vec3f& center, float side) {
+        vec3f lo = center - vec3f(0.5 * side);
+        vec3f hi = center + vec3f(0.5 * side);
+        addCube(lo, hi);
+    }
+    
+    bool Geometry::addRing(int sectors,
+                           int xsections,
+                           float innerRadius,
+                           float outerRadius,
+                           const vec3f& o) {
+        if(sectors <= 0 || xsections <= 0 ||
+           innerRadius < EPSILON || outerRadius < EPSILON)
+            return false;
+
+        
+        
+        
+        return false;
+    }
+    
+    bool Geometry::addDisc(int sectors,
+                           int xsections,
+                           float radius,
+                           float thickness,
+                           const vec3f& o) {
+        if(sectors <= 0 || radius < EPSILON)
+            return false;
+        
+        int idxStart = countVertices();
+        this->addVertex(o);
+        float oneOverSector = 1.0f / static_cast<float>(sectors);
+        for(int i=0; i<sectors; i++) {
+            this->addVertex(o + vec3f::mul(radius, vec3f(0.0f, cos(i * (TwoPi * oneOverSector)), sin(i * (TwoPi * oneOverSector)))));
+            this->addTriangle(vec3i(idxStart + i + 2, idxStart + i + 1, idxStart));
+        }
+        this->addVertex(o + vec3f(0.0f, radius, 0.0f));
+        
+        assert(checkIndices());
+
+        
+        return false;
+    }
+
 
 bool Geometry::checkIndices() const {
 	U32 count = countVertices();

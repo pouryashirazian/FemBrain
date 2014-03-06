@@ -11,13 +11,13 @@ namespace PS{
 namespace SKETCH {
 
 SketchAction::SketchAction(): m_name("unset"), m_isReversible(false) {
-	m_lpBlob = &TheSketchMachine::Instance().blob;
+	m_lpBlob = TheSketchMachine::Instance().blob();
 	m_status = asPending;
 }
 
 SketchAction::SketchAction(string name, bool isReversible):m_name(name), m_isReversible(isReversible)
 {
-	m_lpBlob = &TheSketchMachine::Instance().blob;
+	m_lpBlob = TheSketchMachine::Instance().blob();
 	m_status = asPending;
 }
 

@@ -38,6 +38,9 @@ public:
     void reset();
     void updateBackward();
 
+    //For opengl usage
+    void bind();
+    void unbind();
 
     const mat44f& forward() const {return m_mtxForward;}
     const mat44f& backward() const {return m_mtxBackward;}

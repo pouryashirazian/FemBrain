@@ -58,12 +58,20 @@ public:
     void mouseWheel(int button, int dir, int x, int y);
     void mouseMove(int x, int y);
 
+    //Get
+    const LinearBlobTree* cblob() const {return &m_blob;}
+    LinearBlobTree* blob() {return &m_blob;}
+    GPUPoly* polygonizer() const {return m_lpPolyModel;}
+
 	//Sync
 	void sync();
 
+	//load and Store Blob
+	bool loadBlob(const AnsiStr& strFileName);
+
 	//load and store actions
-	int load(const AnsiStr& strFileName);
-	int store(const AnsiStr& strFileName);
+	int loadActions(const AnsiStr& strFileName);
+	int storeActions(const AnsiStr& strFileName);
 private:
 	vector<SketchAction*> m_vActions;
 	int m_current;
@@ -77,8 +85,9 @@ private:
 
 	//Selected SubTree Polygonizer
 	GPUPoly* m_lpPolySelected;
-public:
-	LinearBlobTree blob;
+
+	//BlobTree
+	LinearBlobTree m_blob;
 };
 
 typedef SingletonHolder<SketchMachine, CreateUsingNew, PhoenixSingleton> TheSketchMachine;

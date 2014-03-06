@@ -1,6 +1,8 @@
 #include "ComputeDevice.h"
 #include "OclHelperFuncs.h"
 #include "base/Logger.h"
+#include "base/FileDirectory.h"
+
 #include <iostream>
 #include <fstream>
 #include <openssl/md5.h>
@@ -557,6 +559,11 @@ int ComputeDevice::addProgramFromFile(const AnsiStr& strFP, bool tryLoadBinary)
     if(!m_bReady)
         return -1;
     
+    if(!PS::FILESTRINGUTILS::FileExists(strFP)) {
+    	LogErrorArg1("File does not exist! Path: %s", strFP.cptr());
+    	return -1;
+    }
+
     std::ifstream fp;
     fp.open(strFP.cptr(), std::ios::binary);
     if(!fp.is_open())
@@ -654,7 +661,7 @@ int ComputeDevice::addProgramFromFile(const AnsiStr& strFP, bool tryLoadBinary)
         // Create the compute kernel in the program
         cl_kernel k = clCreateKernel(m_lstPrograms[prgID]->handle(), chrKernelName, &err);
         if (!k || err != CL_SUCCESS) {
-            LogErrorArg1("Failed to create compute kernel. Ocl Error: %s", oclErrorString(err));
+            LogErrorArg2("Failed to create compute kernel. KernelName:%s,  Error: %s", chrKernelName, oclErrorString(err));
             return NULL;
         }
         

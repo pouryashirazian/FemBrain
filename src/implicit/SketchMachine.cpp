@@ -48,12 +48,6 @@ void SketchMachine::clearQ() {
 
 void SketchMachine::draw() {
 	m_lpPolyModel->draw();
-	m_lpPolyModel->drawBBox();
-    
-    //m_lpQuad->draw();
-
-	//Draw Sketching Gizmos last
-	//TheGizmoManager::Instance().draw();
 }
 
 //Control
@@ -114,8 +108,8 @@ int SketchMachine::select(const Ray& r) {
 	Range selHit(FLT_MAX, FLT_MAX);
 
 	int idxSelected = -1;
-	for(int i=0; i < (int)blob.countPrimitives(); i++) {
-		 if(blob.getPrimAABB(i).intersect(r, t, hit)) {
+	for(int i=0; i < (int)m_blob.countPrimitives(); i++) {
+		 if(m_blob.getPrimAABB(i).intersect(r, t, hit)) {
 			 if(hit.left < selHit.left) {
 				 selHit = hit;
 				 idxSelected = i;
@@ -153,20 +147,23 @@ void SketchMachine::mouseMove(int x,  int y) {
 
 void SketchMachine::sync() {
 	//TODO: Needs a tracker object to control syncing
-	m_lpPolyModel->setBlob(this->blob);
-	m_lpPolyModel->runPolygonizer();
+
+	this->setAABB(m_blob.aabb());
+	m_lpPolyModel->setBlob(this->m_blob);
+	m_lpPolyModel->run();
+
 
 	vec3i g = m_lpPolyModel->voxelGridDim();
 	char buf[1024];
-	sprintf(buf, "DIM [%d, %d, %d]", g.x, g.y, g.z);
+	sprintf(buf, "Poly Grid [%d, %d, %d]", g.x, g.y, g.z);
 	LogInfo(buf);
     
     
     
     
-    vec3f dim = blob.aabb().extent();
+    vec3f dim = m_blob.aabb().extent();
     dim.z = 0;
-    vec3f c = blob.aabb().center();
+    vec3f c = m_blob.aabb().center();
     vec3f lo = c - vec3f::mul(0.5, dim);
     vec3f hi = c + vec3f::mul(0.5, dim);
     m_lpPolyModel->computeFieldImage(lo, hi, m_lpTexFields);
@@ -175,12 +172,18 @@ void SketchMachine::sync() {
 	glutPostRedisplay();
 }
 
+//load and Store Blob
+bool SketchMachine::loadBlob(const AnsiStr& strFileName) {
+
+	return m_blob.load(strFileName);
+}
+
 //load and store actions
-int SketchMachine::load(const AnsiStr& strFileName) {
+int SketchMachine::loadActions(const AnsiStr& strFileName) {
 	return 0;
 }
 
-int SketchMachine::store(const AnsiStr& strFileName) {
+int SketchMachine::storeActions(const AnsiStr& strFileName) {
 	SettingsScript* lpScript = new SettingsScript(strFileName, SettingsScript::fmReadWrite);
 	int done = 0;
 	for(int i=0; i<(int)m_vActions.size(); i++) {

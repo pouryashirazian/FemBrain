@@ -65,7 +65,7 @@ int FastRBF::init() {
 	AnsiStr strCodePath = ExtractFilePath(GetExePath());
 	strCodePath = ExtractOneLevelUp(strCodePath);
 
-	AnsiStr strPolyFP = strCodePath + AnsiStr("/src/shaders/RBFRendering.cl");
+	AnsiStr strPolyFP = strCodePath + AnsiStr("data/opencl/RBFRendering.cl");
 
 	LogInfo("1.Setup compute device. Prefer AMD GPU.");
 	m_lpGPU = new ComputeDevice(ComputeDevice::dtGPU, true, false, "AMD");

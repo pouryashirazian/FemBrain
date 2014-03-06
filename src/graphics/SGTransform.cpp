@@ -6,6 +6,7 @@
  */
 
 #include "SGTransform.h"
+#include "selectgl.h"
 
 namespace PS {
 namespace SG {
@@ -60,6 +61,15 @@ void SGTransform::updateBackward() {
 
 void SGTransform::reset() {
 	m_mtxForward.identity();
+}
+
+void SGTransform::bind() {
+	glPushMatrix();
+	glMultMatrixf(m_mtxForward.cptr());
+}
+
+void SGTransform::unbind() {
+	glPopMatrix();
 }
 
 }

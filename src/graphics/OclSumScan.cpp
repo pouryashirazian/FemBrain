@@ -55,7 +55,7 @@ namespace CL {
 SumScan::SumScan(){
 
 	//Load Kernel
-	AnsiStr strFP = ExtractOneLevelUp(ExtractFilePath(GetExePath())) + "data/shaders/clpp/";
+	AnsiStr strFP = ExtractOneLevelUp(ExtractFilePath(GetExePath())) + "data/opencl/clpp/";
 	clppProgram::setBasePath(string(strFP.cptr()));
 
 	//Setup context

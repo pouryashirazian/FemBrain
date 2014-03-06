@@ -71,8 +71,8 @@ public:
     virtual void timestep() { }
 
     //Computes the bounding box of the model
-	void setBBox(const AABB& box) { m_aabb = box;}
-    virtual AABB bbox() const { return m_aabb;}
+	void setAABB(const AABB& box) { m_aabb = box;}
+    virtual AABB aabb() const { return m_aabb;}
 
     //Selection
     virtual int intersect(const Ray& r);

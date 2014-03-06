@@ -79,17 +79,44 @@ public:
 	bool addFaceIndices(const vector<U32>& arrIndex, int faceMode = ftTriangles);
 	bool computeNormalsFromFaces();
 
+    //Lines
+    bool addLine(const vec3f& start, const vec3f& end);
+    bool addLines(const vector<vec3f>& vertices);
+    bool addCircle2D(int sectors,
+                     float radius = 1.0f,
+                     const vec3f& o = vec3f(0,0,0));
+    
 	//Create Objects
-	bool  addCircle(int sectors,
-					  float radius = 1.0f,
-					  const vec3f& o = vec3f(0,0,0));
+	bool  addCircle3D(int sectors,
+                    float radius = 1.0f,
+                    const vec3f& o = vec3f(0,0,0));
 
 	bool addCone(int sectors,
 				  float radius = 1.0f,
 				  float width = 1.0f,
 				  const vec3f& o = vec3f(0,0,0));
 
-    bool addCube(float side, const vec3f& c = vec3f(0,0,0));
+    void addCube(const vec3f& lower, const vec3f& upper);
+    void addCube(const vec3f& center, float side);
+    
+    /*!
+     * Add a ring to the geometry
+     */
+    bool addRing(int sectors,
+                 int xsections,
+                 float innerRadius,
+                 float outerRadius,
+                 const vec3f& o = vec3f(0,0,0));
+ 
+    /*!
+     * Add a disc to the geometry
+     */
+    bool addDisc(int sectors,
+                 int xsections,
+                 float radius,
+                 float thickness,
+                 const vec3f& o = vec3f(0,0,0));
+    
 
 
 	bool checkIndices() const;

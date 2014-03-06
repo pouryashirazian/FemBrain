@@ -32,7 +32,7 @@ public:
     //Axis
     GizmoAxis axis() const {return m_axis;}
     void setAxis(GizmoAxis axis) {m_axis = axis;}
-    void setAxis(const Ray& r);
+    int setAxis(const Ray& r);
     
     vec4f axisColor(GizmoAxis a);
 protected:
@@ -59,6 +59,9 @@ private:
 class GizmoScale : public GizmoInterface {
 public:
 	GizmoScale();
+    
+    void draw();
+    int intersect(const Ray& r);
 protected:
 	void setup();
 
@@ -73,6 +76,8 @@ class GizmoRotate : public GizmoInterface {
 public:
 	GizmoRotate();
 
+    void draw();
+    int intersect(const Ray& r);
 protected:
 	void setup();
 
@@ -103,23 +108,19 @@ public:
 	void draw();
     int intersect(const Ray& r);
 
-    //Get Transform
-    vec3f translate() const {return m_translate;}
-    void setTranslate(const vec3f& v) {m_translate = v;}
-
-
     //Get
     GizmoType gizmoType() const {return m_gizmoType;}
     GizmoAxis axis() const {return m_gizmoAxis;}
-
-
+    
+    
     //Set Gizmo Type and Axis
     void setAxis(const Ray& r);
     void setAxis(GizmoAxis axis);
 	void setType(GizmoType gtype);
-
+    
 	//Return current Gizmo Type
 	GizmoInterface* current() const {return m_lpGizmoCurrent;}
+
 private:
 	GizmoTranslate* m_lpGizmoTranslate;
 	GizmoScale* m_lpGizmoScale;
@@ -128,12 +129,7 @@ private:
 
 	GizmoInterface* m_lpGizmoCurrent;
 	GizmoType m_gizmoType;
-	GizmoAxis m_gizmoAxis;
-
-	//Transform
-	vec3f m_translate;
-	vec3f m_scale;
-	quat m_rotate;
+    GizmoAxis m_gizmoAxis;
 };
 
 //Singleton for UI Gizmo Manager

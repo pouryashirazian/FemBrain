@@ -14,7 +14,7 @@ class SGMesh : public SGNode, public GLMeshBuffer {
 public:
 	SGMesh():GLMeshBuffer() {}
 	SGMesh(const Geometry& g):GLMeshBuffer(g) {
-        this->setBBox(g.aabb());
+        this->setAABB(g.aabb());
     }
 
 	virtual ~SGMesh() {
@@ -23,20 +23,11 @@ public:
     
     void setup(const Geometry& g) {
         GLMeshBuffer::setup(g);
-        this->setBBox(g.aabb());
+        this->setAABB(g.aabb());
     }
 
-	virtual void draw() {
-        //Bind the effect and then draw
-        if(m_spEffect)
-            m_spEffect->bind();
-        
-		GLMeshBuffer::draw();
-        
-        if(m_spEffect)
-            m_spEffect->unbind();
-	}
-    
+	virtual void draw();
+
     virtual void drawNoEffect() {
 		GLMeshBuffer::draw();
     }

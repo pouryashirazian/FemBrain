@@ -74,7 +74,7 @@
 #define AXISY {0.0f, 1.0f, 0.0f, 0.0f}
 #define AXISZ {0.0f, 0.0f, 1.0f, 0.0f}
 
-#define MAX_TREE_DEPTH 64
+#define MAX_TREE_DEPTH 32
 #define MAX_VERTICES_COUNT_PER_CELL		15
 #define MAX_TRIANGLES_COUNT_PER_CELL	5
 
@@ -163,31 +163,115 @@ typedef struct GridParam{
 }GridParam;
 
 
-typedef struct SimpleStack{
+typedef struct StackU32{
 	U32 values[MAX_TREE_DEPTH];
 	U32 count;
-}SimpleStack;
+}StackU32;
 
+typedef struct StackF{
+	float values[MAX_TREE_DEPTH];
+	U32 count;
+}StackF;
+
+//Prototypes
+void StackPush(struct StackU32* pstk, U32 val);
+void StackPop(struct StackU32* pstk);
+bool IsStackEmpty(struct StackU32* pstk);
+U32 StackTop(struct StackU32* pstk);
+
+void StackPushF(struct StackF* pstk, U32 val);
+void StackPopF(struct StackF* pstk);
+bool IsStackEmptyF(struct StackF* pstk);
+float StackTopF(struct StackF* pstk);
+
+float ComputeWyvillField(float dd);
+bool IsOutsideOp(float4 v, U32 idxOp, __global float4* arrOps4);
+
+float ComputeRangeField(float4 v, U32 idxOp, 
+					    __global float4* arrOps4,
+						__global float4* arrPrims4, 
+						__global float4* arrMtxNodes4);
+						
+float ComputePrimitiveField(float4 v,
+							U32 idxPrimitive,									
+							__global float4* arrOps4,
+							__global float4* arrPrims4, 
+							__global float4* arrMtxNodes4);
+						
+float ComputeBranchField(U32 idxBranchOp,
+						 U32* lpNextOp,		
+						 bool* lpIsRightOp, 
+						 float4 v,
+						 float lf,
+						 float rf,
+						 __global float4* arrHeader4,
+						 __global float4* arrOps4,
+						 __global float4* arrPrims4, 
+						 __global float4* arrMtxNodes4);
+
+float3 ComputeNormal(float4 v,
+		   __global float4* arrHeader4, 
+		   __global float4* arrOps4,
+		   __global float4* arrPrims4,
+		   __global float4* arrMtxNodes4);			
+
+float ComputeFieldStackBased(float4 v,			
+						   __global float4* arrHeader4,
+						   __global float4* arrOps4,
+						   __global float4* arrPrims4, 
+						   __global float4* arrMtxNodes4);
+
+						
+float4 ComputeGradientWithPrevField(float4 v,
+								   __global float4* arrHeader4, 
+								   __global float4* arrOps4,
+								   __global float4* arrPrims4,
+								   __global float4* arrMtxNodes4);
+								   
+//////////////////////////////////////////////////////////////////////
 //Stack Operations
-void StackPush(struct SimpleStack* lpStkOperators, U32 val)
+void StackPush(struct StackU32* pstk, U32 val)
 {
-	lpStkOperators->values[lpStkOperators->count] = val;
-	lpStkOperators->count++;			
+	pstk->values[pstk->count] = val;
+	pstk->count++;			
 }
 
-void StackPop(struct SimpleStack* lpStkOperators)
+void StackPop(struct StackU32* pstk)
 {
-	lpStkOperators->count--;
+	pstk->count--;
 }
 
-bool IsStackEmpty(struct SimpleStack* lpStkOperators)
+bool IsStackEmpty(struct StackU32* pstk)
 {
-	return (lpStkOperators->count == 0);
+	return (pstk->count == 0);
 }
 
-U32 StackTop(struct SimpleStack* lpStkOperators)
+U32 StackTop(struct StackU32* pstk)
 {
-	return lpStkOperators->values[lpStkOperators->count - 1];
+	return pstk->values[pstk->count - 1];
+}
+
+
+//Float Stack
+void StackPushF(struct StackF* pstk, U32 val)
+{
+	pstk->values[pstk->count] = val;
+	pstk->count++;			
+}
+
+void StackPopF(struct StackF* pstk)
+{
+	pstk->count--;
+}
+
+bool IsStackEmptyF(struct StackF* pstk)
+{
+	return (pstk->count == 0);
+}
+
+float StackTopF(struct StackF* pstk)
+{
+	return pstk->values[pstk->count - 1];
 }
 
 //Computes Wyvill Field-Function
@@ -210,11 +294,7 @@ bool IsOutsideOp(float4 v, U32 idxOp, __global float4* arrOps4)
 			isgreaterequal(v.z, aabbLo.z) && isgreaterequal(aabbHi.z, v.z));
 }
 
-//Global Functions
-float ComputeRangeField(float4 v, U32 idxOp, 
-					    __global float4* arrOps4,
-						__global float4* arrPrims4, 
-						__global float4* arrMtxNodes4);
+
 
 /*
 float ComputeTriangleSquareDist(float4 v, float4 vertices[3],
@@ -400,8 +480,8 @@ float ComputeTriangleSquareDist(float4 v, float4 vertices[3],
 /*!
  * Compute field due to a primitive.
  */
-float ComputePrimitiveField(U32 idxPrimitive,
-							float4 v,			
+float ComputePrimitiveField(float4 v,
+							U32 idxPrimitive,
 							__global float4* arrOps4,
 							__global float4* arrPrims4, 
 							__global float4* arrMtxNodes4)
@@ -614,6 +694,40 @@ float ComputePrimitiveField(U32 idxPrimitive,
  	return ComputeWyvillField(dist2); 
 }
 
+float ComputeOpField(int opType, float lf, float rf, float4 params) {
+	float field = 0.0f;
+	//Compute All Operators			
+	switch(opType) {
+		case(opUnion): {
+			field = max(lf, rf);
+			break;
+		}
+		case(opIntersect): {
+			field = min(lf, rf);
+			break;
+		}										
+		case(opBlend): {
+			field = lf + rf;
+			break;
+		}					
+		case(opRicciBlend): {
+			field = pow(pow(lf, params.x) + pow(rf, params.x), params.y);
+			break;
+		}		
+
+		case(opDif): {
+			field = min(lf, 1.0f - rf); 
+			break;
+		}
+		
+		case(opSmoothDif): {
+			field = lf * (1.0f - rf);
+			break;
+		}
+	}
+	return field;
+}
+
 float ComputeRangeField(float4 v, U32 idxOp, 						
 					    __global float4* arrOps4,
 						__global float4* arrPrims4, 
@@ -631,23 +745,23 @@ float ComputeRangeField(float4 v, U32 idxOp,
 	switch(opType) {
 		case(opUnion): {
 			for(U32 i=idxFrom; i <= idxTo; i++)									
-				field = max(field, ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4));
+				field = max(field, ComputePrimitiveField(v, i, arrOps4, arrPrims4, arrMtxNodes4));
 		}
 		break;
 		case(opIntersect): {
 			for(U32 i=idxFrom; i <= idxTo; i++)									
-				field = min(field, ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4));
+				field = min(field, ComputePrimitiveField(v, i, arrOps4, arrPrims4, arrMtxNodes4));
 		}
 		break;
 	
 		case(opBlend): {
 			for(U32 i=idxFrom; i <= idxTo; i++)									
-				field += ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);				
+				field += ComputePrimitiveField(v, i, arrOps4, arrPrims4, arrMtxNodes4);				
 		}
 		break;
 		case(opRicciBlend): {
 			for(U32 i=idxFrom; i <= idxTo; i++)									
-				field = pow(pow(field, params.x) + pow(ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4), params.x), params.y); 				
+				field = pow(pow(field, params.x) + pow(ComputePrimitiveField(v, i, arrOps4, arrPrims4, arrMtxNodes4), params.x), params.y); 				
 		}
 		break;
 	}
@@ -703,41 +817,12 @@ float ComputeBranchField(U32 idxBranchOp,
 		else
 		{
 			if(!bLeftChildOp)
-				lf = ComputePrimitiveField(opLeftChild, v, arrOps4, arrPrims4, arrMtxNodes4);
+				lf = ComputePrimitiveField(v, opLeftChild, arrOps4, arrPrims4, arrMtxNodes4);
 			
 			if(!bUnary && !bRightChildOp)
-				rf = ComputePrimitiveField(opRightChild, v, arrOps4, arrPrims4, arrMtxNodes4);
-		
-
-			//Compute All Operators			
-			switch(opType) {
-				case(opUnion): {
-					field = max(lf, rf);
-					break;
-				}
-				case(opIntersect): {
-					field = min(lf, rf);
-					break;
-				}										
-				case(opBlend): {
-					field = lf + rf;
-					break;
-				}					
-				case(opRicciBlend): {
-					field = pow(pow(lf, params.x) + pow(rf, params.x), params.y);
-					break;
-				}		
-		
-				case(opDif): {
-					field = min(lf, 1.0f - rf); 
-					break;
-				}
-				
-				case(opSmoothDif): {
-					field = lf * (1.0f - rf);
-					break;
-				}
-			}
+				rf = ComputePrimitiveField(v, opRightChild, arrOps4, arrPrims4, arrMtxNodes4);
+			
+			field = ComputeOpField(idxBranchOp, lf, rf, params);
 		}	
 		
 		//If we processed a right op
@@ -797,7 +882,7 @@ float ComputeField(float4 v,
 		return field;
 	}
 	else
-		return ComputePrimitiveField(0, v, arrOps4, arrPrims4, arrMtxNodes4);
+		return ComputePrimitiveField(v, 0, arrOps4, arrPrims4, arrMtxNodes4);
 }
 
 /*!
@@ -852,10 +937,10 @@ float ComputeBranchFieldAndColor(U32 idxBranchOp,
 			switch(opType) {
 				case(opUnion): {				
 						U32 idxMaxField = 0;
-						field = ComputePrimitiveField(opLeftChild, v, arrOps4, arrPrims4, arrMtxNodes4);						
+						field = ComputePrimitiveField(v, opLeftChild, arrOps4, arrPrims4, arrMtxNodes4);						
 						for(U32 i=opLeftChild+1; i <= opRightChild; i++)
 						{
-							primF = ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);
+							primF = ComputePrimitiveField(v, i, arrOps4, arrPrims4, arrMtxNodes4);
 							if(isgreaterequal(primF, field))
 							{
 								field = primF;
@@ -867,10 +952,10 @@ float ComputeBranchFieldAndColor(U32 idxBranchOp,
 				break;
 				case(opIntersect): {
 					U32 idxMinField = 0;
-					field = ComputePrimitiveField(opLeftChild, v, arrOps4, arrPrims4, arrMtxNodes4);
+					field = ComputePrimitiveField(v, opLeftChild, arrOps4, arrPrims4, arrMtxNodes4);
 					for(U32 i=opLeftChild+1; i <= opRightChild; i++)
 					{
-						primF = ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);
+						primF = ComputePrimitiveField(v, i, arrOps4, arrPrims4, arrMtxNodes4);
 						if(islessequal(primF, field))
 						{
 							field = primF;
@@ -884,7 +969,7 @@ float ComputeBranchFieldAndColor(U32 idxBranchOp,
 				case(opBlend): {								
 					for(U32 i=opLeftChild; i <= opRightChild; i++)	
 					{				
-						primF = ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);
+						primF = ComputePrimitiveField(v, i, arrOps4, arrPrims4, arrMtxNodes4);
 						(*lpOutColor) += NORMALIZE_FIELD(primF) * arrPrims4[i * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
 						field += primF;
 					}				
@@ -893,7 +978,7 @@ float ComputeBranchFieldAndColor(U32 idxBranchOp,
 				case(opRicciBlend): {
 					for(U32 i=opLeftChild; i <= opRightChild; i++)	
 					{				
-						primF = ComputePrimitiveField(i, v, arrOps4, arrPrims4, arrMtxNodes4);
+						primF = ComputePrimitiveField(v, i, arrOps4, arrPrims4, arrMtxNodes4);
 						(*lpOutColor) += NORMALIZE_FIELD(primF) * arrPrims4[i * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
 						field = pow(pow(field, params.x) + pow(primF, params.x), params.y);
 					}				
@@ -904,18 +989,19 @@ float ComputeBranchFieldAndColor(U32 idxBranchOp,
 		else
 		{
 			if(!bLeftChildOp) {
-				lf = ComputePrimitiveField(opLeftChild, v, arrOps4, arrPrims4, arrMtxNodes4);
+				lf = ComputePrimitiveField(v, opLeftChild, arrOps4, arrPrims4, arrMtxNodes4);
 				lcolor = arrPrims4[opLeftChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
 			}
 			
 			if(!bUnary && !bRightChildOp) {
-				rf = ComputePrimitiveField(opRightChild, v, arrOps4, arrPrims4, arrMtxNodes4);
+				rf = ComputePrimitiveField(v, opRightChild, arrOps4, arrPrims4, arrMtxNodes4);
 				rcolor = arrPrims4[opRightChild * DATASIZE_PRIMITIVE_F4 + OFFSET4_PRIM_COLOR];
 			}
 		
 			//Normalized fields from (0 - 0.5) to (0 - 1)
 			float lfn = NORMALIZE_FIELD(lf);
 			float rfn = NORMALIZE_FIELD(rf);
+			field = ComputeOpField(opType, lf, rf, params);
 
 			//Compute All Operators			
 			switch(opType) {
@@ -924,8 +1010,6 @@ float ComputeBranchFieldAndColor(U32 idxBranchOp,
 						(*lpOutColor) = lfn * lcolor;
 					else
 						(*lpOutColor) = rfn * rcolor;
-
-					field = max(lf, rf);
 				}
 				break;
 				case(opIntersect): {
@@ -933,20 +1017,16 @@ float ComputeBranchFieldAndColor(U32 idxBranchOp,
 						(*lpOutColor) = lcolor;
 					else
 						(*lpOutColor) = rcolor;
-
-					field = min(lf, rf);
 				}					
 				break;
 					
 				case(opBlend): {
 					(*lpOutColor) = lfn * lcolor + rfn * rcolor; 									
-					field = lf + rf;
 				}					
 				break;
 
 				case(opRicciBlend): {
 					(*lpOutColor) = lfn * lcolor + rfn * rcolor;
-					field = pow(pow(lf, params.x) + pow(rf, params.x), params.y);
 				}
 				break;
 				
@@ -955,7 +1035,6 @@ float ComputeBranchFieldAndColor(U32 idxBranchOp,
 						(*lpOutColor) = lcolor;
 					else
 						(*lpOutColor) = rcolor;
-					field = min(lf, 1.0f - rf);
 				}
 				break;
 				
@@ -964,7 +1043,6 @@ float ComputeBranchFieldAndColor(U32 idxBranchOp,
 						(*lpOutColor) = lcolor;
 					else
 						(*lpOutColor) = rcolor;
-					field = min(lf, 1.0f - rf);
 				}
 				break;
 
@@ -1045,37 +1123,10 @@ float ComputeFieldAndColor(float4 v,
 	else
 	{
 		(*lpOutColor) = arrPrims4[OFFSET4_PRIM_COLOR];
-		return ComputePrimitiveField(0, v, arrOps4, arrPrims4, arrMtxNodes4);
+		return ComputePrimitiveField(v, 0, arrOps4, arrPrims4, arrMtxNodes4);
 	}
 }
 
-/*!
- * Compute Normal
- */
-/*
-float3 ComputeNormal(float4 v,
-		   __global float4* arrHeader4, 
-		   __global float4* arrOps4,
-		   __global float4* arrPrims4,
-		   __global float4* arrMtxNodes4)
-{
-	const float deltaInv = -1.0f / NORMAL_DELTA;	
-	float inFieldValue = ComputeField(v, arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);
-	//printf("FieldValue= %.2f \n", inFieldValue); 
-	
-	
-	float3 n;
-	n.x = ComputeField(v + (float4)(NORMAL_DELTA,0,0,0), arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);
-	n.y = ComputeField(v + (float4)(0, NORMAL_DELTA, 0, 0), arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);
-	n.z = ComputeField(v + (float4)(0, 0, NORMAL_DELTA, 0), arrHeader4, arrOps4, arrPrims4, arrMtxNodes4);
-	//n.w = 0.0f;
-
-	n = deltaInv * (n - (float3)(inFieldValue, inFieldValue, inFieldValue));
-	n = normalize(n);
-	//printf("Prenormalized N= [%.2f, %.2f, %.2f, %.2f] \n", n.x, n.y, n.z, n.w); 
-	return n;
-}
-*/
 
 /*!
  * Compute Gradient and FieldValue, Uses 4 evals
@@ -1180,9 +1231,30 @@ __kernel void ComputeAllFields(__global float4* arrInHeader4,
 	
 	float cellsize = inGridParam->cellsize;		
 	float4 v = arrInHeader4[OFFSET4_HEADER_LOWER] + cellsize * (float4)(idX, idY, idZ, 0.0f);
-	float field	= ComputeField(v, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+	v.w = ComputeField(v, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);	
+	arrOutFields[idxVertex] = v;
+}
+
+__kernel void ComputeAllFieldsStackBased(__global float4* arrInHeader4,
+							   __global float4* arrInOps4,										 
+							   __global float4* arrInPrims4,											 
+							   __global float4* arrInMtxNodes4,
+							   __constant struct GridParam* inGridParam,
+							   __global float4* arrOutFields)			
+{
+	int idX = get_global_id(0);
+	int idY = get_global_id(1);
+	int idZ = get_global_id(2);
+	if((idX >= inGridParam->ctGridPoints[0])||(idY >= inGridParam->ctGridPoints[1])||(idZ >= inGridParam->ctGridPoints[2]))
+		return;
+	U32 idxVertex = idZ * (inGridParam->ctGridPoints[0] * inGridParam->ctGridPoints[1]) + idY * inGridParam->ctGridPoints[0] + idX;
+	if(idxVertex >= inGridParam->ctTotalPoints)
+		return;
+	//printf("IDXVertex = %d\n", idxVertex);
 	
-	v.w = field;		
+	float cellsize = inGridParam->cellsize;		
+	float4 v = arrInHeader4[OFFSET4_HEADER_LOWER] + cellsize * (float4)(idX, idY, idZ, 0.0f);
+	v.w	= ComputeFieldStackBased(v, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
 	arrOutFields[idxVertex] = v;
 }
 
@@ -1197,8 +1269,59 @@ __kernel void ComputeFieldArray(U32 ctVertices,
 	int idX = get_global_id(0);
 	if(idX >= ctVertices)
 		return;
-	float field	= ComputeField(arrInOutVertexFields[idX], arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
-	arrInOutVertexFields[idX].w = field;
+	arrInOutVertexFields[idX].w	= ComputeField(arrInOutVertexFields[idX], arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+}
+
+__kernel void ComputeFieldArrayStackBased(U32 ctVertices,
+							   __global float4* arrInHeader4,
+							   __global float4* arrInOps4,										 
+							   __global float4* arrInPrims4,											 
+							   __global float4* arrInMtxNodes4,							
+							   __global float4* arrInOutVertexFields)			
+{
+	int idX = get_global_id(0);
+	if(idX >= ctVertices)
+		return;
+	arrInOutVertexFields[idX].w	= ComputeFieldStackBased(arrInOutVertexFields[idX], arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+}
+
+__kernel void ComputeFieldImage(float4 lo, float4 hi, 
+							    int dimx, int dimy,
+								__global float4* arrInHeader4,
+							   __global float4* arrInOps4,										 
+							   __global float4* arrInPrims4,											 
+							   __global float4* arrInMtxNodes4,							
+							   __write_only image2d_t fields) {
+
+	int2 coords = (int2){ get_global_id(0), get_global_id(1)};
+	if(coords.x >= dimx || coords.y >= dimy)
+		return;
+	
+	float dx = (float)(coords.x) / (float)dimx;
+	float dy = (float)(coords.y) / (float)dimy;
+	
+	bool xset = 0;
+	float4 d = (hi - lo);
+	d.w = 0.0f;
+	if(isnotequal(d.x, 0.0f)) {
+		d.x = dx;
+		xset = 1;
+	}
+	
+	if(isnotequal(d.y, 0.0f))
+		d.y = (xset == 1) ? dy : dx;
+	if(isnotequal(d.z, 0.0f))
+		d.z = dy;
+	
+				
+	float4 p = lo + d * (hi - lo);
+	float f = ComputeField(p, arrInHeader4, arrInOps4, arrInPrims4, arrInMtxNodes4);
+	float4 pixel = (float4)(f, f, f, 1.0f);
+
+	//write_imagef(fields, coords, pixel);	
+	
+	uint4 color = (uint4)(0, 255, 0, 255);					
+	write_imageui(fields, coords, color);						
 }
 
 //Per each vertex computes 2 offscreen points and their associated field-values
@@ -1547,6 +1670,105 @@ __kernel void ComputeElements(__global U32* arrInHighEdgesOffset,
 }
 
 
+/*!
+ * Stackless Non-Recursive BlobTree Traversal
+ */
+float ComputeFieldStackBased(float4 v,			
+						   __global float4* arrHeader4,
+						   __global float4* arrOps4,
+						   __global float4* arrPrims4, 
+						   __global float4* arrMtxNodes4)
+{
+	//Index Stack
+	StackU32 stk;
+	stk.count = 0;
+
+	//Field Stack
+	StackU32 stkFieldOp;
+	stkFieldOp.count = 0;
+	
+	StackF stkField;
+	stkField.count = 0;
+
+	//Count : Prims, Ops, Mtx ; CellSize
+	//U32 ctPrims = (U32)arrHeader4[OFFSET4_HEADER_PARAMS].x;
+	U32 ctOps   = (U32)arrHeader4[OFFSET4_HEADER_PARAMS].y;
+	if(ctOps == 0) 
+		return ComputePrimitiveField(v, 0, arrOps4, arrPrims4, arrMtxNodes4);
+	
+	
+	//Push the first operator onto stack
+	StackPush(&stk, 0);
+	while(!IsStackEmpty(&stk)) {
+		U32 idxOp = StackTop(&stk);
+		StackPop(&stk);
+		
+		U32 opType = (U32)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].x;
+		U32 opLeftChild = (U32)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].y;
+		U32 opRightChild = (U32)arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_TYPE].z;	
+		float4 params = arrOps4[idxOp * DATASIZE_OPERATOR_F4 + OFFSET4_OP_RES];
+		U32 flags = (U32)params.w;
+		
+		//enum OPFLAGS {ofRightChildIsOp = 1, ofLeftChildIsOp = 2, ofChildIndexIsRange = 4, ofIsUnaryOp = 8, ofIsRightOp = 16, ofBreak = 32};
+		//bool isBreak = (flags & ofBreak) >> 5;
+		//bool bUnary  = (flags & ofIsUnaryOp) >> 3;
+		bool bRange  = (flags & ofChildIndexIsRange) >> 2;
+		bool bLeftChildOp  = (flags & ofLeftChildIsOp) >> 1;
+		bool bRightChildOp = (flags & ofRightChildIsOp);
+		
+		if(bRange) {
+			StackPushF(&stkField, ComputeRangeField(v, idxOp, arrOps4, arrPrims4, arrMtxNodes4));
+			continue;
+		}
+		
+		bool isLFReady = !bLeftChildOp;
+		if(!IsStackEmpty(&stkFieldOp)) {
+			isLFReady |= (StackTop(&stkFieldOp) == opLeftChild);
+		}
+
+		bool isRFReady = !bRightChildOp;
+		if(!IsStackEmpty(&stkFieldOp)) {
+			isRFReady |= (StackTop(&stkFieldOp) == opRightChild);
+		}
+
+		
+		if(isLFReady && isRFReady) {
+			float lf = 0.0f;
+			float rf = 0.0f;
+			
+			//Left Node
+			if(bLeftChildOp) {
+				lf = StackTopF(&stkField);
+				StackPopF(&stkField);
+			}
+			else
+				lf = ComputePrimitiveField(v, opLeftChild, arrOps4, arrPrims4, arrMtxNodes4);
+
+			
+			//Right Node
+			if(bRightChildOp) {
+				rf = StackTopF(&stkField);
+				StackPopF(&stkField);
+			}
+			else
+				rf = ComputePrimitiveField(v, opRightChild, arrOps4, arrPrims4, arrMtxNodes4);
+
+			//Push Field
+			StackPushF(&stkField, ComputeOpField(opType, lf, rf, params));
+		}
+		else {		
+			if(bLeftChildOp && !isLFReady)
+				StackPush(&stk, opLeftChild);
+			if(bRightChildOp && !isRFReady)
+				StackPush(&stk, opRightChild);
+		}
+	}
+	
+	if(IsStackEmptyF(&stkField))
+		return 0.0f;
+	else
+		return StackTopF(&stkField);
+}
 
 
 

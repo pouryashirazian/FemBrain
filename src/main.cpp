@@ -176,7 +176,7 @@ GLMeshBuffer* g_lpSphere = NULL;
 //Particles* g_lpParticles = NULL;
 
 //SimulationObjects
-PS::CL::FastRBF*	g_lpFastRBF = NULL;
+//PS::CL::FastRBF*	g_lpFastRBF = NULL;
 Deformable* 		g_lpDeformable = NULL;
 Cutting* 			g_lpCutting = NULL;
 
@@ -189,7 +189,6 @@ AppSettings g_appSettings;
 //Function Prototype
 void Close();
 void Draw();
-void Resize(int w, int h);
 
 void TimeStep();
 void MousePress(int button, int state, int x, int y);
@@ -208,32 +207,7 @@ string GetGPUInfo();
 //Settings
 bool LoadSettings(const AnsiStr& strSimFP);
 bool SaveSettings(const AnsiStr& strSimFP);
-////////////////////////////////////////////////
-//Vertex Shader Code
-const char * g_lpVertexShaderCode =
-	"varying vec3 N;"
-	"varying vec3 V; "
-	"void main(void) {"
-	"gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;"
-	"gl_FrontColor = gl_Color;"
-	"N = normalize(gl_NormalMatrix * gl_Normal);"
-	"V = vec3(gl_ModelViewMatrix * gl_Vertex); }";
-
-//Fragment Shader Code
-const char* g_lpFragShaderCode =
-	"varying vec3 N;"
-	"varying vec3 V;"
-	"void main(void) {"
-	"vec3 L = normalize(gl_LightSource[0].position.xyz - V);"
-	"vec3 E = normalize(-V);"
-	"vec3 R = normalize(-reflect(L, N));"
-	"vec4 Iamb = 0.5 * gl_LightSource[0].ambient * gl_Color;"
-	"vec4 Idif = (gl_LightSource[0].diffuse * gl_Color) * max(dot(N,L), 0.0);"
-	"vec4 Ispec = (gl_LightSource[0].specular * (vec4(0.8, 0.8, 0.8, 0.8) + 0.2 * gl_Color)) * pow(max(dot(R, E), 0.0), 32.0);"
-	"gl_FragColor = gl_FrontLightModelProduct.sceneColor + Iamb + Idif + Ispec;	}";
-
 ////////////////////////////////////////////////////////////////////////////////////////
-
 void AdvanceHapticPosition() {
 //	if(g_lpDeformable->isHapticInProgress() && g_appSettings.hapticMode == hmDynamic) {
 //		vec2f v = g_hapticPosLerp.value();
@@ -249,46 +223,32 @@ void Draw()
 	g_appSettings.tick = tkStart;
 
 
+	//Draws Everything in the scenegraph
 	TheSceneGraph::Instance().draw();
 
-	//1.Draw RBF
-	if(g_lpFastRBF && (g_appSettings.drawIsoSurface != disNone)) {
-		g_lpFastRBF->setWireFrameMode(g_appSettings.drawIsoSurface == disWireFrame);
+	//Draw Sketch Machine Stuff
+	if(g_appSettings.bDrawAABB)
+		TheSketchMachine::Instance().drawBBox();
 
-		//Draw AABB and Normals
-		if(g_appSettings.bDrawAABB) {
-			g_lpFastRBF->drawBBox();
-		}
+	//Draw WireFrame Mode
+	GPUPoly* poly = TheSketchMachine::Instance().polygonizer();
+	poly->setWireFrameMode(g_appSettings.drawIsoSurface == disWireFrame);
+	poly->draw();
 
-		//Draw Model Normals
-		if(g_lpDrawNormals && (g_appSettings.bDrawNormals))
-			g_lpDrawNormals->draw();
+	//		if(g_lpDrawNormals && (g_appSettings.bDrawNormals))
+	//	g_lpDrawNormals->draw();
+	//g_lpFastRBF->drawCollision();
+	//Draw Cutting
+	//g_lpDeformable->drawCuttingArea();
+	//if(g_lpCutting)
+		//g_lpCutting->draw();
 
-		//Draw Collision
-		g_lpFastRBF->drawCollision();
+	//Draw the Gizmo Manager
+	TheGizmoManager::Instance().draw();
 
-		glEnable(GL_LIGHTING);
-			g_lpFastRBF->draw();
-		glDisable(GL_LIGHTING);
-	}
-
-
-	//2.Draw Deformable Mesh and cuts
-	if(g_lpDeformable) {
-		if(g_appSettings.bDrawTetMesh)
-			g_lpDeformable->draw();
-
-		//Draw Cutting
-		g_lpDeformable->drawCuttingArea();
-
-		//if(g_lpCutting)
-			//g_lpCutting->draw();
-	}
-
-	//3.Draw Avatar
 	if(g_lpAvatarCube && g_appSettings.bDrawAvatar)
 	{
-		vec3f wpos = TheGizmoManager::Instance().translate();
+		vec3f wpos = TheGizmoManager::Instance().transform()->getTranslate();
 		glPushMatrix();
 			glTranslatef(wpos.x, wpos.y, wpos.z);
 
@@ -366,11 +326,11 @@ void Draw()
 				g_appSettings.ctLogsCollected);
 		g_infoLines[INDEX_ANIMATION_INFO] = string(chrMsg);
 
-		if(g_lpFastRBF && g_lpDeformable) {
+		if(poly && g_lpDeformable) {
 			sprintf(chrMsg, "MESH CELLSIZE:%.3f, ISOSURF: V# %d, TRI# %d, VOLUME: V# %d, TET# %d",
 					g_appSettings.cellsize,
-					g_lpFastRBF->countVertices(),
-					g_lpFastRBF->countTriangles(),
+					poly->countVertices(),
+					poly->countTriangles(),
 					g_lpDeformable->getTetMesh()->getNumVertices(),
 					g_lpDeformable->getTetMesh()->getNumElements());
 			g_infoLines[INDEX_MESH_INFO] = string(chrMsg);
@@ -481,7 +441,7 @@ void MousePassiveMove(int x, int y)
 	g_appSettings.screenDragStart = vec2i(x, y);
 
 	string strAxis;
-	vec3f worldAvatarPos = TheGizmoManager::Instance().translate();
+	vec3f worldAvatarPos = TheGizmoManager::Instance().transform()->getTranslate();
 
 	switch (TheGizmoManager::Instance().axis()) {
 	case axisX:
@@ -501,10 +461,15 @@ void MousePassiveMove(int x, int y)
 		worldAvatarPos = worldAvatarPos + vec3f(dx, dy, 0.0);
 		strAxis = "FREE";
 		break;
+
+	case axisCount: {
+
+	}
+	break;
 	}
 
 	//World Avatar Pos
-	TheGizmoManager::Instance().setTranslate(worldAvatarPos);
+	TheGizmoManager::Instance().transform()->translate(worldAvatarPos);
 	vec3d wpos = vec3d(worldAvatarPos.x, worldAvatarPos.y, worldAvatarPos.z);
 
 	char buffer[1024];
@@ -518,11 +483,11 @@ void MousePassiveMove(int x, int y)
 	vec3d upper = g_lpAvatarCube->upper() + wpos;
 
 	//Avatar Box
-	AABB aabbAvatar(vec3(lower.x, lower.y, lower.z),
-			vec3(upper.x, upper.y, upper.z));
+	AABB aabbAvatar(vec3f(lower.x, lower.y, lower.z),
+			vec3f(upper.x, upper.y, upper.z));
 
 	//1.If boxes donot intersect return
-	if (!g_lpFastRBF->bbox().intersect(aabbAvatar)) {
+	if (!TheSketchMachine::Instance().aabb().intersect(aabbAvatar)) {
 		g_appSettings.idxCollisionFace = -1;
 		g_hashVertices.clear();
 		g_lpDeformable->cleanupCuttingStructures();
@@ -715,8 +680,9 @@ void MouseWheel(int button, int dir, int x, int y)
 
 void ApplyDeformations(U32 dof, double* displacements) {
 	tbb::tick_count tsStart = tbb::tick_count::now();
-	if(g_lpFastRBF)
-		g_lpFastRBF->applyFemDisplacements(dof, displacements);
+
+	//if(g_lpFastRBF)
+		//g_lpFastRBF->applyFemDisplacements(dof, displacements);
 
 	g_appSettings.msAnimApplyDisplacements = (tbb::tick_count::now() - tsStart).seconds() * 1000.0;
 }
@@ -731,7 +697,7 @@ void Close()
 	cout << "Cleanup Memory objects" << endl;
 
 	SAFE_DELETE(g_lpDrawNormals);
-	SAFE_DELETE(g_lpFastRBF);
+	//SAFE_DELETE(g_lpFastRBF);
 	SAFE_DELETE(g_lpDeformable);
 	SAFE_DELETE(g_lpCutting);
 	SAFE_DELETE(g_lpAvatarCube);
@@ -785,20 +751,21 @@ void NormalKey(unsigned char key, int x, int y)
 	case('+'):{
 		g_appSettings.cellsize += 0.01;
 		LogInfoArg1("Changed cellsize to: %.2f", g_appSettings.cellsize);
-//		g_lpBlobRender->runPolygonizer(g_appSettings.cellsize);
+		TheSketchMachine::Instance().polygonizer()->setCellSize(g_appSettings.cellsize);
+		TheSketchMachine::Instance().sync();
 		break;
 	}
 	case('-'):{
 		g_appSettings.cellsize -= 0.01;
 		LogInfoArg1("Changed cellsize to: %.2f", g_appSettings.cellsize);
-//		g_lpBlobRender->runPolygonizer(g_appSettings.cellsize);
+		TheSketchMachine::Instance().polygonizer()->setCellSize(g_appSettings.cellsize);
+		TheSketchMachine::Instance().sync();
 		break;
 	}
 
 	case('a'): {
 		g_appSettings.bDrawAvatar = !g_appSettings.bDrawAvatar;
 		LogInfoArg1("Draw avatar: %d", g_appSettings.bDrawAvatar);
-		glutPostRedisplay();
 	}
 	break;
 
@@ -842,28 +809,31 @@ void NormalKey(unsigned char key, int x, int y)
 	case('d'): {
 		g_appSettings.bDrawGround = !g_appSettings.bDrawGround;
 		LogInfoArg1("Draw ground checkerboard set to: %d", g_appSettings.bDrawGround);
-		glutPostRedisplay();
+		SGNode* floor = TheSceneGraph::Instance().get("floor");
+		if(floor)
+			floor->setVisible(g_appSettings.bDrawGround);
 	}
 	break;
 	case('n'): {
 		g_appSettings.bDrawNormals = !g_appSettings.bDrawNormals;
 		LogInfoArg1("Draw Model Normals set to: %d", g_appSettings.bDrawNormals);
-		glutPostRedisplay();
 	}
 	break;
 
 	case('['):{
 		TheSceneGraph::Instance().camera().incrZoom(0.5f);
-		glutPostRedisplay();
 	}
 	break;
 	case(']'):{
 		TheSceneGraph::Instance().camera().incrZoom(-0.5f);
-		glutPostRedisplay();
 	}
 	break;
 
 	}
+
+
+	//Update Screen
+	glutPostRedisplay();
 }
 
 void SpecialKey(int key, int x, int y)
@@ -874,6 +844,9 @@ void SpecialKey(int key, int x, int y)
 		{
 			g_appSettings.bDrawTetMesh = !g_appSettings.bDrawTetMesh;
 			LogInfoArg1("Draw tetmesh: %d", g_appSettings.bDrawTetMesh);
+			SGNode* tissue = TheSceneGraph::Instance().get("tissue");
+			if(tissue)
+				tissue->setVisible(g_appSettings.bDrawTetMesh);
 			break;
 		}
 
@@ -948,6 +921,7 @@ void SpecialKey(int key, int x, int y)
 		case(GLUT_KEY_F9):
 		{
 			g_appSettings.bDrawAffineWidgets = !g_appSettings.bDrawAffineWidgets;
+			TheGizmoManager::Instance().setVisible(g_appSettings.bDrawAffineWidgets);
 			LogInfoArg1("Draw affine widgets: %d", g_appSettings.bDrawAffineWidgets);
 			break;
 		}
@@ -1046,7 +1020,7 @@ bool LoadSettings(const AnsiStr& strSimFP)
 	g_appSettings.bGravity = cfg.readBool("SYSTEM", "GRAVITY", true);
 
 	//Avatar
-	TheGizmoManager::Instance().setTranslate(cfg.readVec3f("AVATAR", "POS"));
+	TheGizmoManager::Instance().transform()->translate(cfg.readVec3f("AVATAR", "POS"));
 	TheGizmoManager::Instance().setAxis((GizmoAxis)cfg.readInt("AVATAR", "AXIS"));
 	vec3f thickness = cfg.readVec3f("AVATAR", "THICKNESS");
 	vec3d thicknessd = vec3d(thickness.x, thickness.y, thickness.z);
@@ -1100,7 +1074,7 @@ bool SaveSettings(const AnsiStr& strSimFP)
 
 	//Avatar
 	vec3d sides = g_lpAvatarCube->upper() - g_lpAvatarCube->lower();
-	cfg.writeVec3f("AVATAR", "POS", TheGizmoManager::Instance().translate());
+	cfg.writeVec3f("AVATAR", "POS", TheGizmoManager::Instance().transform()->getTranslate());
 	cfg.writeVec3f("AVATAR", "THICKNESS", vec3f(sides.x, sides.y, sides.z));
 	cfg.writeInt("AVATAR", "AXIS", TheGizmoManager::Instance().axis());
 
@@ -1240,11 +1214,13 @@ int main(int argc, char* argv[])
 	g_appSettings.tick = tbb::tick_count::now();
 
 	//Ground and Room
-	TheSceneGraph::Instance().addFloor(32, 32, 0.2f);
+	//TheSceneGraph::Instance().addFloor(32, 32, 0.2f);
 	TheSceneGraph::Instance().addSceneBox(AABB(vec3f(-10,-10,-16), vec3f(10,10,16)));
 
 	//Add morphing sphere
-	TheSceneGraph::Instance().add(new MorphingSphere(2.0f, 16, 16));
+	MorphingSphere* m = new MorphingSphere(2.0f, 16, 16);
+	m->setName("floor");
+	TheSceneGraph::Instance().add(m);
 
 	//Check the model file extension
 	AnsiStr strFileExt = ExtractFileExt(AnsiStr(g_appSettings.strModelFilePath.c_str()));
@@ -1266,10 +1242,10 @@ int main(int argc, char* argv[])
 		g_appSettings.msPolyTriangleMesh = 0;
 
 		tbb::tick_count tsStart = tbb::tick_count::now();
-		g_lpFastRBF = new FastRBF(lpMesh);
+		//g_lpFastRBF = new FastRBF(lpMesh);
 		g_appSettings.msRBFCreation = (tbb::tick_count::now() - tsStart).seconds() * 1000.0;
 
-		g_lpDrawNormals = g_lpFastRBF->prepareMeshBufferNormals();
+		//g_lpDrawNormals = g_lpFastRBF->prepareMeshBufferNormals();
 
 		//Readback mesh
 		MeshNode* lpNode = lpMesh->getNode(0);
@@ -1282,39 +1258,24 @@ int main(int argc, char* argv[])
 	else
 	{
 		LogInfoArg1("Loading input BlobTree file at: %s", g_appSettings.strModelFilePath.c_str());
-		LinearBlobTree blob;
-		if(!blob.load(g_appSettings.strModelFilePath)) {
+
+		if(!TheSketchMachine::Instance().loadBlob(g_appSettings.strModelFilePath)) {
 			LogErrorArg1("Unable to read Blob file at: %s", g_appSettings.strModelFilePath.c_str());
 			exit(-1);
 		}
 
-		GPUPoly* lpBlobRender = new GPUPoly(blob);
 		LogInfoArg1("Polygonizing BlobTree file with cellsize: %.2f", g_appSettings.cellsize);
-
-
-		ProfileStartArg("Polygonize");
-		tbb::tick_count tsStart = tbb::tick_count::now();
-		lpBlobRender->runPolygonizer(g_appSettings.cellsize);
-		g_appSettings.msPolyTriangleMesh = (tbb::tick_count::now() - tsStart).seconds() * 1000.0;
-		ProfileEnd();
-
-		//Save Mesh
-		//CLMeshBuffer::StoreAsObjMesh("CubeStored.obj", lpBlobRender->computeDevice(), lpBlobRender);
+		TheSketchMachine::Instance().polygonizer()->setCellSize(g_appSettings.cellsize);
+		TheSketchMachine::Instance().sync();
 
 		//Create the RBF representation
-		tsStart = tbb::tick_count::now();
-		g_lpFastRBF = new FastRBF(lpBlobRender);
-		g_appSettings.msRBFCreation = (tbb::tick_count::now() - tsStart).seconds() * 1000.0;
-
+		//g_lpFastRBF = new FastRBF(lpBlobRender);
 		//g_lpFastRBF->setShaderEffectProgram(g_uiPhongShader);
-		g_lpDrawNormals = g_lpFastRBF->prepareMeshBufferNormals();
+		//g_lpDrawNormals = g_lpFastRBF->prepareMeshBufferNormals();
 
 		//Read Back Polygonized Mesh
-		if(!lpBlobRender->readbackMeshV3T3(ctVertices, vertices, ctTriangles, elements))
+		if(!TheSketchMachine::Instance().polygonizer()->readbackMeshV3T3(ctVertices, vertices, ctTriangles, elements))
 			LogError("Unable to read mesh from RBF in the format of V3T3");
-
-
-		SAFE_DELETE(lpBlobRender);
 	}
 
 
@@ -1340,6 +1301,7 @@ int main(int argc, char* argv[])
 		g_lpDeformable->setDeformCallback(ApplyDeformations);
 		g_lpDeformable->setHapticForceRadius(g_appSettings.hapticNeighborhoodPropagationRadius);
 		g_lpDeformable->setName("tissue");
+		g_lpDeformable->setVisible(false);
 
 		//Setup Cutting system
 		//g_lpCutting = new Cutting(g_lpDeformable);

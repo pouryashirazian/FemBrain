@@ -200,6 +200,9 @@ namespace SKETCH {
 
 	int GPUPoly::init()
 	{
+		//Cellsize
+		m_cellsize = DEFAULT_CELL_SIZE;
+
 		//Set Rendering Shader
         if(TheShaderManager::Instance().has("phong")) {
             m_spEffect = SmartPtrSGEffect(new SGEffect(TheShaderManager::Instance().get("phong")));
@@ -209,8 +212,8 @@ namespace SKETCH {
 		AnsiStr strCodePath = ExtractFilePath(GetExePath());
 		strCodePath = ExtractOneLevelUp(strCodePath);
 		
-		AnsiStr strPolyFP = strCodePath + AnsiStr("data/shaders/Polygonizer.cl");
-		AnsiStr strTetFP = strCodePath + AnsiStr("data/shaders/Tetrahedralizer.cl");
+		AnsiStr strPolyFP = strCodePath + AnsiStr("data/opencl/Polygonizer.cl");
+		AnsiStr strTetFP = strCodePath + AnsiStr("data/opencl/Tetrahedralizer.cl");
 
 		LogInfo("1.Setup compute device. Prefer AMD GPU.");
 		//Create a GPU Compute Device
@@ -638,19 +641,19 @@ namespace SKETCH {
 	}
 
 	//Runs a multipass High Performance Polygonizer
-	int GPUPoly::runPolygonizer(float cellsize)
+	int GPUPoly::run()
 	{
-		if(DefinitelyLessThan(cellsize, 0.01, EPSILON))
+		if(DefinitelyLessThan(m_cellsize, 0.01, EPSILON))
 			return -1;
 
-		AnsiStr strArg = printToAStr("Total poly with cellsize: %.3f", cellsize);
+		AnsiStr strArg = printToAStr("Total poly with cellsize: %.3f", m_cellsize);
 		ProfileStartArg(strArg.cptr());
 
 		//Clear previous mesh
 		GLMeshBuffer::cleanup();
 
 		//1. Compute All Fields
-		computeAllFields(cellsize);
+		computeAllFields(m_cellsize);
 
 		//2. Compute Edge Table
 		computeEdgeTable();

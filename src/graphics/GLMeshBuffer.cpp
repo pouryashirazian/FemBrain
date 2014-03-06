@@ -474,7 +474,6 @@ void GLMeshBuffer::draw()
 		glEnableClientState(GL_VERTEX_ARRAY);
 	}
 
-
 	//Draw Faces
 	if(m_isValidIndex)
 	{

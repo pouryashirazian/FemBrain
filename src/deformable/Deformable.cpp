@@ -165,7 +165,7 @@ void Deformable::setup(const char* lpVegFilePath,
 
 
 	//Compute AABB
-	this->setBBox(m_lpSurfaceMesh->bbox());
+	this->setAABB(m_lpSurfaceMesh->aabb());
 
 	//Compute Volume
 	U32 ctElems = m_lpTetMesh->getNumElements();
@@ -233,7 +233,7 @@ int Deformable::setupTetMesh(const vector<double>& inTetVertices,
 
 
 	//Compute AABB
-	this->setBBox(m_lpSurfaceMesh->bbox());
+	this->setAABB(m_lpSurfaceMesh->aabb());
 
 	//Compute Volume
 	U32 ctElems = m_lpTetMesh->getNumElements();

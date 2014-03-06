@@ -73,13 +73,13 @@ namespace PS {
         
         void SceneGraph::addSceneBox(const AABB& box) {
             SGBox* lpBox = new SGBox(box.lower(), box.upper());
-            lpBox->setName("BOX");
+            lpBox->setName("scenebox");
             this->add(lpBox);
         }
         
         void SceneGraph::addFloor(int rows, int cols, float step) {
             SGFloor* pFloor = new SGFloor(rows, cols, step);
-            pFloor->setName("FLOOR");
+            pFloor->setName("floor");
             this->add(pFloor);
         }
         
@@ -123,7 +123,7 @@ namespace PS {
             //Draw All Visible Nodes
             for(U32 i=0; i < m_vSceneNodes.size(); i++) {
                 if(m_vSceneNodes[i]->isVisible()) {
-                    AABB box = m_vSceneNodes[i]->bbox();
+                    AABB box = m_vSceneNodes[i]->aabb();
                     if(box.isValid())
                         DrawAABB(box.lower(), box.upper(), vec3f(0,0,1), 1.0f);
                 }

@@ -56,7 +56,7 @@ public:
 	void testScan();
 
 	//Multi-Pass polygonization
-	int runPolygonizer(float cellsize = DEFAULT_CELL_SIZE);
+	int run();
 
 	//Run tetrahedralization process
 	int runTetrahedralizer();
@@ -93,12 +93,15 @@ public:
 	 */
 	bool applyFemDisplacements(U32 dof, double* displacements);
 
-	/*!
-	 * Sets the BlobTree
-	 */
-	bool setBlob(const LinearBlobTree& blob);
-	ComputeDevice* computeDevice() const {return m_lpGPU;}
 
+	//Set BlobTree
+	bool setBlob(const LinearBlobTree& blob);
+
+	//Cellsize
+	void setCellSize(float cellsize) { m_cellsize = cellsize;}
+	float cellsize() const {return m_cellsize;}
+
+	ComputeDevice* computeDevice() const {return m_lpGPU;}
 	vec3i voxelGridDim() const;
 private:
 	/*!
@@ -220,6 +223,7 @@ private:
 	//Model
 	bool m_bModelLoaded;
 	LinearBlobTree m_blob;
+	float m_cellsize;
 };
 
 

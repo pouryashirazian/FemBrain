@@ -35,10 +35,10 @@
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.cross.cpp.compiler.1776191537" name="Cross G++ Compiler" superClass="cdt.managedbuild.tool.gnu.cross.cpp.compiler">
 								<option id="gnu.cpp.compiler.option.include.paths.887736535" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/3rdparty}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/3rdparty/eigen}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/3rdparty/vegafem/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;/src"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty/eigen}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty/vegafem/include}&quot;"/>
 									<listOptionValue builtIn="false" value="/opt/intel/mkl/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/OPENCL/common/inc"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLUI/src/include"/>
