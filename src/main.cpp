@@ -34,133 +34,14 @@
 
 #include "volumetricMeshLoader.h"
 #include "generateSurfaceMesh.h"
-
+#include "settings.h"
 
 using namespace std;
 using namespace PS;
 using namespace PS::FILESTRINGUTILS;
 using namespace PS::CL;
 
-#define WINDOW_WIDTH 1200
-#define WINDOW_HEIGHT 800
-#define FOVY 45.0
-#define ZNEAR 0.01
-#define ZFAR 100.0
 
-#define DEFAULT_FORCE_COEFF 600000
-#define ANIMATION_TIME_SAMPLE_INTERVAL 5
-
-
-#define INDEX_GPU_INFO 	   0
-#define INDEX_CAMERA_INFO 1
-#define INDEX_HAPTIC_INFO 2
-#define INDEX_ANIMATION_INFO 3
-#define INDEX_MESH_INFO 4
-
-
-
-enum HAPTICMODES {hmDynamic, hmSceneEdit};
-enum DRAWISOSURFACE {disNone, disWireFrame, disFull, disTetMesh, disCount};
-
-//Application Settings
-class AppSettings{
-public:
-	//Set to default values in constructor
-	AppSettings() {
-		//Set the simulation file path
-		this->strSimFilePath = ChangeFileExt(ExtractFilePath(GetExePath()), AnsiStr(".sim"));
-		this->appWidth = WINDOW_WIDTH;
-		this->appHeight = WINDOW_HEIGHT;
-		this->hapticNeighborhoodPropagationRadius = DEFAULT_FORCE_NEIGHBORHOOD_SIZE;
-		this->collisionDist = 0;
-		this->groundLevel = 0.0f;
-		this->drawIsoSurface = disFull;
-		this->bEditConstrainedNodes = false;
-		this->bPanCamera = false;
-		this->bDrawAABB = true;
-		this->bDrawNormals = true;
-
-		this->bDrawTetMesh = true;
-		this->bDrawAffineWidgets = true;
-		this->bDrawGround = true;
-		this->bDrawAvatar = true;
-
-		this->bLogSql = true;
-		this->bGravity = true;
-		this->idxCollisionFace = -1;
-		this->ctFrames = 0;
-		this->ctAnimLogger = 0;
-		this->ctLogsCollected = 0;
-		this->ctSolverThreads = task_scheduler_init::default_num_threads();
-
-		//Animation
-		this->tick = tbb::tick_count::now();
-		this->msFrameTime = 0;
-		this->fps = 0;
-
-
-		this->hapticMode = 0;
-		this->hapticForceCoeff = DEFAULT_FORCE_COEFF;
-		this->cellsize = DEFAULT_CELL_SIZE;
-	}
-
-public:
-	AnsiStr strSimFilePath;
-	AnsiStr strModelFilePath;
-	int  drawIsoSurface;
-	bool bDrawAvatar;
-	bool bDrawGround;
-	bool bPanCamera;
-	bool bDrawAABB;
-	bool bDrawNormals;
-	bool bDrawTetMesh;
-	bool bDrawAffineWidgets;
-	bool bLogSql;
-	bool bGravity;
-	bool bEditConstrainedNodes;
-
-	int idxCollisionFace;
-	double collisionDist;
-	vec3d collisionClosestPoint;
-	double hapticForceCoeff;
-
-
-	//AppSettings
-	int appWidth;
-	int appHeight;
-	int hapticMode;
-
-	float cellsize;
-	float groundLevel;
-	//vec3d worldAvatarPos;
-	//vec3d worldDragStart;
-	//vec3d worldDragEnd;
-	vec2i screenDragStart;
-	vec2i screenDragEnd;
-
-	//Fixed Vertices
-	vector<U32> vFixedVertices;
-
-	//Propagate force to neighborhood
-	int hapticNeighborhoodPropagationRadius;
-
-	//Stats
-	U64  ctLogsCollected;
-	U64  ctAnimLogger;
-	U64  ctFrames;
-
-	//FrameTime Stats
-	double fps;
-	double msFrameTime;
-	tbb::tick_count tick;
-
-	//Other timings
-	double msAnimApplyDisplacements;
-	double msPolyTriangleMesh;
-	double msPolyTetrahedraMesh;
-	double msRBFCreation;
-	int ctSolverThreads;
-};
 
 void AdvanceHapticPosition();
 
@@ -181,16 +62,15 @@ Deformable* 		g_lpDeformable = NULL;
 Cutting* 			g_lpCutting = NULL;
 
 //Info Lines
-std::vector<std::string> g_infoLines;
 AppSettings g_appSettings;
 
 
 ////////////////////////////////////////////////
 //Function Prototype
 void Close();
-void Draw();
+void draw();
 
-void TimeStep();
+void timestep();
 void MousePress(int button, int state, int x, int y);
 void MouseMove(int x, int y);
 void MousePassiveMove(int x, int y);
@@ -201,7 +81,6 @@ void ApplyDeformations(U32 dof, double* displacements);
 void NormalKey(unsigned char key, int x, int y);
 void SpecialKey(int key, int x, int y);
 
-void DrawText(const char* chrText, int x, int y);
 string GetGPUInfo();
 
 //Settings
@@ -215,7 +94,7 @@ void AdvanceHapticPosition() {
 //	}
 }
 
-void Draw()
+void draw()
 {
 	tbb::tick_count tkStart = tbb::tick_count::now();
 	g_appSettings.msFrameTime = (tkStart - g_appSettings.tick).seconds() * 1000.0;
@@ -230,10 +109,8 @@ void Draw()
 	if(g_appSettings.bDrawAABB)
 		TheSketchMachine::Instance().drawBBox();
 
-	//Draw WireFrame Mode
-	GPUPoly* poly = TheSketchMachine::Instance().polygonizer();
-	poly->setWireFrameMode(g_appSettings.drawIsoSurface == disWireFrame);
-	poly->draw();
+	//Draw the Gizmo Manager
+	TheGizmoManager::Instance().draw();
 
 	//		if(g_lpDrawNormals && (g_appSettings.bDrawNormals))
 	//	g_lpDrawNormals->draw();
@@ -243,8 +120,6 @@ void Draw()
 	//if(g_lpCutting)
 		//g_lpCutting->draw();
 
-	//Draw the Gizmo Manager
-	TheGizmoManager::Instance().draw();
 
 	if(g_lpAvatarCube && g_appSettings.bDrawAvatar)
 	{
@@ -275,7 +150,7 @@ void Draw()
 
 
 	//4.Draw Haptic Line
-	if(g_lpDeformable->isHapticInProgress() && g_appSettings.bDrawAffineWidgets)
+	//if(g_lpDeformable->isHapticInProgress() && g_appSettings.bDrawAffineWidgets)
 	{
 		GLint vp[4];
 		glGetIntegerv(GL_VIEWPORT, vp);
@@ -310,22 +185,16 @@ void Draw()
 	//Write Info
 	{
 		char chrMsg[1024];
-		ArcBallCamera& cam = TheSceneGraph::Instance().camera();
-		sprintf(chrMsg,"Camera [Roll=%.1f, Tilt=%.1f, PanX=%.2f, PanY=%.2f]",
-				cam.getRoll(),
-				cam.getTilt(),
-				cam.getPan().x,
-				cam.getPan().y);
-		g_infoLines[INDEX_CAMERA_INFO] = string(chrMsg);
-
 		//Frame Count, Frame Time and FPS, Log Count
 		sprintf(chrMsg, "ANIMATION FRAME# %08llu, TIME# %.2f, FPS# %d, LOGS# %08llu",
 				g_appSettings.ctFrames,
 				g_appSettings.msFrameTime,
 				(int)g_appSettings.fps,
 				g_appSettings.ctLogsCollected);
-		g_infoLines[INDEX_ANIMATION_INFO] = string(chrMsg);
+		TheSceneGraph::Instance().headers()->updateHeaderLine("animation", AnsiStr(chrMsg));
 
+
+		/*
 		if(poly && g_lpDeformable) {
 			sprintf(chrMsg, "MESH CELLSIZE:%.3f, ISOSURF: V# %d, TRI# %d, VOLUME: V# %d, TET# %d",
 					g_appSettings.cellsize,
@@ -335,42 +204,16 @@ void Draw()
 					g_lpDeformable->getTetMesh()->getNumElements());
 			g_infoLines[INDEX_MESH_INFO] = string(chrMsg);
 		}
+		*/
 	}
 
-	//Write Model Info
-	{
-		for(size_t i=0; i<g_infoLines.size(); i++)
-			DrawText(g_infoLines[i].c_str(), 10, 20 + i * 15);
-	}
 
 	glutSwapBuffers();
 }
 
 
 
-void DrawText(const char* chrText, int x, int y)
-{
-	GLint vp[4];
-	glGetIntegerv(GL_VIEWPORT, vp);
 
-	glMatrixMode(GL_PROJECTION);
-	glPushMatrix();
-	glLoadIdentity();
-	glOrtho(0, vp[2], vp[3], 0, -1, 1);
-
-
-	glMatrixMode(GL_MODELVIEW);
-	glPushMatrix();
-	glLoadIdentity();
-
-	float clFont[] = { 0, 0, 1, 1 };
-	DrawString(chrText, x,  y, clFont, GLUT_BITMAP_8_BY_13);
-
-	glMatrixMode(GL_MODELVIEW);
-	glPopMatrix();
-	glMatrixMode(GL_PROJECTION);
-	glPopMatrix();
-}
 
 
 
@@ -391,13 +234,13 @@ void MousePress(int button, int state, int x, int y)
 			int stencilValue = ScreenToWorldReadStencil(x, y, wpos);
 			if (stencilValue == 1) {
 				vec3d closestVertex;
-				int idxVertex = g_lpDeformable->pickVertex(wpos, closestVertex);
-				g_lpDeformable->setPulledVertex(idxVertex);
-				LogInfoArg1("Selected Vertex Index = %d ", idxVertex);
+				//int idxVertex = g_lpDeformable->pickVertex(wpos, closestVertex);
+				//g_lpDeformable->setPulledVertex(idxVertex);
+				//LogInfoArg1("Selected Vertex Index = %d ", idxVertex);
 
 				//Edit Fixed Vertices
 				if (g_appSettings.bEditConstrainedNodes) {
-					g_appSettings.vFixedVertices.push_back(idxVertex);
+					//g_appSettings.vFixedVertices.push_back(idxVertex);
 					LogInfoArg1(
 							"Added last selection to fixed vertices. count = %d",
 							g_appSettings.vFixedVertices.size());
@@ -405,6 +248,7 @@ void MousePress(int button, int state, int x, int y)
 			}
 		}
 	}
+	/*
 	else if (button == GLUT_RIGHT_BUTTON) {
 		if (state == GLUT_DOWN) {
 			if (g_lpDeformable->isHapticInProgress()) {
@@ -418,6 +262,7 @@ void MousePress(int button, int state, int x, int y)
 	} else if (button == GLUT_MIDDLE_BUTTON) {
 
 	}
+	*/
 	//Update selection
 	glutPostRedisplay();
 }
@@ -428,6 +273,7 @@ void MousePress(int button, int state, int x, int y)
  */
 void MousePassiveMove(int x, int y)
 {
+	/*
 	if(!(g_lpDeformable->isHapticInProgress() && g_appSettings.hapticMode == hmDynamic))
 		return;
 
@@ -500,7 +346,7 @@ void MousePassiveMove(int x, int y)
 	//g_lpDeformable->performCuts(lower, lower + extent);
 	//g_lpCutting->performCut(lower, lower + extent);
 
-
+*/
 	//2.Compute Collision using RBF Interpolation Function
 	/*
 	 vector<vec3f> avatarVertices;
@@ -515,7 +361,7 @@ void MousePassiveMove(int x, int y)
 	 }
 	 */
 
-
+/*
 
 	//List all the vertices in the model impacted
 	{
@@ -625,7 +471,7 @@ void MousePassiveMove(int x, int y)
 
 
 	glutPostRedisplay();
-
+*/
 }
 
 void MouseMove(int x, int y)
@@ -829,6 +675,16 @@ void NormalKey(unsigned char key, int x, int y)
 	}
 	break;
 
+	case(27):
+	{
+		//Saving Settings and Exit
+		LogInfo("Saving settings and exit.");
+		SaveSettings(g_appSettings.strSimFilePath);
+		glutLeaveMainLoop();
+	}
+	break;
+
+
 	}
 
 
@@ -842,20 +698,27 @@ void SpecialKey(int key, int x, int y)
 	{
 		case(GLUT_KEY_F1):
 		{
-			g_appSettings.bDrawTetMesh = !g_appSettings.bDrawTetMesh;
-			LogInfoArg1("Draw tetmesh: %d", g_appSettings.bDrawTetMesh);
-			SGNode* tissue = TheSceneGraph::Instance().get("tissue");
-			if(tissue)
-				tissue->setVisible(g_appSettings.bDrawTetMesh);
-			break;
+			g_appSettings.drawTetMesh = (g_appSettings.drawTetMesh + 1) % disCount;
+			bool wireframe = (g_appSettings.drawTetMesh == disWireFrame);
+
+			Deformable* tissue = dynamic_cast<Deformable*>(TheSceneGraph::Instance().get("tissue"));
+			tissue->setVisible(g_appSettings.drawTetMesh);
+			tissue->setWireFrameMode(wireframe);
+			LogInfoArg1("Draw tetmesh: %d", g_appSettings.drawTetMesh);
 		}
+		break;
 
 		case(GLUT_KEY_F2):
 		{
 			g_appSettings.drawIsoSurface = (g_appSettings.drawIsoSurface + 1) % disCount;
+			bool wireframe = (g_appSettings.drawIsoSurface == disWireFrame);
+
+			//Set Visibility
+			TheSketchMachine::Instance().polygonizer()->setVisible(g_appSettings.drawIsoSurface > 0);
+			TheSketchMachine::Instance().polygonizer()->setWireFrameMode(wireframe);
 			LogInfoArg1("Draw isosurf mode: %d", g_appSettings.drawIsoSurface);
-			break;
 		}
+		break;
 
 		case(GLUT_KEY_F3):
 		{
@@ -904,17 +767,17 @@ void SpecialKey(int key, int x, int y)
 
 		case(GLUT_KEY_F7):
 		{
-			int radius = MATHMAX(g_lpDeformable->getHapticForceRadius() - 1, 1);
-			g_lpDeformable->setHapticForceRadius(radius);
-			LogInfoArg1("Decrease haptic force radius: %d", radius);
+			//int radius = MATHMAX(g_lpDeformable->getHapticForceRadius() - 1, 1);
+			//g_lpDeformable->setHapticForceRadius(radius);
+			//LogInfoArg1("Decrease haptic force radius: %d", radius);
 			break;
 		}
 
 		case(GLUT_KEY_F8):
 		{
-			int radius = MATHMIN(g_lpDeformable->getHapticForceRadius() + 1, 10);
-			g_lpDeformable->setHapticForceRadius(radius);
-			LogInfoArg1("Increase haptic force radius: %d", radius);
+			//int radius = MATHMIN(g_lpDeformable->getHapticForceRadius() + 1, 10);
+			//g_lpDeformable->setHapticForceRadius(radius);
+			//LogInfoArg1("Increase haptic force radius: %d", radius);
 			break;
 		}
 
@@ -925,24 +788,13 @@ void SpecialKey(int key, int x, int y)
 			LogInfoArg1("Draw affine widgets: %d", g_appSettings.bDrawAffineWidgets);
 			break;
 		}
-
-		case(GLUT_KEY_F11):
-		{
-			//Saving Settings and Exit
-			SaveSettings(g_appSettings.strSimFilePath);
-
-			LogInfo("Exiting.");
-
-			glutLeaveMainLoop();
-			break;
-		}
 	}
 
 	glutPostRedisplay();
 }
 
 
-void TimeStep()
+void timestep()
 {
 	//Advance timestep in scenegraph
 	TheSceneGraph::Instance().timestep();
@@ -957,6 +809,7 @@ void TimeStep()
 		//Log Database
 		if(g_appSettings.bLogSql)
 		{
+			/*
 			if(g_lpDeformable->isVolumeChanged())
 			{
 				DBLogger::Record rec;
@@ -977,6 +830,7 @@ void TimeStep()
 
 				g_appSettings.ctLogsCollected ++;
 			}
+			*/
 		}
 
 	}
@@ -1043,15 +897,15 @@ bool LoadSettings(const AnsiStr& strSimFP)
 	g_appSettings.bDrawAffineWidgets = cfg.readBool("DISPLAY", "AFFINEWIDGETS", true);
 	g_appSettings.bDrawGround = cfg.readBool("DISPLAY", "GROUND", true);
 	g_appSettings.bDrawNormals = cfg.readBool("DISPLAY", "NORMALS", true);
-	g_appSettings.bDrawTetMesh = cfg.readBool("DISPLAY", "TETMESH", true);
+	g_appSettings.drawTetMesh = cfg.readBool("DISPLAY", "TETMESH", true);
 	g_appSettings.drawIsoSurface = cfg.readInt("DISPLAY", "ISOSURF", disFull);
 
 	//DISPLAY INFO
-	g_infoLines.push_back(GetGPUInfo());
-	g_infoLines.push_back(string("CAMERA"));
-	g_infoLines.push_back(string("HAPTIC"));
-	g_infoLines.push_back(string("ANIMATION"));
-	g_infoLines.push_back(string("MESH"));
+//	g_infoLines.push_back(GetGPUInfo());
+//	g_infoLines.push_back(string("CAMERA"));
+//	g_infoLines.push_back(string("HAPTIC"));
+//	g_infoLines.push_back(string("ANIMATION"));
+//	g_infoLines.push_back(string("MESH"));
 	return true;
 }
 
@@ -1083,7 +937,7 @@ bool SaveSettings(const AnsiStr& strSimFP)
 	cfg.writeBool("DISPLAY", "AFFINEWIDGETS", g_appSettings.bDrawAffineWidgets);
 	cfg.writeBool("DISPLAY", "GROUND", g_appSettings.bDrawGround);
 	cfg.writeBool("DISPLAY", "NORMALS", g_appSettings.bDrawNormals);
-	cfg.writeBool("DISPLAY", "TETMESH", g_appSettings.bDrawTetMesh);
+	cfg.writeBool("DISPLAY", "TETMESH", g_appSettings.drawTetMesh);
 	cfg.writeInt("DISPLAY", "ISOSURF", g_appSettings.drawIsoSurface);
 
 	//MODEL PROPS
@@ -1144,19 +998,16 @@ int main(int argc, char* argv[])
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH | GLUT_STENCIL);
 	glutInitWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
 	glutCreateWindow("Deformable Tissue Modeling - PhD Project - Pourya Shirazian");
-	glutDisplayFunc(Draw);
+	glutDisplayFunc(draw);
 	glutReshapeFunc(def_resize);
 	glutMouseFunc(MousePress);
 	glutPassiveMotionFunc(MousePassiveMove);
 	glutMotionFunc(MouseMove);
 	glutMouseWheelFunc(MouseWheel);
-
 	glutKeyboardFunc(NormalKey);
 	glutSpecialFunc(SpecialKey);
 	glutCloseFunc(Close);
-
-	glutIdleFunc(TimeStep);
-	//glutTimerFunc(g_appSettings.animTimerInterval, TimeStep, 0);
+	glutIdleFunc(timestep);
 
 	//Print GPU INFO
 	GetGPUInfo();

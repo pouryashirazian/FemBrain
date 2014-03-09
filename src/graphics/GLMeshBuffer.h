@@ -13,10 +13,12 @@
 #include "GLFuncs.h"
 #include "GLTypes.h"
 #include "Geometry.h"
+#include "SceneGraph.h"
 
 using namespace std;
 using namespace PS;
 using namespace PS::MATH;
+using namespace PS::SG;
 
 namespace PS {
 namespace GL {
@@ -73,7 +75,7 @@ private:
  * Synopsis: GLMeshBuffer Simplifies drawing geometries using GPU Buffers.
  * Types of buffer objects are: Vertex, Color, TexCoord, Normal and Index
  */
-class GLMeshBuffer {
+class GLMeshBuffer : public SGNode {
 public:
 	GLMeshBuffer();
 	GLMeshBuffer(const Geometry& g);
@@ -87,7 +89,7 @@ public:
 
     //Wireframe
 	bool getWireFrameMode() const {return m_bWireFrame;}
-	void setWireFrameMode(bool bSet) { m_bWireFrame = bSet;}
+	virtual void setWireFrameMode(bool bSet) { m_bWireFrame = bSet;}
 
 	int getFaceMode() const {return m_faceMode;}
 	void setFaceMode(int fmode) {

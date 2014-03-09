@@ -137,6 +137,17 @@ public:
         return true;
     }
 
+    bool remove(const char* name) {
+    	ITER it = m_hash.find(string(name));
+    	if(it != m_hash.end()) {
+    		PolicyResourceInsertRemove<Resource>::Remove(it->second);
+    		m_hash.erase(it);
+    		return true;
+    	}
+
+    	return false;
+    }
+
     //Clear the list
     void cleanup() {
         for(ITER it = m_hash.begin(); it != m_hash.end(); it++) {

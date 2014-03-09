@@ -1150,6 +1150,7 @@ void Deformable::drawCuttingArea() {
 
 void Deformable::draw()
 {
+	m_lpSurfaceMesh->setWireFrameMode(getWireFrameMode());
 	if(m_lpSurfaceMesh)
 		m_lpSurfaceMesh->draw();
 

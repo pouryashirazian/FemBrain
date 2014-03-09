@@ -10,7 +10,7 @@ using namespace PS::GL;
 namespace PS {
 namespace SG {
 
-class SGMesh : public SGNode, public GLMeshBuffer {
+class SGMesh : public GLMeshBuffer {
 public:
 	SGMesh():GLMeshBuffer() {}
 	SGMesh(const Geometry& g):GLMeshBuffer(g) {

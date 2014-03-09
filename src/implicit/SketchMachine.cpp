@@ -27,7 +27,7 @@ SketchMachine::SketchMachine():SGNode(), m_current(0), m_delay(DEFAULT_MACHINE_D
     m_lpQuad = new SGQuad(4, 4, m_lpTexFields);
     
 	//Add Global Blend Action
-
+    TheSceneGraph::Instance().add(m_lpPolyModel);
 }
 
 SketchMachine::~SketchMachine() {
@@ -35,7 +35,7 @@ SketchMachine::~SketchMachine() {
 
     SAFE_DELETE(m_lpQuad);
     SAFE_DELETE(m_lpTexFields);
-    SAFE_DELETE(m_lpPolyModel);
+    //SAFE_DELETE(m_lpPolyModel);
     SAFE_DELETE(m_lpPolySelected);
 }
 

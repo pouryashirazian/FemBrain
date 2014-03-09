@@ -22,20 +22,22 @@ namespace FEM {
 
 class SurfaceMesh : public SGMesh {
 public:
-	enum DRAW_TYPE {dtNone = 0, dtFaces = 1, dtEdges = 2, dtVertices = 4, dtFixedVertices = 8, dtPickedVertices = 16};
 	SurfaceMesh();
 	SurfaceMesh(const char* chrObjFilePath);
+
+	SurfaceMesh(const vector<double>& inTetVertices,
+				const vector<U32>& inTetElements);
+
+
 	virtual ~SurfaceMesh();
 
 	void draw();
+	void drawFixedVertices();
+	void drawVertices();
 
 	//Extract from tetmesh
 	bool setupFromTetMesh(const vector<double>& inTetVertices,
 							const vector<U32>& inTetElements);
-
-	//Draw Mode
-	void setDrawMode(int mode);
-	int getDrawMode() const;
 
 	//Count
 	U32 getVertexCount() const;
@@ -77,6 +79,7 @@ public:
 	int trianglesAroundVertex(U32 idxVertex, vector<U32>& outTriangles);
 
 private:
+	void init();
 	bool readFromDisk(const char* chrObjFilePath);
 	bool computeAABB();
 	void setupDrawBuffers();
@@ -86,7 +89,6 @@ private:
 	GLMemoryBuffer* m_lpMemVertices;
 	GLMemoryBuffer* m_lpMemNormal;
 	GLMemoryBuffer* m_lpMemFaces;
-	int m_drawMode;
 
 
 	//Vertices

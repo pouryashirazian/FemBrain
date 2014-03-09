@@ -75,18 +75,22 @@ bool FaceOrderResolver::operator()(const FaceTopology & x,
 
 ///////////////////////////////////////////////////////////////////////////
 SurfaceMesh::SurfaceMesh() {
-	m_drawMode = dtFaces | dtEdges | dtFixedVertices | dtPickedVertices;
-	m_lpMemFaces = m_lpMemNormal = m_lpMemVertices = NULL;
+	init();
 }
 
 SurfaceMesh::SurfaceMesh(const char* chrObjFilePath) {
-	//m_drawMode = dtFaces | dtEdges | dtVertices | dtFixedVertices | dtPickedVertices;
-	m_drawMode = dtEdges | dtFixedVertices | dtPickedVertices;
-	m_lpMemFaces = m_lpMemNormal = m_lpMemVertices = NULL;
+	init();
 	assert(readFromDisk(chrObjFilePath));
 	computeAABB();
 	setupDrawBuffers();
 }
+
+SurfaceMesh::SurfaceMesh(const vector<double>& inTetVertices,
+						 const vector<U32>& inTetElements) {
+	init();
+	setupFromTetMesh(inTetVertices, inTetElements);
+}
+
 
 SurfaceMesh::~SurfaceMesh() {
 
@@ -95,6 +99,16 @@ SurfaceMesh::~SurfaceMesh() {
 	m_vRestPos.resize(0);
 	m_vNormals.resize(0);
 	m_faces.resize(0);
+}
+
+void SurfaceMesh::init() {
+	m_lpMemFaces = m_lpMemNormal = m_lpMemVertices = NULL;
+
+	//Set Rendering Shader
+    if(TheShaderManager::Instance().has("phong")) {
+        m_spEffect = SmartPtrSGEffect(new SGEffect(TheShaderManager::Instance().get("phong")));
+    }
+
 }
 
 void SurfaceMesh::cleanupDrawBuffers() {
@@ -201,76 +215,66 @@ void SurfaceMesh::draw() {
 	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
 	glStencilFunc(GL_ALWAYS, 1, ~(0u));
 
-	//Draw Faces
-	if ((m_drawMode & dtFaces) != 0) {
-		//	glCallList(m_glListFaces);
-		glPushAttrib(GL_ALL_ATTRIB_BITS);
-		glColor4f(0.8, 0.8, 0.8, 1.0);
-		m_lpMemVertices->attach();
-		m_lpMemNormal->attach();
+	//Drawing wireframe
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
 
-		m_lpMemFaces->attach();
-		m_lpMemFaces->drawElements(GL_TRIANGLES, m_faces.size());
-		m_lpMemFaces->detach();
-
-		m_lpMemNormal->detach();
-		m_lpMemVertices->detach();
-		glPopAttrib();
-	}
-
-	if ((m_drawMode & dtEdges) != 0) {
-		glPushAttrib(GL_ALL_ATTRIB_BITS);
-
+	if(m_bWireFrame)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		glLineWidth(1.0f);
-		glColor4f(0.0, 0.0, 0.0, 1.0);
-		m_lpMemVertices->attach();
-		m_lpMemNormal->attach();
+	else
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	glLineWidth(1.0f);
 
-		m_lpMemFaces->attach();
-		m_lpMemFaces->drawElements(GL_TRIANGLES, m_faces.size());
-		m_lpMemFaces->detach();
+	glColor4f(0.7, 0.7, 0.7, 1.0);
+	m_lpMemVertices->attach();
+	m_lpMemNormal->attach();
 
-		m_lpMemNormal->detach();
-		m_lpMemVertices->detach();
-		glPopAttrib();
-	}
+	m_lpMemFaces->attach();
+	m_lpMemFaces->drawElements(GL_TRIANGLES, m_faces.size());
+	m_lpMemFaces->detach();
 
-	//Draw Vertices
-	if ((m_drawMode & dtVertices) != 0) {
-		glPushAttrib(GL_ALL_ATTRIB_BITS);
-		glPointSize(5.0f);
-		glColor4f(0.0, 1.0, 0.0, 1.0);
-		m_lpMemVertices->attach();
+	m_lpMemNormal->detach();
+	m_lpMemVertices->detach();
+	glPopAttrib();
 
-		glDrawArrays(GL_POINTS, 0, m_vCurPos.size() / 3);
-
-		m_lpMemVertices->detach();
-		glPopAttrib();
-	}
-
-	//Draw Fixed Vertices
-	if ((m_drawMode & dtFixedVertices) != 0) {
-		glPushAttrib(GL_ALL_ATTRIB_BITS);
-		glPointSize(8.0f);
-		glColor3f(1.0f, 0.0f, 0.0f);
-
-		glBegin(GL_POINTS);
-		for (U32 i = 0; i < m_vFixedVertices.size(); i++)
-			glVertex3dv(&m_vCurPos[m_vFixedVertices[i] * 3]);
-		glEnd();
-		glPopAttrib();
+	//In Wireframe mode vertices can not be seen!
+	if(!m_bWireFrame) {
+		drawVertices();
+		drawFixedVertices();
 	}
 
 	glStencilFunc(GL_ALWAYS, 0, ~(0u));
 }
 
-void SurfaceMesh::setDrawMode(int mode) {
-	m_drawMode = mode;
+void SurfaceMesh::drawFixedVertices() {
+	//Draw Fixed Vertices
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+	glDisable(GL_LIGHTING);
+
+	glPointSize(8.0f);
+	glColor3f(1.0f, 0.0f, 0.0f);
+
+	glBegin(GL_POINTS);
+	for (U32 i = 0; i < m_vFixedVertices.size(); i++)
+		glVertex3dv(&m_vCurPos[m_vFixedVertices[i] * 3]);
+	glEnd();
+
+	glEnable(GL_LIGHTING);
+	glPopAttrib();
 }
 
-int SurfaceMesh::getDrawMode() const {
-	return m_drawMode;
+void SurfaceMesh::drawVertices() {
+	//Draw Vertices
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+	glDisable(GL_LIGHTING);
+
+	glPointSize(3.0f);
+	glColor3f(0.0, 1.0, 0.0);
+	m_lpMemVertices->attach();
+	glDrawArrays(GL_POINTS, 0, m_vCurPos.size() / 3);
+	m_lpMemVertices->detach();
+
+	glEnable(GL_LIGHTING);
+	glPopAttrib();
 }
 
 //Count

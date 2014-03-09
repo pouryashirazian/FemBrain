@@ -175,7 +175,7 @@ bool GLMemoryBuffer::modify(U32 offset, U32 szTotal, const void* lpData) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
-GLMeshBuffer::GLMeshBuffer()
+GLMeshBuffer::GLMeshBuffer():SGNode()
 {
 	init();
 }
