@@ -13,10 +13,12 @@ namespace PS {
 namespace SG {
 
 void SGMesh::draw() {
+	/*
 	if(m_spTransform) {
 		glPushMatrix();
 		glMultMatrixf(m_spTransform->forward().cptr());
 	}
+	*/
 
 
     if(m_spEffect)
@@ -27,8 +29,10 @@ void SGMesh::draw() {
     if(m_spEffect)
         m_spEffect->unbind();
 
+    /*
     if(m_spTransform)
     	glPopMatrix();
+    	*/
 }
 
 }

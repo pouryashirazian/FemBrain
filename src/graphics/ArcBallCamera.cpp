@@ -120,7 +120,7 @@ void ArcBallCamera::goHome()
 void ArcBallCamera::mousePress(int button, int state, int x, int y)
 {
     PS_UNUSED(state);
-    m_mouseButton = (MOUSEBUTTONSTATE)button;
+    m_mouseButton = (MouseButton)button;
     m_lastPos = vec2i(x, y);
 }
 
@@ -131,16 +131,14 @@ void ArcBallCamera::mouseMove(int x, int y)
     m_lastPos = vec2i(x, y);
 
     //Spherical movement on the left button
-    if(m_mouseButton == mbLeft)
+    if(m_mouseButton == mbMiddle)
     {
         setRoll(this->getRoll() + dx);
         setTilt(this->getTilt() + dy);
-    }
-    else if(m_mouseButton == mbMiddle)
-    //Pan on Middle
-    {
-        m_pan.x += 0.01f * dx;
-        m_pan.y += 0.01f * dy;
+//        if() {
+//        	m_pan.x += 0.01f * dx;
+//        	m_pan.y += 0.01f * dy;
+//        }
     }
 }
 

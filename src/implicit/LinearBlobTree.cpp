@@ -480,7 +480,7 @@ namespace SKETCH {
 				{
 					ofs << endl;
 					currentDepth = n.depth;
-					for(int i=0; i<(maxDepth - currentDepth); i++)
+					for(U32 i=0; i<(maxDepth - currentDepth); i++)
 						ofs << "\t\t\t";
 				}
 

@@ -281,6 +281,7 @@ namespace PS
 #else
 		ctConverted = wcstombs(pDst, src, srcSize);
 #endif
+		PS_UNUSED(ctConverted);
 		m_length += srcSize;
 		m_sequence[m_length] = nullChar();
 	}
@@ -430,15 +431,7 @@ namespace PS
 	{		
 		CAString strWrite;
 		strWrite.copyFromW(src.ptr(), src.length());
-		outs << strWrite;
-		/*
-        for (int i = 0; i < strWrite.length(); i++)
-		{
-			outs << (strWrite[i]);
-		}		
-		outs << strWrite.nullChar();
-		return outs;
-		*/
+		outs << strWrite.cptr();
 		return outs;
 	}
 

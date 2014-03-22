@@ -401,8 +401,6 @@ namespace SKETCH {
 		m_lpKernelComputeConfig->setArg(7, sizeof(cl_mem), &inoutMemVertexCount);
 
 	
-		size_t local = m_lpGPU->getKernelWorkgroupSize(m_lpKernelComputeConfig);
-
 		// Execute the kernel over the vector using the
 		// maximum number of work group items for this device
 		size_t szNeeded[3];

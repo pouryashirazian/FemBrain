@@ -64,11 +64,14 @@ void SGTransform::reset() {
 }
 
 void SGTransform::bind() {
+
+	glMatrixMode(GL_MODELVIEW_MATRIX);
 	glPushMatrix();
 	glMultMatrixf(m_mtxForward.cptr());
 }
 
 void SGTransform::unbind() {
+	glMatrixMode(GL_MODELVIEW_MATRIX);
 	glPopMatrix();
 }
 

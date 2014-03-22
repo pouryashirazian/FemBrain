@@ -54,6 +54,14 @@ public:
     bool isVisible() const {return m_visible;}
     void setVisible(bool visible) {m_visible = visible;}
 
+    //Animation
+    bool isAnimate() const {return m_animate;}
+    void setAnimate(bool animate) {m_animate = animate;}
+
+    //Selection
+    bool isSelected() const {return m_selected;}
+    void setSelected(bool selected) {m_selected = selected;}
+
     //Effect to be managed by asset and shadermanager collections
     SmartPtrSGEffect effect() const {return m_spEffect;}
     void setEffect(const SmartPtrSGEffect& spEffect) { m_spEffect = spEffect;}
@@ -77,6 +85,8 @@ protected:
 	//Attribs
     string m_name;
     bool m_visible;
+    bool m_animate;
+    bool m_selected;
 
     //bool m_bAnimated;
     std::shared_ptr<SGEffect> m_spEffect;

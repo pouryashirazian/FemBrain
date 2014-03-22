@@ -90,7 +90,7 @@ namespace PS{
 			strLine = m_content[i];
 			if(strLine.length() > 0)
 			{
-				ofs << strLine << '\0' << '\n';
+				ofs << strLine.cptr() << '\n';
 			}
 		}
 		ofs.close();

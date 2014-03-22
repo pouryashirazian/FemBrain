@@ -22,9 +22,11 @@ SceneGraph::SceneGraph() {
 	m_stkProjection.top().identity();
 	m_headers = new SGHeaders();
 	m_vSceneNodes.push_back(m_headers);
+	m_tick = tbb::tick_count::now();
+	m_ctFrames = m_ctSampledFrames = 0;
 
 	//Headers to show
-	m_idGPUHeader = m_headers->addHeaderLine("gpu", "");
+	m_idGPUHeader = m_headers->addHeaderLine("gpu", gpuInfo());
 	m_idCamHeader = m_headers->addHeaderLine("camera", "");
 	m_idAnimationHeader = m_headers->addHeaderLine("animation", "");
 
@@ -37,7 +39,7 @@ SceneGraph::~SceneGraph() {
 }
 
 void SceneGraph::cleanup() {
-	for (int i = 0; i < m_vSceneNodes.size(); i++)
+	for (U32 i = 0; i < m_vSceneNodes.size(); i++)
 		SAFE_DELETE(m_vSceneNodes[i]);
 	m_vSceneNodes.resize(0);
 }
@@ -77,6 +79,27 @@ SGNode* SceneGraph::last() const {
 }
 
 void SceneGraph::draw() {
+	//Stats
+	m_ctFrames++;
+	tbb::tick_count tkStart = tbb::tick_count::now();
+	m_avgFrameTime.addValue((tkStart - m_tick).seconds() * 1000.0);
+	m_tick = tkStart;
+
+	double avgFT = m_avgFrameTime.getAverage();
+	m_fps = 1000.0 / ((avgFT > 1.0) ? avgFT : 1.0);
+
+
+	//Frame Count, Frame Time and FPS, Log Count
+	char chrMsg[1024];
+	sprintf(chrMsg, "ANIMATION FRAME# %08llu, LOGS# %08llu, AVG TIME# %.2f, FPS# %d",
+			m_ctFrames,
+			m_ctSampledFrames,
+			avgFT,
+			(int)m_fps);
+	TheSceneGraph::Instance().headers()->updateHeaderLine("animation", AnsiStr(chrMsg));
+
+
+	//Draw
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
@@ -89,6 +112,7 @@ void SceneGraph::draw() {
 		if (m_vSceneNodes[i]->isVisible())
 			m_vSceneNodes[i]->draw();
 	}
+
 
 	//Cull SwapBuffers of the API such as
 	//glutSwapBuffers
@@ -107,7 +131,8 @@ void SceneGraph::drawBBoxes() {
 
 void SceneGraph::timestep() {
 	for (U32 i = 0; i < m_vSceneNodes.size(); i++) {
-		m_vSceneNodes[i]->timestep();
+		if(m_vSceneNodes[i]->isAnimate())
+			m_vSceneNodes[i]->timestep();
 	}
 }
 
@@ -203,6 +228,21 @@ vec4i SceneGraph::viewport() const {
 	GLint vp[4];
 	glGetIntegerv( GL_VIEWPORT, vp);
 	return vec4i(&vp[0]);
+}
+
+AnsiStr SceneGraph::gpuInfo() {
+	AnsiStr strVendorName = AnsiStr((const char*)glGetString(GL_VENDOR));
+	AnsiStr strRenderer   = AnsiStr((const char*)glGetString(GL_RENDERER));
+	AnsiStr strVersion	 = AnsiStr((const char*)glGetString(GL_VERSION));
+	AnsiStr strExtensions = AnsiStr((const char*)glGetString(GL_EXTENSIONS));
+
+	int pos;
+	if(strVendorName.lfindstr("Intel", pos)) {
+			cout << "WARNING: Integrated GPU is being used!" << endl;
+			LogWarning("Non-Discrete GPU selected for rendering!");
+	}
+
+	return  AnsiStr("GPU: ") + strVendorName + ", " + strRenderer + ", " + strVersion;
 }
 
 }

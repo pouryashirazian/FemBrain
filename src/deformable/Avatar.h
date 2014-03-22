@@ -2,6 +2,7 @@
 #define AVATAR_H
 
 #include "graphics/SGMesh.h"
+#include "Deformable.h"
 
 using namespace PS;
 using namespace PS::SG;
@@ -12,17 +13,18 @@ using namespace PS::SG;
 class AvatarCube : public SGMesh {
 public:
 	AvatarCube();
-	AvatarCube(const vec3d& lo, const vec3d& hi);
+	AvatarCube(Deformable* tissue);
 	virtual ~AvatarCube();
 
-	vec3d lower() const {return m_lo;}
-	vec3d upper() const {return m_hi;}
+	vec3f lower() const;
+	vec3f upper() const;
 private:
-	void setup(const vec3d& lo, const vec3d& hi);
+	void setup();
 
-private:
-	vec3d m_lo;
-	vec3d m_hi;
+protected:
+	Deformable* m_lpTissue;
+	vec3f m_lower;
+	vec3f m_upper;
 };
 
 /*!

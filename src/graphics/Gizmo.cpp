@@ -7,6 +7,7 @@
 #include "Gizmo.h"
 #include "selectgl.h"
 #include "ShaderManager.h"
+#include "base/Logger.h"
 
 #define DEFAULT_AXIS_LENGTH 2.0f
 #define DEFAULT_AXIS_THICKNESS 0.05f
@@ -47,9 +48,13 @@ namespace PS {
         
         //////////////////////////////////////////////////////////
         int GizmoInterface::setAxis(const PS::MATH::Ray &r) {
-            int res = this->intersect(r);
-            if(res >= 0)
+            //1 = x, 2 = y, 3 = z
+        	int res = this->intersect(r);
+            if(res > 0)
                 this->setAxis((GizmoAxis)(res-1));
+
+            //Set selected
+            this->setSelected(res > 0);
             return res;
         }
         
@@ -112,9 +117,9 @@ namespace PS {
         }
         
         void GizmoTranslate::draw() {
-            glClear(GL_DEPTH_BUFFER_BIT);
+            //glClear(GL_DEPTH_BUFFER_BIT);
 
-            m_spTransform->bind();
+            //m_spTransform->bind();
             GizmoEffect* peff = dynamic_cast<GizmoEffect*>(m_spEffect.get());
             peff->bind();
             
@@ -131,7 +136,7 @@ namespace PS {
             m_z.drawNoEffect();
             
             m_spEffect->unbind();
-            m_spTransform->unbind();
+           // m_spTransform->unbind();
         }
         
         
@@ -309,7 +314,9 @@ namespace PS {
         }
         ////////////////////////////////////////////////////////////
         GizmoManager::GizmoManager():SGNode() {
-            
+            m_buttonState = ArcBallCamera::bsUp;
+            m_pressedPos = vec2i(0, 0);
+
             //Create All needed Gizmo Widgets
             m_lpGizmoTranslate = new GizmoTranslate();
             m_lpGizmoScale = new GizmoScale();
@@ -332,7 +339,12 @@ namespace PS {
         
         void GizmoManager::draw() {
             if(m_lpGizmoCurrent && isVisible()) {
+            	glPushMatrix();
+            	glTranslatef(m_pos.x, m_pos.y, m_pos.z);
+
                 m_lpGizmoCurrent->draw();
+
+                glPopMatrix();
             }
         }
         
@@ -345,8 +357,13 @@ namespace PS {
         
         void GizmoManager::setAxis(const Ray& r) {
             if(m_lpGizmoCurrent) {
-                m_lpGizmoCurrent->setAxis(r);
-                m_gizmoAxis = m_lpGizmoCurrent->axis();
+                if(m_lpGizmoCurrent->setAxis(r)) {
+                	m_gizmoAxis = m_lpGizmoCurrent->axis();
+                	LogInfoArg1("Set selected axis to: %d", m_gizmoAxis);
+                }
+
+                //Selection
+                this->setSelected(m_lpGizmoCurrent->isSelected());
             }
         }
         
@@ -384,6 +401,74 @@ namespace PS {
             glutPostRedisplay();
         }
         
+        void GizmoManager::mousePress(int button, int state, int x, int y) {
+            ArcBallCamera::MouseButton b = (ArcBallCamera::MouseButton)button;
+            m_buttonState = (ArcBallCamera::ButtonState)state;
+            if(b == ArcBallCamera::mbLeft && m_buttonState == ArcBallCamera::bsDown) {
+                Ray r = TheSceneGraph::Instance().screenToWorldRay(x, y);
+                r.setStart(r.getStart() - m_pos);
+                setAxis(r);
+            }
+
+            m_pressedPos = vec2i(x, y);
+        }
+
+        void GizmoManager::mouseMove(int x, int y) {
+        	printf("Button %d\n", m_buttonState);
+        	if(m_buttonState != ArcBallCamera::bsDown)
+        		return;
+
+
+        	float dx = m_pressedPos.x - x;
+        	float dy = m_pressedPos.y - y;
+
+        	dx *= 0.005f;
+        	dy *= 0.005f;
+        	m_pressedPos = vec2i(x, y);
+
+        	string strAxis;
+        	vec3f delta(0.0f);
+
+        	switch (m_gizmoAxis) {
+        	case axisX:
+        		delta.x = dx;
+        		strAxis = "X";
+        		break;
+        	case axisY:
+        		delta.y = dy;
+        		strAxis = "Y";
+        		break;
+        	case axisZ:
+        		delta.z = dx;
+        		strAxis = "Z";
+        		break;
+
+        	case axisFree:
+        		delta = delta + vec3f(dx, dy, 0.0);
+        		strAxis = "FREE";
+        		break;
+
+        	case axisCount: {
+
+        	}
+        	break;
+        	}
+
+
+        	//apply
+        	m_pos = m_pos + delta;
+        	//transform()->translate(delta);
+
+//        	char buffer[1024];
+//        	sprintf(buffer,
+//        			"HAPTIC DELTA=(%.4f, %.4f), AVATAR=(%.4f, %0.4f, %.4f), AXIS=%s PRESS F4 To Change.",
+//        			dx, dy, wpos.x, wpos.y, wpos.z, strAxis.c_str());
+        	//g_infoLines[INDEX_HAPTIC_INFO] = string(buffer);
+
+
+        }
+
+
     }
 }
 

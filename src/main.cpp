@@ -96,103 +96,19 @@ void AdvanceHapticPosition() {
 
 void draw()
 {
-	tbb::tick_count tkStart = tbb::tick_count::now();
-	g_appSettings.msFrameTime = (tkStart - g_appSettings.tick).seconds() * 1000.0;
-	g_appSettings.fps = 1000.0 / ((g_appSettings.msFrameTime > 1.0) ? g_appSettings.msFrameTime: 1.0);
-	g_appSettings.tick = tkStart;
-
-
 	//Draws Everything in the scenegraph
 	TheSceneGraph::Instance().draw();
 
 	//Draw Sketch Machine Stuff
-	if(g_appSettings.bDrawAABB)
+	if(g_appSettings.drawAABB)
 		TheSketchMachine::Instance().drawBBox();
 
 	//Draw the Gizmo Manager
 	TheGizmoManager::Instance().draw();
 
-	//		if(g_lpDrawNormals && (g_appSettings.bDrawNormals))
-	//	g_lpDrawNormals->draw();
-	//g_lpFastRBF->drawCollision();
-	//Draw Cutting
-	//g_lpDeformable->drawCuttingArea();
-	//if(g_lpCutting)
-		//g_lpCutting->draw();
-
-
-	if(g_lpAvatarCube && g_appSettings.bDrawAvatar)
-	{
-		vec3f wpos = TheGizmoManager::Instance().transform()->getTranslate();
-		glPushMatrix();
-			glTranslatef(wpos.x, wpos.y, wpos.z);
-
-			//Draw Avatar Filled
-			glEnable(GL_LIGHTING);
-			//g_lpAvatarCube->setShaderEffectProgram(g_uiPhongShader);
-			g_lpAvatarCube->setWireFrameMode(false);
-			g_lpAvatarCube->draw();
-			glDisable(GL_LIGHTING);
-
-			//Draw Edges
-			//g_lpAvatarCube->setShaderEffectProgram(g_uiHardEdgesShader);
-			g_lpAvatarCube->setWireFrameMode(true);
-			g_lpAvatarCube->draw();
-
-			if (g_appSettings.bDrawAffineWidgets)
-			{
-				glDisable(GL_DEPTH_TEST);
-				//g_lpAffineWidget->draw();
-				glEnable(GL_DEPTH_TEST);
-			}
-		glPopMatrix();
-	}
-
-
-	//4.Draw Haptic Line
-	//if(g_lpDeformable->isHapticInProgress() && g_appSettings.bDrawAffineWidgets)
-	{
-		GLint vp[4];
-		glGetIntegerv(GL_VIEWPORT, vp);
-		vec2i s1 = g_appSettings.screenDragStart;
-		vec2i s2 = g_appSettings.screenDragEnd;
-
-		glMatrixMode(GL_PROJECTION);
-		glPushMatrix();
-		glLoadIdentity();
-		glOrtho(0.0, vp[2], vp[3], 0.0, -1.0, 1.0);
-
-		glMatrixMode(GL_MODELVIEW);
-		glPushMatrix();
-		glLoadIdentity();
-
-		glColor3f(1,0,0);
-		glPushAttrib(GL_ALL_ATTRIB_BITS);
-		glLineWidth(1.0);
-
-		glBegin(GL_LINES);
-			glVertex2f(s1.x, s1.y);
-			glVertex2f(s2.x, s2.y);
-		glEnd();
-		glPopAttrib();
-
-		glMatrixMode(GL_MODELVIEW);
-		glPopMatrix();
-		glMatrixMode(GL_PROJECTION);
-		glPopMatrix();
-	}
 
 	//Write Info
 	{
-		char chrMsg[1024];
-		//Frame Count, Frame Time and FPS, Log Count
-		sprintf(chrMsg, "ANIMATION FRAME# %08llu, TIME# %.2f, FPS# %d, LOGS# %08llu",
-				g_appSettings.ctFrames,
-				g_appSettings.msFrameTime,
-				(int)g_appSettings.fps,
-				g_appSettings.ctLogsCollected);
-		TheSceneGraph::Instance().headers()->updateHeaderLine("animation", AnsiStr(chrMsg));
-
 
 		/*
 		if(poly && g_lpDeformable) {
@@ -211,15 +127,10 @@ void draw()
 	glutSwapBuffers();
 }
 
-
-
-
-
-
-
 void MousePress(int button, int state, int x, int y)
 {
-	TheSketchMachine::Instance().mousePress(button, state, x, y);
+    TheGizmoManager::Instance().mousePress(button, state, x, y);
+    TheSceneGraph::Instance().mousePress(button, state, x, y);
 
 	//Set Values
 	g_appSettings.screenDragStart = vec2i(x, y);
@@ -239,7 +150,7 @@ void MousePress(int button, int state, int x, int y)
 				//LogInfoArg1("Selected Vertex Index = %d ", idxVertex);
 
 				//Edit Fixed Vertices
-				if (g_appSettings.bEditConstrainedNodes) {
+				if (g_appSettings.editConstrainedNodes) {
 					//g_appSettings.vFixedVertices.push_back(idxVertex);
 					LogInfoArg1(
 							"Added last selection to fixed vertices. count = %d",
@@ -476,10 +387,12 @@ void MousePassiveMove(int x, int y)
 
 void MouseMove(int x, int y)
 {
+	TheGizmoManager::Instance().mouseMove(x, y);
+	TheSceneGraph::Instance().mouseMove(x, y);
 
-
-	if(g_appSettings.hapticMode == hmDynamic)
-		TheSketchMachine::Instance().mouseMove(x, y);
+	if(g_appSettings.hapticMode == hmDynamic) {
+		//TheSketchMachine::Instance().mouseMove(x, y);
+	}
 	else{
 		double d[3];
 		d[0] = x - g_appSettings.screenDragStart.x;
@@ -520,7 +433,7 @@ void MouseMove(int x, int y)
 
 void MouseWheel(int button, int dir, int x, int y)
 {
-	TheSketchMachine::Instance().mouseWheel(button, dir, x, y);
+	TheSceneGraph::Instance().mouseWheel(button, dir, x, y);
 	glutPostRedisplay();
 }
 
@@ -563,30 +476,6 @@ string QueryOGL(GLenum name)
 	}
 }
 
-string GetGPUInfo()
-{
-	string strVendorName = QueryOGL(GL_VENDOR);
-	string strRenderer   = QueryOGL(GL_RENDERER);
-	string strVersion	 = QueryOGL(GL_VERSION);
-	string strExtensions = QueryOGL(GL_EXTENSIONS);
-//	cout << "GPU VENDOR: " << strVendorName << endl;
-//	cout << "GPU RENDERER: " << strRenderer << endl;
-//	cout << "GPU VERSION: " << strVersion << endl;
-
-	LogInfoArg1("GPU VENDOR: %s", strVendorName.c_str());
-	LogInfoArg1("GPU RENDERER: %s", strRenderer.c_str());
-	LogInfoArg1("GPU VERSION: %s", strVersion.c_str());
-	LogInfoArg1("GLSL Version: %s", QueryOGL(GL_SHADING_LANGUAGE_VERSION).c_str());
-
-
-	if(strcmp(strVendorName.c_str(), "Intel") == 0)
-	{
-		cout << "WARNING: Integrated GPU is being used!" << endl;
-		LogWarning("Non-Discrete GPU selected for rendering!");
-	}
-	//cout << "GPU EXTENSIONS: " << strExtensions << endl;
-	return  string("GPU: ") + strVendorName + ", " + strRenderer + ", " + strVersion;
-}
 
 
 
@@ -610,14 +499,14 @@ void NormalKey(unsigned char key, int x, int y)
 	}
 
 	case('a'): {
-		g_appSettings.bDrawAvatar = !g_appSettings.bDrawAvatar;
-		LogInfoArg1("Draw avatar: %d", g_appSettings.bDrawAvatar);
+		g_appSettings.drawAvatar = !g_appSettings.drawAvatar;
+		LogInfoArg1("Draw avatar: %d", g_appSettings.drawAvatar);
 	}
 	break;
 
 	case('f'): {
 		LogInfo("Begin selecting fixed nodes now!");
-		g_appSettings.bEditConstrainedNodes = true;
+		g_appSettings.editConstrainedNodes = true;
 		g_appSettings.vFixedVertices.resize(0);
 	}
 	break;
@@ -653,16 +542,16 @@ void NormalKey(unsigned char key, int x, int y)
 	}
 	break;
 	case('d'): {
-		g_appSettings.bDrawGround = !g_appSettings.bDrawGround;
-		LogInfoArg1("Draw ground checkerboard set to: %d", g_appSettings.bDrawGround);
+		g_appSettings.drawGround = !g_appSettings.drawGround;
+		LogInfoArg1("Draw ground checkerboard set to: %d", g_appSettings.drawGround);
 		SGNode* floor = TheSceneGraph::Instance().get("floor");
 		if(floor)
-			floor->setVisible(g_appSettings.bDrawGround);
+			floor->setVisible(g_appSettings.drawGround);
 	}
 	break;
 	case('n'): {
-		g_appSettings.bDrawNormals = !g_appSettings.bDrawNormals;
-		LogInfoArg1("Draw Model Normals set to: %d", g_appSettings.bDrawNormals);
+		g_appSettings.drawNormals = !g_appSettings.drawNormals;
+		LogInfoArg1("Draw Model Normals set to: %d", g_appSettings.drawNormals);
 	}
 	break;
 
@@ -722,8 +611,8 @@ void SpecialKey(int key, int x, int y)
 
 		case(GLUT_KEY_F3):
 		{
-			g_appSettings.bDrawAABB = !g_appSettings.bDrawAABB;
-			LogInfoArg1("Draw the AABB: %d", g_appSettings.bDrawAABB);
+			g_appSettings.drawAABB = !g_appSettings.drawAABB;
+			LogInfoArg1("Draw the AABB: %d", g_appSettings.drawAABB);
 			break;
 		}
 
@@ -783,9 +672,9 @@ void SpecialKey(int key, int x, int y)
 
 		case(GLUT_KEY_F9):
 		{
-			g_appSettings.bDrawAffineWidgets = !g_appSettings.bDrawAffineWidgets;
-			TheGizmoManager::Instance().setVisible(g_appSettings.bDrawAffineWidgets);
-			LogInfoArg1("Draw affine widgets: %d", g_appSettings.bDrawAffineWidgets);
+			g_appSettings.drawAffineWidgets = !g_appSettings.drawAffineWidgets;
+			TheGizmoManager::Instance().setVisible(g_appSettings.drawAffineWidgets);
+			LogInfoArg1("Draw affine widgets: %d", g_appSettings.drawAffineWidgets);
 			break;
 		}
 	}
@@ -798,6 +687,8 @@ void timestep()
 {
 	//Advance timestep in scenegraph
 	TheSceneGraph::Instance().timestep();
+
+	/*
 	g_appSettings.ctFrames++;
 
 	//Sample For Logs and Info
@@ -807,9 +698,8 @@ void timestep()
 		g_appSettings.ctAnimLogger = g_appSettings.ctFrames;
 
 		//Log Database
-		if(g_appSettings.bLogSql)
+		if(g_appSettings.logSql)
 		{
-			/*
 			if(g_lpDeformable->isVolumeChanged())
 			{
 				DBLogger::Record rec;
@@ -830,10 +720,9 @@ void timestep()
 
 				g_appSettings.ctLogsCollected ++;
 			}
-			*/
 		}
-
 	}
+	*/
 
 	//Animation Frame Prepared now display
 	glutPostRedisplay();
@@ -868,17 +757,15 @@ bool LoadSettings(const AnsiStr& strSimFP)
 	//System settings
 	g_appSettings.groundLevel = cfg.readInt("SYSTEM", "GROUNDLEVEL", 0.0f);
 	g_appSettings.hapticForceCoeff = cfg.readInt("SYSTEM", "FORCECOEFF", DEFAULT_FORCE_COEFF);
-	g_appSettings.bLogSql = cfg.readBool("SYSTEM", "LOGSQL", g_appSettings.bLogSql);
+	g_appSettings.logSql = cfg.readBool("SYSTEM", "LOGSQL", g_appSettings.logSql);
 	g_appSettings.cellsize = cfg.readFloat("SYSTEM", "CELLSIZE", DEFAULT_CELL_SIZE);
 	g_appSettings.hapticNeighborhoodPropagationRadius = cfg.readInt("AVATAR", "RADIUS");
-	g_appSettings.bGravity = cfg.readBool("SYSTEM", "GRAVITY", true);
+	g_appSettings.gravity = cfg.readBool("SYSTEM", "GRAVITY", true);
 
 	//Avatar
 	TheGizmoManager::Instance().transform()->translate(cfg.readVec3f("AVATAR", "POS"));
 	TheGizmoManager::Instance().setAxis((GizmoAxis)cfg.readInt("AVATAR", "AXIS"));
 	vec3f thickness = cfg.readVec3f("AVATAR", "THICKNESS");
-	vec3d thicknessd = vec3d(thickness.x, thickness.y, thickness.z);
-	g_lpAvatarCube = new AvatarCube(thicknessd * (-0.5), thicknessd * 0.5);
 
 	//Loading Camera
 	if(cfg.hasSection("CAMERA") >= 0)
@@ -893,10 +780,10 @@ bool LoadSettings(const AnsiStr& strSimFP)
 	}
 
 	//DISPLAY SETTINGS
-	g_appSettings.bDrawAABB = cfg.readBool("DISPLAY", "AABB", true);
-	g_appSettings.bDrawAffineWidgets = cfg.readBool("DISPLAY", "AFFINEWIDGETS", true);
-	g_appSettings.bDrawGround = cfg.readBool("DISPLAY", "GROUND", true);
-	g_appSettings.bDrawNormals = cfg.readBool("DISPLAY", "NORMALS", true);
+	g_appSettings.drawAABB = cfg.readBool("DISPLAY", "AABB", true);
+	g_appSettings.drawAffineWidgets = cfg.readBool("DISPLAY", "AFFINEWIDGETS", true);
+	g_appSettings.drawGround = cfg.readBool("DISPLAY", "GROUND", true);
+	g_appSettings.drawNormals = cfg.readBool("DISPLAY", "NORMALS", true);
 	g_appSettings.drawTetMesh = cfg.readBool("DISPLAY", "TETMESH", true);
 	g_appSettings.drawIsoSurface = cfg.readInt("DISPLAY", "ISOSURF", disFull);
 
@@ -924,24 +811,24 @@ bool SaveSettings(const AnsiStr& strSimFP)
 
 	//Write Cellsize
 	cfg.writeFloat("SYSTEM", "CELLSIZE", g_appSettings.cellsize);
-	cfg.writeBool("SYSTEM", "GRAVITY", g_appSettings.bDrawGround);
+	cfg.writeBool("SYSTEM", "GRAVITY", g_appSettings.drawGround);
 
 	//Avatar
-	vec3d sides = g_lpAvatarCube->upper() - g_lpAvatarCube->lower();
+	vec3f thickness = g_lpAvatarCube->transform()->getScale();
 	cfg.writeVec3f("AVATAR", "POS", TheGizmoManager::Instance().transform()->getTranslate());
-	cfg.writeVec3f("AVATAR", "THICKNESS", vec3f(sides.x, sides.y, sides.z));
+	cfg.writeVec3f("AVATAR", "THICKNESS", thickness);
 	cfg.writeInt("AVATAR", "AXIS", TheGizmoManager::Instance().axis());
 
 	//DISPLAY SETTINGS
-	cfg.writeBool("DISPLAY", "AABB", g_appSettings.bDrawAABB);
-	cfg.writeBool("DISPLAY", "AFFINEWIDGETS", g_appSettings.bDrawAffineWidgets);
-	cfg.writeBool("DISPLAY", "GROUND", g_appSettings.bDrawGround);
-	cfg.writeBool("DISPLAY", "NORMALS", g_appSettings.bDrawNormals);
+	cfg.writeBool("DISPLAY", "AABB", g_appSettings.drawAABB);
+	cfg.writeBool("DISPLAY", "AFFINEWIDGETS", g_appSettings.drawAffineWidgets);
+	cfg.writeBool("DISPLAY", "GROUND", g_appSettings.drawGround);
+	cfg.writeBool("DISPLAY", "NORMALS", g_appSettings.drawNormals);
 	cfg.writeBool("DISPLAY", "TETMESH", g_appSettings.drawTetMesh);
 	cfg.writeInt("DISPLAY", "ISOSURF", g_appSettings.drawIsoSurface);
 
 	//MODEL PROPS
-	if(g_appSettings.bEditConstrainedNodes) {
+	if(g_appSettings.editConstrainedNodes) {
 		cfg.writeInt("MODEL", "FIXEDVERTICESCOUNT", g_appSettings.vFixedVertices.size());
 		cfg.writeIntArrayU32("MODEL", "FIXEDVERTICES", g_appSettings.vFixedVertices);
 	}
@@ -1009,9 +896,6 @@ int main(int argc, char* argv[])
 	glutCloseFunc(Close);
 	glutIdleFunc(timestep);
 
-	//Print GPU INFO
-	GetGPUInfo();
-
 	//Setup Shading Environment
 	static const GLfloat lightColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 	static const GLfloat lightPos[4] = { 0.0f, 9.0f, 0.0f, 1.0f };
@@ -1059,10 +943,6 @@ int main(int argc, char* argv[])
 	//Load Settings
 	if(!LoadSettings(g_appSettings.strSimFilePath))
 		exit(0);
-
-
-	//Init
-	g_appSettings.tick = tbb::tick_count::now();
 
 	//Ground and Room
 	//TheSceneGraph::Instance().addFloor(32, 32, 0.2f);
@@ -1141,24 +1021,32 @@ int main(int argc, char* argv[])
 		TetGenExporter::tesselate(vertices, elements, tetVertices, tetElements);
 		g_appSettings.msPolyTetrahedraMesh = (tbb::tick_count::now() - tsStart).seconds() * 1000.0;
 
-		//Setup Deformable model
+		//Deformable
 		g_lpDeformable = new Deformable();
 		g_lpDeformable->setupTetMesh(tetVertices, tetElements, g_appSettings.vFixedVertices);
 
 
 		//Deformations will be applied using opencl kernel
-		LogInfoArg1("GRAVITY is: %d", g_appSettings.bGravity);
-		g_lpDeformable->setGravity(g_appSettings.bGravity);
+		LogInfoArg1("GRAVITY is: %d", g_appSettings.gravity);
+		g_lpDeformable->setGravity(g_appSettings.gravity);
 		g_lpDeformable->setDeformCallback(ApplyDeformations);
 		g_lpDeformable->setHapticForceRadius(g_appSettings.hapticNeighborhoodPropagationRadius);
 		g_lpDeformable->setName("tissue");
-		g_lpDeformable->setVisible(false);
+		g_lpDeformable->setAnimate(false);
+		//g_lpDeformable->setVisible(false);
 
-		//Setup Cutting system
+		//Avatar
+		g_lpAvatarCube = new AvatarCube();
+		g_lpAvatarCube->setName("avatar");
+		g_lpAvatarCube->transform()->scale(g_appSettings.avatarDim);
+
+
+		//Cutting
 		//g_lpCutting = new Cutting(g_lpDeformable);
 
 		//Add to scene graph
 		TheSceneGraph::Instance().add(g_lpDeformable);
+		TheSceneGraph::Instance().add(g_lpAvatarCube);
 		//TheSceneGraph::Instance().add(g_lpCutting);
 	}
 

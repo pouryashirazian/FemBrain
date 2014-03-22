@@ -24,12 +24,11 @@ public:
 		direction = vec3f(1,0,0);
 	}
 
-	Ray(const vec3f& s, const vec3f& dir)
-	{
-		set(s, dir);
+	Ray(const Ray& r) {
+		copyFrom(r);
 	}
 
-	Ray(const vec3d& s, const vec3d& dir)
+	Ray(const vec3f& s, const vec3f& dir)
 	{
 		set(s, dir);
 	}
@@ -40,9 +39,18 @@ public:
 		return res;
 	}
 
-	void set(const vec3d& s, const vec3d& dir)
-	{
-		this->set(vec3f(s.x, s.y, s.z), vec3f(dir.x, dir.y, dir.z));
+	//Start
+	vec3f getStart() const {return this->start;}
+	void setStart(const vec3f& s) { this->start = s;}
+
+	//Direction
+	vec3f getDirection() const {return this->direction;}
+	void setDirection(const vec3f& dir) {
+		direction = dir;
+		inv_direction = vec3f(1/dir.x, 1/dir.y, 1/dir.z);
+		sign[0] = (inv_direction.x < 0.0f);
+		sign[1] = (inv_direction.y < 0.0f);
+		sign[2] = (inv_direction.z < 0.0f);
 	}
 
 	void set(const vec3f& s, const vec3f& dir)
@@ -55,14 +63,18 @@ public:
 		sign[2] = (inv_direction.z < 0.0f);
 	}
 
-	Ray& operator =(const Ray& r)
-	{
+	void copyFrom(const Ray& r) {
 		start	  = r.start;
 		direction = r.direction;
 		inv_direction = r.inv_direction;
 		sign[0] = r.sign[0];
 		sign[1] = r.sign[1];
 		sign[2] = r.sign[2];
+	}
+
+	Ray& operator =(const Ray& r)
+	{
+		this->copyFrom(r);
 		return(*this);
 	}
 };

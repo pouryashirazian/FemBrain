@@ -9,8 +9,11 @@
 #define GIZMO_H_
 
 #include "SGMesh.h"
+#include "IMouseListener.h"
 #include <loki/Singleton.h>
+#include "ArcBallCamera.h"
 
+using namespace PS;
 using namespace PS::GL;
 
 /*!
@@ -100,7 +103,7 @@ protected:
  * Gizmo Manager controls the UI Widgets for sketching, transforming, cutting and poking of
  * deformable models.
  */
-class GizmoManager : public SGNode {
+class GizmoManager : public SGNode, public IMouseListener {
 public:
 	GizmoManager();
 	virtual ~GizmoManager();
@@ -112,6 +115,10 @@ public:
     GizmoType gizmoType() const {return m_gizmoType;}
     GizmoAxis axis() const {return m_gizmoAxis;}
     
+    //Mouse
+    void mousePress(int button, int state, int x, int y);
+    void mouseMove(int x, int y);
+
     
     //Set Gizmo Type and Axis
     void setAxis(const Ray& r);
@@ -130,6 +137,15 @@ private:
 	GizmoInterface* m_lpGizmoCurrent;
 	GizmoType m_gizmoType;
     GizmoAxis m_gizmoAxis;
+
+    //transform
+    vec3f m_pos;
+
+
+    //
+    vec2i m_pressedPos;
+    PS::ArcBallCamera::ButtonState m_buttonState;
+
 };
 
 //Singleton for UI Gizmo Manager

@@ -71,22 +71,48 @@ void SGHeaders::DrawText(const char* chrText, int x, int y) {
 	GLint vp[4];
 	glGetIntegerv(GL_VIEWPORT, vp);
 
+	//Make ortho projection
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
 	glLoadIdentity();
 	glOrtho(0, vp[2], vp[3], 0, -1, 1);
 
+	//goto origin
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
 	glLoadIdentity();
 
+	//draw text
 	float clFont[] = { 0, 0, 1, 1 };
-	DrawString(chrText, x, y, clFont, GLUT_BITMAP_8_BY_13);
+	// lighting and color mask
+    glPushAttrib(GL_LIGHTING_BIT | GL_CURRENT_BIT);
+
+    //disable lighting for proper text color
+    glDisable(GL_LIGHTING);
+    glDisable(GL_TEXTURE_2D);
+
+    glColor4fv(clFont);          // set text color
+    glRasterPos2i(x, y);        // place text position
+
+    // loop all characters in the string
+    while(*chrText)
+    {
+        glutBitmapCharacter(GLUT_BITMAP_8_BY_13, *chrText);
+        ++chrText;
+    }
+
+    glEnable(GL_TEXTURE_2D);
+    glEnable(GL_LIGHTING);
+    glPopAttrib();
+
 
 	glMatrixMode(GL_MODELVIEW);
 	glPopMatrix();
 	glMatrixMode(GL_PROJECTION);
 	glPopMatrix();
+
+	//important to change the state back to modelview
+	glMatrixMode(GL_MODELVIEW);
 }
 
 }

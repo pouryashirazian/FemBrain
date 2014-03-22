@@ -54,9 +54,9 @@ public:
 	int select(const Ray& r);
     
     //MousePress
-    void mousePress(int button, int state, int x, int y);
-    void mouseWheel(int button, int dir, int x, int y);
-    void mouseMove(int x, int y);
+//    void mousePress(int button, int state, int x, int y);
+//    void mouseWheel(int button, int dir, int x, int y);
+//    void mouseMove(int x, int y);
 
     //Get
     const LinearBlobTree* cblob() const {return &m_blob;}

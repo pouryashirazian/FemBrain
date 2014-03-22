@@ -8,12 +8,14 @@
 #ifndef SCENEGRAPH_H_
 #define SCENEGRAPH_H_
 
+#include "tbb/tick_count.h"
 #include "loki/Singleton.h"
 #include "loki/Functor.h"
 #include "loki/SmartPtr.h"
 #include "base/CopyStack.h"
 #include "base/AssetManager.h"
 #include "base/FastAccessToNamedResource.h"
+#include "base/MovingAverage.h"
 
 #include "TexManager.h"
 #include "ShaderManager.h"
@@ -78,6 +80,7 @@ public:
     SGHeaders* headers() const {return m_headers;}
     void updateCameraHeader();
 
+    static AnsiStr gpuInfo();
 
     //Timing and Profiling services
 
@@ -99,6 +102,15 @@ private:
     int m_idCamHeader;
     int m_idGPUHeader;
     int m_idAnimationHeader;
+
+    //Stats
+    MovingAvg<double, 128> m_avgFrameTime;
+    tbb::tick_count m_tick;
+    double m_fps;
+    U64 m_ctFrames;
+    U64 m_ctSampledFrames;
+
+
 };
 
 //Singleton Access to scene graph

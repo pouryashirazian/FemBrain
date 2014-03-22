@@ -19,7 +19,8 @@ namespace PS{
 class ArcBallCamera
 {
 public:
-    enum MOUSEBUTTONSTATE {mbLeft, mbMiddle, mbRight, mbNone};
+    enum MouseButton {mbLeft, mbMiddle, mbRight, mbNone};
+    enum ButtonState {bsDown, bsUp};
 
 private:
     //Omega and Phi are horizontal and vertical angles of spherical coordinates respectively
@@ -36,7 +37,7 @@ private:
     vec3f m_yAxis;
     vec3f m_zAxis;
 
-    MOUSEBUTTONSTATE m_mouseButton;
+    MouseButton m_mouseButton;
 public:
     //Default Constructor
     ArcBallCamera();

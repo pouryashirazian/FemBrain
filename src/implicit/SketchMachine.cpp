@@ -121,30 +121,6 @@ int SketchMachine::select(const Ray& r) {
 	return idxSelected;
 }
     
-//MousePress
-void SketchMachine::mousePress(int button, int state, int x, int y) {
-    //Create a ray from selection
-    PS_UNUSED(state);
-    ArcBallCamera::MOUSEBUTTONSTATE btn = (ArcBallCamera::MOUSEBUTTONSTATE)button;
-    if(btn == ArcBallCamera::mbLeft) {
-        Ray r = TheSceneGraph::Instance().screenToWorldRay(x, y);
-        TheGizmoManager::Instance().setAxis(r);
-    }
-    else if(btn == ArcBallCamera::mbRight){
-        
-    }
-    
-    TheSceneGraph::Instance().mousePress(button, state, x, y);
-}
-
-void SketchMachine::mouseWheel(int button, int dir, int x, int y) {
-	TheSceneGraph::Instance().mouseWheel(button, dir, x, y);
-}
-
-void SketchMachine::mouseMove(int x,  int y) {
-    TheSceneGraph::Instance().mouseMove(x, y);
-}
-
 void SketchMachine::sync() {
 	//TODO: Needs a tracker object to control syncing
 

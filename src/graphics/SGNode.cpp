@@ -10,15 +10,16 @@
 namespace PS {
     namespace SG {
         //////////////////////////////////////////////
-        SGNode::SGNode(): m_name("unset"), m_visible(true),
+        SGNode::SGNode(): m_name("unset"), m_visible(true), m_animate(true), m_selected(false),
             m_spEffect(std::make_shared<SGEffect>()),
             m_spTransform(std::make_shared<SGTransform>())
         {
         }
 
-        SGNode::SGNode(const string& name, bool visible):m_name(name), m_visible(visible),
-        m_spEffect(std::make_shared<SGEffect>()),
-        m_spTransform(std::make_shared<SGTransform>())
+        SGNode::SGNode(const string& name, bool visible):m_name(name), m_visible(visible), m_animate(true),
+			m_selected(false),
+			m_spEffect(std::make_shared<SGEffect>()),
+			m_spTransform(std::make_shared<SGTransform>())
         {
         }
 
