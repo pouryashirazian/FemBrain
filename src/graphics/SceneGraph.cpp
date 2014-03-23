@@ -39,8 +39,8 @@ SceneGraph::~SceneGraph() {
 }
 
 void SceneGraph::cleanup() {
-	for (U32 i = 0; i < m_vSceneNodes.size(); i++)
-		SAFE_DELETE(m_vSceneNodes[i]);
+//	for (U32 i = 0; i < m_vSceneNodes.size(); i++)
+	//	SAFE_DELETE(m_vSceneNodes[i]);
 	m_vSceneNodes.resize(0);
 }
 
@@ -228,6 +228,10 @@ vec4i SceneGraph::viewport() const {
 	GLint vp[4];
 	glGetIntegerv( GL_VIEWPORT, vp);
 	return vec4i(&vp[0]);
+}
+
+void SceneGraph::update() {
+	glutPostRedisplay();
 }
 
 AnsiStr SceneGraph::gpuInfo() {

@@ -51,7 +51,6 @@ std::map<int, vec3d> g_hashVertices;
 //Visual Cues
 AvatarCube* g_lpAvatarCube = NULL;
 GLMeshBuffer* g_lpDrawNormals = NULL;
-GLMeshBuffer* g_lpSphere = NULL;
 
 //SpringDumble* g_lpMassSpring = NULL;
 //Particles* g_lpParticles = NULL;
@@ -81,8 +80,6 @@ void ApplyDeformations(U32 dof, double* displacements);
 void NormalKey(unsigned char key, int x, int y);
 void SpecialKey(int key, int x, int y);
 
-string GetGPUInfo();
-
 //Settings
 bool LoadSettings(const AnsiStr& strSimFP);
 bool SaveSettings(const AnsiStr& strSimFP);
@@ -105,23 +102,6 @@ void draw()
 
 	//Draw the Gizmo Manager
 	TheGizmoManager::Instance().draw();
-
-
-	//Write Info
-	{
-
-		/*
-		if(poly && g_lpDeformable) {
-			sprintf(chrMsg, "MESH CELLSIZE:%.3f, ISOSURF: V# %d, TRI# %d, VOLUME: V# %d, TET# %d",
-					g_appSettings.cellsize,
-					poly->countVertices(),
-					poly->countTriangles(),
-					g_lpDeformable->getTetMesh()->getNumVertices(),
-					g_lpDeformable->getTetMesh()->getNumElements());
-			g_infoLines[INDEX_MESH_INFO] = string(chrMsg);
-		}
-		*/
-	}
 
 
 	glutSwapBuffers();
@@ -189,51 +169,6 @@ void MousePassiveMove(int x, int y)
 		return;
 
 	//ProfileAuto();
-
-	float dx = x - g_appSettings.screenDragStart.x;
-	float dy = g_appSettings.screenDragStart.y - y;
-
-	dx *= 0.005f;
-	dy *= 0.005f;
-	g_appSettings.screenDragStart = vec2i(x, y);
-
-	string strAxis;
-	vec3f worldAvatarPos = TheGizmoManager::Instance().transform()->getTranslate();
-
-	switch (TheGizmoManager::Instance().axis()) {
-	case axisX:
-		worldAvatarPos.x += dx;
-		strAxis = "X";
-		break;
-	case axisY:
-		worldAvatarPos.y += dy;
-		strAxis = "Y";
-		break;
-	case axisZ:
-		worldAvatarPos.z += dx;
-		strAxis = "Z";
-		break;
-
-	case axisFree:
-		worldAvatarPos = worldAvatarPos + vec3f(dx, dy, 0.0);
-		strAxis = "FREE";
-		break;
-
-	case axisCount: {
-
-	}
-	break;
-	}
-
-	//World Avatar Pos
-	TheGizmoManager::Instance().transform()->translate(worldAvatarPos);
-	vec3d wpos = vec3d(worldAvatarPos.x, worldAvatarPos.y, worldAvatarPos.z);
-
-	char buffer[1024];
-	sprintf(buffer,
-			"HAPTIC DELTA=(%.4f, %.4f), AVATAR=(%.4f, %0.4f, %.4f), AXIS=%s PRESS F4 To Change.",
-			dx, dy, wpos.x, wpos.y, wpos.z, strAxis.c_str());
-	g_infoLines[INDEX_HAPTIC_INFO] = string(buffer);
 
 	//Avatar corners
 	vec3d lower = g_lpAvatarCube->lower() + wpos;
@@ -390,44 +325,6 @@ void MouseMove(int x, int y)
 	TheGizmoManager::Instance().mouseMove(x, y);
 	TheSceneGraph::Instance().mouseMove(x, y);
 
-	if(g_appSettings.hapticMode == hmDynamic) {
-		//TheSketchMachine::Instance().mouseMove(x, y);
-	}
-	else{
-		double d[3];
-		d[0] = x - g_appSettings.screenDragStart.x;
-		d[1] = g_appSettings.screenDragEnd.y - y;
-		d[2] = d[0];
-		for(int i=0;i<3;i++)
-			d[i] *= 0.001;
-
-		printf("WP = [%.4f, %.4f, %.4f] \n", d[0], d[1], d[2]);
-
-		//Scale
-
-		/*
-		if(TheUITransform::Instance().type == uitScale)
-		{
-			int axis = TheUITransform::Instance().axis;
-			vec3d inc(0,0,0);
-			if(axis < uiaFree)
-				inc.setElement(axis, d[axis]);
-			else
-				inc = vec3d(d);
-			inc = inc * 0.5;
-			vec3d lo = g_lpAvatarCube->lower() - inc;
-			vec3d hi = g_lpAvatarCube->upper() + inc;
-			lo = vec3d::minP(lo, hi);
-			hi = vec3d::maxP(lo, hi);
-			vec3d sides = hi - lo;
-			LogInfoArg3("New Avatar Size is [%.3f, %.3f, %.3f]", sides.x, sides.y, sides.z);
-
-			//Rebuild avatar
-			SAFE_DELETE(g_lpAvatarCube);
-			g_lpAvatarCube = new AvatarCube(lo, hi);
-		}
-		*/
-	}
 	glutPostRedisplay();
 }
 
@@ -763,9 +660,10 @@ bool LoadSettings(const AnsiStr& strSimFP)
 	g_appSettings.gravity = cfg.readBool("SYSTEM", "GRAVITY", true);
 
 	//Avatar
-	TheGizmoManager::Instance().transform()->translate(cfg.readVec3f("AVATAR", "POS"));
-	TheGizmoManager::Instance().setAxis((GizmoAxis)cfg.readInt("AVATAR", "AXIS"));
-	vec3f thickness = cfg.readVec3f("AVATAR", "THICKNESS");
+	g_appSettings.avatarPos = cfg.readVec3f("AVATAR", "POS");
+	g_appSettings.avatarThickness = cfg.readVec3f("AVATAR", "THICKNESS");
+	g_appSettings.avatarAxis = cfg.readInt("AVATAR", "AXIS");
+
 
 	//Loading Camera
 	if(cfg.hasSection("CAMERA") >= 0)
@@ -787,12 +685,6 @@ bool LoadSettings(const AnsiStr& strSimFP)
 	g_appSettings.drawTetMesh = cfg.readBool("DISPLAY", "TETMESH", true);
 	g_appSettings.drawIsoSurface = cfg.readInt("DISPLAY", "ISOSURF", disFull);
 
-	//DISPLAY INFO
-//	g_infoLines.push_back(GetGPUInfo());
-//	g_infoLines.push_back(string("CAMERA"));
-//	g_infoLines.push_back(string("HAPTIC"));
-//	g_infoLines.push_back(string("ANIMATION"));
-//	g_infoLines.push_back(string("MESH"));
 	return true;
 }
 
@@ -814,9 +706,8 @@ bool SaveSettings(const AnsiStr& strSimFP)
 	cfg.writeBool("SYSTEM", "GRAVITY", g_appSettings.drawGround);
 
 	//Avatar
-	vec3f thickness = g_lpAvatarCube->transform()->getScale();
-	cfg.writeVec3f("AVATAR", "POS", TheGizmoManager::Instance().transform()->getTranslate());
-	cfg.writeVec3f("AVATAR", "THICKNESS", thickness);
+	cfg.writeVec3f("AVATAR", "POS", g_lpAvatarCube->transform()->getTranslate());
+	cfg.writeVec3f("AVATAR", "THICKNESS", g_lpAvatarCube->transform()->getScale());
 	cfg.writeInt("AVATAR", "AXIS", TheGizmoManager::Instance().axis());
 
 	//DISPLAY SETTINGS
@@ -1022,8 +913,7 @@ int main(int argc, char* argv[])
 		g_appSettings.msPolyTetrahedraMesh = (tbb::tick_count::now() - tsStart).seconds() * 1000.0;
 
 		//Deformable
-		g_lpDeformable = new Deformable();
-		g_lpDeformable->setupTetMesh(tetVertices, tetElements, g_appSettings.vFixedVertices);
+		g_lpDeformable = new Deformable(tetVertices, tetElements, g_appSettings.vFixedVertices);
 
 
 		//Deformations will be applied using opencl kernel
@@ -1033,21 +923,34 @@ int main(int argc, char* argv[])
 		g_lpDeformable->setHapticForceRadius(g_appSettings.hapticNeighborhoodPropagationRadius);
 		g_lpDeformable->setName("tissue");
 		g_lpDeformable->setAnimate(false);
-		//g_lpDeformable->setVisible(false);
 
 		//Avatar
-		g_lpAvatarCube = new AvatarCube();
+		g_lpAvatarCube = new AvatarCube(g_lpDeformable);
 		g_lpAvatarCube->setName("avatar");
-		g_lpAvatarCube->transform()->scale(g_appSettings.avatarDim);
+		g_lpAvatarCube->transform()->translate(g_appSettings.avatarPos);
+		g_lpAvatarCube->transform()->scale(g_appSettings.avatarThickness);
+		TheGizmoManager::Instance().setNode(g_lpAvatarCube);
+		TheGizmoManager::Instance().setAxis((GizmoAxis)g_appSettings.avatarAxis);
 
 
 		//Cutting
 		//g_lpCutting = new Cutting(g_lpDeformable);
 
 		//Add to scene graph
+		//TheSceneGraph::Instance().add(g_lpCutting);
 		TheSceneGraph::Instance().add(g_lpDeformable);
 		TheSceneGraph::Instance().add(g_lpAvatarCube);
-		//TheSceneGraph::Instance().add(g_lpCutting);
+
+		char chrMsg[1024];
+
+		GPUPoly* poly = TheSketchMachine::Instance().polygonizer();
+		sprintf(chrMsg, "MESH CELLSIZE:%.3f, ISOSURF: V# %d, TRI# %d, VOLUME: V# %d, TET# %d",
+					g_appSettings.cellsize,
+					poly->countVertices(),
+					poly->countTriangles(),
+					g_lpDeformable->getTetMesh()->getNumVertices(),
+					g_lpDeformable->getTetMesh()->getNumElements());
+		TheSceneGraph::Instance().headers()->addHeaderLine("mesh", chrMsg);
 	}
 
 	//Draw the first time

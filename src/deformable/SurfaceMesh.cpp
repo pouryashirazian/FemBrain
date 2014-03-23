@@ -318,7 +318,7 @@ bool SurfaceMesh::computeAABB() {
 
 	for (U32 i = 1; i < ctVertices; i++) {
 		lo = vec3d::minP(lo, vec3d(&m_vCurPos[i * 3]));
-		hi = vec3d::maxP(lo, vec3d(&m_vCurPos[i * 3]));
+		hi = vec3d::maxP(hi, vec3d(&m_vCurPos[i * 3]));
 	}
 
 	//Set the bounding box

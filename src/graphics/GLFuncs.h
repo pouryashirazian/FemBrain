@@ -11,7 +11,7 @@
 #include <string>
 #include "base/MathBase.h"
 #include "base/Vec.h"
-
+#include "graphics/AABB.h"
 
 using namespace std;
 using namespace PS::MATH;
@@ -79,6 +79,9 @@ int  ScreenToWorld(const vec3d& screenP, vec3d& worldP);
  * Returns the value associated with this pixel in the stencil buffer.
  */
 int  ScreenToWorldReadStencil(int x, int y, vec3d& world);
+
+
+void DrawAABB(const AABB& box, const vec3f& color = vec3f(0,0,1));
 
 /*!
  * \brief DrawAABB using direct model rendering

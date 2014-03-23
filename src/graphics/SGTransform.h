@@ -31,8 +31,12 @@ public:
     //Get Transform
     vec3f getScale() const { return m_mtxForward.getDiag().xyz();}
     vec3f getTranslate() const {
+    	return m_mtxForward.getTranslate();
+    }
+
+    void resetTranslate() {
     	vec4f t = m_mtxForward.getCol(3);
-    	return vec3f(t.x/t.w, t.y/t.w, t.z/t.w);
+    	translate(t.xyz() * -1.0f);
     }
 
     void reset();

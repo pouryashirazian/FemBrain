@@ -80,6 +80,7 @@ public:
     SGHeaders* headers() const {return m_headers;}
     void updateCameraHeader();
 
+    void update();
     static AnsiStr gpuInfo();
 
     //Timing and Profiling services
@@ -104,7 +105,7 @@ private:
     int m_idAnimationHeader;
 
     //Stats
-    MovingAvg<double, 128> m_avgFrameTime;
+    MovingAvg<double, 512> m_avgFrameTime;
     tbb::tick_count m_tick;
     double m_fps;
     U64 m_ctFrames;

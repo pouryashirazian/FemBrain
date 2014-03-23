@@ -55,12 +55,9 @@ public:
     	m_upper = m_upper + d;
     }
 
-    void tranform(const mat44f& mtx){
-    	vec4f lo(m_lower, 1.0);
-    	vec4f hi(m_upper, 1.0);
-    	m_lower = mtx.map(lo).xyz();
-    	m_upper = mtx.map(hi).xyz();
-    }
+    //Transform using graphics gems method
+    void transform(const mat44f& mtx);
+
 
     //dimensions
     vec3f lower() const {return this->m_lower;}

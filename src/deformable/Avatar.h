@@ -2,6 +2,7 @@
 #define AVATAR_H
 
 #include "graphics/SGMesh.h"
+#include "graphics/Gizmo.h"
 #include "Deformable.h"
 
 using namespace PS;
@@ -10,11 +11,16 @@ using namespace PS::SG;
 /*!
  * Synopsis: Haptics Avatar guide
  */
-class AvatarCube : public SGMesh {
+class AvatarCube : public SGMesh, public IGizmoListener {
 public:
 	AvatarCube();
 	AvatarCube(Deformable* tissue);
 	virtual ~AvatarCube();
+
+	void draw();
+
+	//From Gizmo Manager
+	void translate(const vec3f& delta, const vec3f& pos);
 
 	vec3f lower() const;
 	vec3f upper() const;
@@ -25,6 +31,11 @@ protected:
 	Deformable* m_lpTissue;
 	vec3f m_lower;
 	vec3f m_upper;
+
+	SGMesh m_outline;
+
+	AABB m_aabbAvatar;
+	AABB m_model;
 };
 
 /*!

@@ -37,6 +37,14 @@ Deformable::Deformable(const char* lpVegFilePath,
 	setup(lpVegFilePath, lpObjFilePath, vFixedVertices, ctThreads, lpModelTitle);
 }
 
+Deformable::Deformable(const vector<double>& inTetVertices,
+				 	 const vector<U32>& inTetElements,
+				 	 const vector<U32>& vFixedVertices) {
+	init();
+	setupTetMesh(inTetVertices, inTetElements, vFixedVertices);
+}
+
+
 Deformable::~Deformable()
 {
 	this->cleanup();

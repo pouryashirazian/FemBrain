@@ -26,6 +26,21 @@ namespace SG {
 enum GizmoAxis {axisX, axisY, axisZ, axisFree, axisCount};
 enum GizmoType {gtTranslate, gtRotate, gtScale, gtAvatar, gtCount};
 
+//Interface for Gizmo listeners
+class IGizmoListener {
+public:
+	IGizmoListener();
+	virtual ~IGizmoListener();
+	virtual void translate(const vec3f& delta, const vec3f& pos) {}
+	virtual void scale(const vec3f& delta, const vec3f& current) {}
+	virtual void rotate(const quatf& delta, const quatf& current) {}
+
+	bool registerListener();
+	void unregisterListener();
+protected:
+	int m_id;
+};
+
 //Interface for all affine Gizmo Widgets
 class GizmoInterface : public SGMesh {
 public:
@@ -128,6 +143,12 @@ public:
 	//Return current Gizmo Type
 	GizmoInterface* current() const {return m_lpGizmoCurrent;}
 
+	//Set Node
+	void setNode(SGNode* node);
+
+	//Clients
+	int registerClient(IGizmoListener* client);
+	void unregisterClient(int id);
 private:
 	GizmoTranslate* m_lpGizmoTranslate;
 	GizmoScale* m_lpGizmoScale;
@@ -140,12 +161,19 @@ private:
 
     //transform
     vec3f m_pos;
+    vec3f m_scale;
+    quatf m_rotate;
 
 
-    //
+    //Mouse State
     vec2i m_pressedPos;
     PS::ArcBallCamera::ButtonState m_buttonState;
 
+    //Register SGNode
+    SGNode* m_lpSGNode;
+
+    //Registered clients
+    vector<IGizmoListener*> m_clients;
 };
 
 //Singleton for UI Gizmo Manager

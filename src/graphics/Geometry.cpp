@@ -549,12 +549,24 @@ void Geometry::addCube(const vec3f& lower, const vec3f& upper) {
     
     //Add Face Indices
     vec4i quad;
-    for(int i=0; i<6; i++) {
-        quad.load(&indices[i*4]);
-        quad = quad + vec4i(idxStart);
-        addTriangle(vec3i(quad.x, quad.z, quad.y));
-        addTriangle(vec3i(quad.x, quad.w, quad.z));
+    if(m_faceMode == ftQuads) {
+		for(int i=0; i<6; i++) {
+			quad.load(&indices[i*4]);
+			quad = quad + vec4i(idxStart);
+			quad = vec4i(quad.w, quad.z, quad.y, quad.x);
+			addQuad(quad);
+		}
     }
+    else
+    {
+		for(int i=0; i<6; i++) {
+			quad.load(&indices[i*4]);
+			quad = quad + vec4i(idxStart);
+			addTriangle(vec3i(quad.x, quad.z, quad.y));
+			addTriangle(vec3i(quad.x, quad.w, quad.z));
+		}
+    }
+
 }
     
     void Geometry::addCube(const vec3f& center, float side) {

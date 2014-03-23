@@ -66,6 +66,11 @@ public:
 						   std::vector<U32>& vFixedVertices,
 						   int ctThreads = 0,
 						   const char* lpModelTitle = NULL);
+
+	explicit Deformable(const vector<double>& inTetVertices,
+					 	 const vector<U32>& inTetElements,
+					 	 const vector<U32>& vFixedVertices);
+
 	virtual ~Deformable();
 
 

@@ -583,6 +583,10 @@ int ScreenToWorldReadStencil(int x, int y, vec3d& world)
 	return stencilValue;
 }
 
+void DrawAABB(const AABB& box, const vec3f& color) {
+	DrawAABB(box.lower(), box.upper(), color, 1.0f);
+}
+
 void DrawAABB(const vec3f& lo, const vec3f& hi, const vec3f& color, float lineWidth) {
     float l = lo.x; float r = hi.x;
     float b = lo.y; float t = hi.y;

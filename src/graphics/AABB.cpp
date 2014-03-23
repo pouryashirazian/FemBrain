@@ -5,7 +5,43 @@
 namespace PS{
 namespace MATH{
 
+void AABB::transform(const mat44f& mtx) {
 
+	float amin[3], amax[3];
+	float bmin[3], bmax[3];
+	float a, b;
+
+	//Store current AABB into a vector
+	m_lower.store(amin);
+	m_upper.store(amax);
+
+
+	//Store translare vector in to b vector
+	vec3f t = mtx.getTranslate();
+	t.store(bmin);
+	t.store(bmax);
+
+	// Find extreme points by considering product of
+	// min and max with each component of M.
+	for (int i = 0; i < 3; i++) {
+	for (int j = 0; j < 3; j++) {
+			a = mtx.element(i, j) * amin[j];
+			b = mtx.element(i, j) * amax[j];
+			if (a < b) {
+				bmin[i] += a;
+				bmax[i] += b;
+			}
+			else
+			{
+				bmin[i] += b;
+				bmax[i] += a;
+			}
+		}
+	}
+
+	m_lower = vec3f(&bmin[0]);
+	m_upper = vec3f(&bmax[0]);
+}
 
 bool AABB::contains(const vec3& p) const {
 	if(((p.x >= m_lower.x) && (p.x <= m_upper.x))&&

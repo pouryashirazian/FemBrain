@@ -8,13 +8,15 @@
 #include "base/Vec.h"
 
 using namespace PS::MATH;
+using namespace PS::SG;
 
-AvatarCube::AvatarCube():SGMesh()
+AvatarCube::AvatarCube():SGMesh(), IGizmoListener()
 {
+	m_lpTissue = NULL;
 	setup();
 }
 
-AvatarCube::AvatarCube(Deformable* tissue) {
+AvatarCube::AvatarCube(Deformable* tissue):SGMesh(), IGizmoListener() {
 	m_lpTissue = tissue;
 	setup();
 }
@@ -29,14 +31,22 @@ void AvatarCube::setup()
 	m_lower = vec3f(-0.5f);
 	m_upper = vec3f(0.5f);
 
+	//Geometry
 	Geometry g;
 	g.init(3, 4, 2, ftTriangles);
 	g.addCube(m_lower, m_upper);
 	g.addPerVertexColor(vec4f(0, 0, 1, 1), g.countVertices());
-
 	SGMesh::setup(g);
-	resetTransform();
 
+	//Outline
+	Geometry gWireframe;
+	gWireframe.init(3, 4, 2, ftQuads);
+	gWireframe.addCube(m_lower, m_upper);
+	m_outline.setup(gWireframe);
+	m_outline.setWireFrameMode(true);
+
+
+	resetTransform();
 	if(TheShaderManager::Instance().has("phong")) {
         m_spEffect = SmartPtrSGEffect(new SGEffect(TheShaderManager::Instance().get("phong")));
     }
@@ -55,6 +65,50 @@ vec3f AvatarCube::upper() const {
 	else
 		return m_upper;
 }
+
+void AvatarCube::translate(const vec3f& delta, const vec3f& pos) {
+
+	if(m_lpTissue == NULL)
+		return;
+
+	//Avatar corners
+	AABB aabbAvatar = this->aabb();
+    aabbAvatar.transform(m_spTransform->forward());
+    m_aabbAvatar = aabbAvatar;
+
+	//1.If boxes donot intersect return
+	if (!m_lpTissue->aabb().intersect(aabbAvatar)) {
+		return;
+	}
+
+	printf("Collision!\n");
+}
+
+void AvatarCube::draw() {
+
+	glDisable(GL_LIGHTING);
+	DrawAABB(m_aabbAvatar, vec3f(1,0,0));
+
+	if(m_lpTissue)
+		DrawAABB(m_lpTissue->aabb(), vec3f(0,1,0));
+
+	glEnable(GL_LIGHTING);
+/*
+ *
+	m_spTransform->bind();
+    SGMesh::draw();
+
+    //WireFrame
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
+    glDisable(GL_LIGHTING);
+    glColor3f(0,0,0);
+    	m_outline.draw();
+    glEnable(GL_LIGHTING);
+    glPopAttrib();
+    m_spTransform->unbind();
+    */
+}
+
 
 //Avatar Scalpel
 AvatarScalpel::AvatarScalpel() {

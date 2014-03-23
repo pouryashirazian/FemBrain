@@ -16,9 +16,7 @@ using namespace PS::GL;
 
 namespace PS {
     namespace SG {
-        
-        
-        
+
         //The Effect for Gizmos
         class GizmoEffect : public SGEffect {
         public:
@@ -45,7 +43,24 @@ namespace PS {
             int m_idColor;
             
         };
-        
+
+        //////////////////////////////////////////////////////////
+    	IGizmoListener::IGizmoListener():m_id(-1) {
+    		assert(registerListener());
+    	}
+
+    	IGizmoListener::~IGizmoListener() {
+    		unregisterListener();
+    	}
+
+    	bool IGizmoListener::registerListener() {
+    		m_id = TheGizmoManager::Instance().registerClient(this);
+    		return (m_id >= 0);
+    	}
+
+    	void IGizmoListener::unregisterListener() {
+    		TheGizmoManager::Instance().unregisterClient(m_id);
+    	}
         //////////////////////////////////////////////////////////
         int GizmoInterface::setAxis(const PS::MATH::Ray &r) {
             //1 = x, 2 = y, 3 = z
@@ -117,9 +132,9 @@ namespace PS {
         }
         
         void GizmoTranslate::draw() {
-            //glClear(GL_DEPTH_BUFFER_BIT);
+            glClear(GL_DEPTH_BUFFER_BIT);
 
-            //m_spTransform->bind();
+            m_spTransform->bind();
             GizmoEffect* peff = dynamic_cast<GizmoEffect*>(m_spEffect.get());
             peff->bind();
             
@@ -136,7 +151,7 @@ namespace PS {
             m_z.drawNoEffect();
             
             m_spEffect->unbind();
-           // m_spTransform->unbind();
+            m_spTransform->unbind();
         }
         
         
@@ -271,8 +286,8 @@ namespace PS {
         
         void GizmoRotate::draw() {
             glClear(GL_DEPTH_BUFFER_BIT);
-            
-            m_spTransform->bind();
+
+           // m_spTransform->bind();
             GizmoEffect* peff = dynamic_cast<GizmoEffect*>(m_spEffect.get());
             peff->bind();
             
@@ -289,7 +304,7 @@ namespace PS {
             m_z.drawNoEffect();
             
             m_spEffect->unbind();
-            m_spTransform->unbind();
+            //m_spTransform->unbind();
         }
         
         int GizmoRotate::intersect(const PS::MATH::Ray &r) {
@@ -326,6 +341,9 @@ namespace PS {
             m_gizmoType = gtTranslate;
             m_gizmoAxis = axisFree;
             m_lpGizmoCurrent = m_lpGizmoTranslate;
+            TheSceneGraph::Instance().headers()->addHeaderLine("gizmo", "");
+
+            setNode(NULL);
 
             this->resetTransform();
         }
@@ -335,6 +353,8 @@ namespace PS {
             SAFE_DELETE(m_lpGizmoScale);
             SAFE_DELETE(m_lpGizmoRotate);
             SAFE_DELETE(m_lpGizmoAvatar);
+            m_clients.resize(0);
+            m_lpSGNode = NULL;
         }
         
         void GizmoManager::draw() {
@@ -414,7 +434,6 @@ namespace PS {
         }
 
         void GizmoManager::mouseMove(int x, int y) {
-        	printf("Button %d\n", m_buttonState);
         	if(m_buttonState != ArcBallCamera::bsDown)
         		return;
 
@@ -428,6 +447,7 @@ namespace PS {
 
         	string strAxis;
         	vec3f delta(0.0f);
+        	vec3f rotAxis[3] = {vec3f(1,0,0), vec3f(0,1,0), vec3f(0,0,1)};
 
         	switch (m_gizmoAxis) {
         	case axisX:
@@ -454,19 +474,109 @@ namespace PS {
         	break;
         	}
 
+        	//Update header
+        	char buffer[512];
 
-        	//apply
-        	m_pos = m_pos + delta;
-        	//transform()->translate(delta);
+        	//apply to gizmo type
+            switch (m_gizmoType) {
+                case gtTranslate: {
+                	m_pos = m_pos + delta;
 
-//        	char buffer[1024];
-//        	sprintf(buffer,
-//        			"HAPTIC DELTA=(%.4f, %.4f), AVATAR=(%.4f, %0.4f, %.4f), AXIS=%s PRESS F4 To Change.",
-//        			dx, dy, wpos.x, wpos.y, wpos.z, strAxis.c_str());
-        	//g_infoLines[INDEX_HAPTIC_INFO] = string(buffer);
+                	if(m_lpSGNode) {
+                		vec3f t = m_lpSGNode->transform()->getTranslate();
+                		m_lpSGNode->transform()->translate(m_pos - t);
+                	}
 
 
+                	//Post Messages
+                	for(U32 i=0; i<m_clients.size(); i++)
+                		m_clients[i]->translate(delta, m_pos);
+
+                	sprintf(buffer,
+                			"translate del=(%.3f, %.3f, %.3f), cur=(%.3f, %0.3f, %.3f), axis=%s",
+                			delta.x, delta.y, delta.z, m_pos.x, m_pos.y, m_pos.z, strAxis.c_str());
+                }
+                break;
+                case gtScale: {
+                	m_scale = vec3f(1,1,1) + delta;
+
+                	if(m_lpSGNode)
+                		m_lpSGNode->transform()->scale(m_scale);
+
+                	//Post Messages
+                	for(U32 i=0; i<m_clients.size(); i++)
+                		m_clients[i]->scale(delta, m_scale);
+
+                	sprintf(buffer,
+                			"scale del=(%.3f, %.3f, %.3f), cur=(%.3f, %0.3f, %.3f), axis=%s",
+                			delta.x, delta.y, delta.z, m_scale.x, m_scale.y, m_scale.z, strAxis.c_str());
+
+                }
+                break;
+                case gtRotate: {
+                	quatf q;
+                	vec3f axis = rotAxis[m_gizmoAxis];
+                	q.fromAxisAngle(axis, delta[m_gizmoAxis]);
+                	m_rotate = m_rotate.mul(q);
+
+                	if(m_lpSGNode)
+                		m_lpSGNode->transform()->rotate(q);
+
+                	//Post Messages
+                	for(U32 i=0; i<m_clients.size(); i++)
+                		m_clients[i]->rotate(q, m_rotate);
+
+                	sprintf(buffer,
+                			"rotate axis=(%.3f, %.3f, %.3f), angle=(%.3f), axis=%s",
+                			axis.x, axis.y, axis.z, delta[m_gizmoAxis], strAxis.c_str());
+
+                }
+                break;
+
+                case gtAvatar: {
+
+                }
+                break;
+
+                case gtCount: {
+
+                }
+                break;
+            };
+
+        	TheSceneGraph::Instance().headers()->updateHeaderLine("gizmo", buffer);
         }
+
+        void GizmoManager::setNode(SGNode* node) {
+        	m_lpSGNode = node;
+        	if(m_lpSGNode) {
+        		m_pos = m_lpSGNode->aabb().center() + m_lpSGNode->transform()->getTranslate();
+        		m_scale = m_lpSGNode->transform()->getScale();
+        		m_rotate.identity();
+        	}
+        	else {
+        		m_pos = vec3f(0,0,0);
+        		m_scale = vec3f(1,1,1);
+        		m_rotate.identity();
+        	}
+
+        	glutPostRedisplay();
+        }
+
+    	int GizmoManager::registerClient(IGizmoListener* client) {
+    		for(U32 i=0; i<m_clients.size(); i++)
+    			if(m_clients[i] == client) {
+    				LogError("Client already registered!");
+    				return -1;
+    			}
+
+    		m_clients.push_back(client);
+    		return (m_clients.size() - 1);
+    	}
+
+    	void GizmoManager::unregisterClient(int id) {
+    		m_clients.erase(m_clients.begin() + id);
+    	}
 
 
     }
