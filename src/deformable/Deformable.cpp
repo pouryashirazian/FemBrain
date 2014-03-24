@@ -380,6 +380,25 @@ int Deformable::pickVertex(const vec3d& wpos, vec3d& vertex)
 	return index;
 }
 
+int Deformable::pickVertices(const AABB& box,
+							 vector<vec3f>& arrPickedVertices,
+				 	 	 	 vector<int>& arrPickedIndices) {
+	arrPickedVertices.resize(0);
+	arrPickedIndices.resize(0);
+	U32 ctVertices = m_lpSurfaceMesh->getVertexCount();
+	for(U32 i=0; i<ctVertices;i++)
+	{
+		vec3d v = m_lpSurfaceMesh->vertexAt(i);
+		vec3f vf = vec3f(v.x, v.y, v.z);
+		if(Contains<float>(box.lower(), box.upper(), vf)) {
+			arrPickedVertices.push_back(vf);
+			arrPickedIndices.push_back(i);
+		}
+	}
+
+	return (int)arrPickedVertices.size();
+}
+
 int Deformable::pickVertices(const vec3d& boxLo, const vec3d& boxHi,
 								 vector<vec3d>& arrFoundCoords, vector<int>& arrFoundIndices) const
 {

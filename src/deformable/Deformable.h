@@ -88,6 +88,11 @@ public:
 
 	//Pick a vertex
 	int pickVertex(const vec3d& wpos, vec3d& vertex);
+
+	int pickVertices(const AABB& box,
+					 vector<vec3f>& arrPickedVertices,
+					 vector<int>& arrPickedIndices);
+
 	int pickVertices(const vec3d& boxLo, const vec3d& boxHi,
 					   vector<vec3d>& arrFoundCoords, vector<int>& arrFoundIndices) const;
 	int pickVertices(const vec3d& boxLo, const vec3d& boxHi);

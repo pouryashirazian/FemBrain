@@ -27,7 +27,7 @@ enum GizmoAxis {axisX, axisY, axisZ, axisFree, axisCount};
 enum GizmoType {gtTranslate, gtRotate, gtScale, gtAvatar, gtCount};
 
 //Interface for Gizmo listeners
-class IGizmoListener {
+class IGizmoListener : public IMouseListener {
 public:
 	IGizmoListener();
 	virtual ~IGizmoListener();
@@ -133,6 +133,7 @@ public:
     //Mouse
     void mousePress(int button, int state, int x, int y);
     void mouseMove(int x, int y);
+    void mouseWheel(int button, int dir, int x, int y);
 
     
     //Set Gizmo Type and Axis

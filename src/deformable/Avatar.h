@@ -20,6 +20,7 @@ public:
 	void draw();
 
 	//From Gizmo Manager
+	void mousePress(int button, int state, int x, int y);
 	void translate(const vec3f& delta, const vec3f& pos);
 
 	vec3f lower() const;
@@ -29,13 +30,21 @@ private:
 
 protected:
 	Deformable* m_lpTissue;
+	std::map<int, vec3d> m_hashVertices;
+	int m_idxContactFace;
+	double m_hapticForceCoeff;
+	double m_contactDist;
+	vec3d m_closestPoint;
+
+	//Lower and upper corners
 	vec3f m_lower;
 	vec3f m_upper;
 
+	//Outline mesh for easier view
 	SGMesh m_outline;
 
-	AABB m_aabbAvatar;
-	AABB m_model;
+	//Transformed aabb
+	AABB m_aabbCurrent;
 };
 
 /*!

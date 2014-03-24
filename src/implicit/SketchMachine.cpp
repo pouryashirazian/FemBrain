@@ -35,7 +35,7 @@ SketchMachine::~SketchMachine() {
 
     SAFE_DELETE(m_lpQuad);
     SAFE_DELETE(m_lpTexFields);
-    //SAFE_DELETE(m_lpPolyModel);
+    SAFE_DELETE(m_lpPolyModel);
     SAFE_DELETE(m_lpPolySelected);
 }
 

@@ -42,12 +42,6 @@ using namespace PS::FILESTRINGUTILS;
 using namespace PS::CL;
 
 
-
-void AdvanceHapticPosition();
-
-
-std::map<int, vec3d> g_hashVertices;
-
 //Visual Cues
 AvatarCube* g_lpAvatarCube = NULL;
 GLMeshBuffer* g_lpDrawNormals = NULL;
@@ -84,13 +78,6 @@ void SpecialKey(int key, int x, int y);
 bool LoadSettings(const AnsiStr& strSimFP);
 bool SaveSettings(const AnsiStr& strSimFP);
 ////////////////////////////////////////////////////////////////////////////////////////
-void AdvanceHapticPosition() {
-//	if(g_lpDeformable->isHapticInProgress() && g_appSettings.hapticMode == hmDynamic) {
-//		vec2f v = g_hapticPosLerp.value();
-//		printf("Hx= %.3f, Hy= %.3f\n", v.x, v.y);
-//	}
-}
-
 void draw()
 {
 	//Draws Everything in the scenegraph
@@ -139,185 +126,13 @@ void MousePress(int button, int state, int x, int y)
 			}
 		}
 	}
-	/*
-	else if (button == GLUT_RIGHT_BUTTON) {
-		if (state == GLUT_DOWN) {
-			if (g_lpDeformable->isHapticInProgress()) {
-				g_lpDeformable->hapticEnd();
-				g_hashVertices.clear();
-			}
-			else if (g_appSettings.hapticMode == hmDynamic) {
-				g_lpDeformable->hapticStart(0);
-			}
-		}
-	} else if (button == GLUT_MIDDLE_BUTTON) {
-
-	}
-	*/
 	//Update selection
 	glutPostRedisplay();
 }
 
 
-/*!
- * Passive Move for mouse
- */
 void MousePassiveMove(int x, int y)
 {
-	/*
-	if(!(g_lpDeformable->isHapticInProgress() && g_appSettings.hapticMode == hmDynamic))
-		return;
-
-	//ProfileAuto();
-
-	//Avatar corners
-	vec3d lower = g_lpAvatarCube->lower() + wpos;
-	vec3d upper = g_lpAvatarCube->upper() + wpos;
-
-	//Avatar Box
-	AABB aabbAvatar(vec3f(lower.x, lower.y, lower.z),
-			vec3f(upper.x, upper.y, upper.z));
-
-	//1.If boxes donot intersect return
-	if (!TheSketchMachine::Instance().aabb().intersect(aabbAvatar)) {
-		g_appSettings.idxCollisionFace = -1;
-		g_hashVertices.clear();
-		g_lpDeformable->cleanupCuttingStructures();
-		return;
-	}
-
-	//Cutting
-	vec3d extent  = (upper - lower);
-	extent.y = 0.0;
-	//g_lpDeformable->performCuts(lower, lower + extent);
-	//g_lpCutting->performCut(lower, lower + extent);
-
-*/
-	//2.Compute Collision using RBF Interpolation Function
-	/*
-	 vector<vec3f> avatarVertices;
-	 vector<bool> flags;
-	 vector<float> penetrations;
-	 int idxMaxPenetration;
-	 aabbAvatar.getVertices(avatarVertices);
-	 g_lpFastRBF->resetCollision();
-	 int ctIntersected = g_lpFastRBF->intersects(avatarVertices, flags, penetrations, idxMaxPenetration);
-	 if(ctIntersected == 0) {
-	 return;
-	 }
-	 */
-
-/*
-
-	//List all the vertices in the model impacted
-	{
-		vector<vec3d> arrVertices;
-		vector<int> arrIndices;
-		g_lpDeformable->pickVertices(lower, upper, arrVertices, arrIndices);
-
-		//Add new vertices
-		for (U32 i = 0; i < arrIndices.size(); i++) {
-			//If it does not have the vertex then add it. If we have it then the original vertex is used.
-			if (g_hashVertices.find(arrIndices[i]) == g_hashVertices.end())
-				g_hashVertices.insert(
-						std::pair<int, vec3d>(arrIndices[i], arrVertices[i]));
-		}
-	}
-
-	//If no vertices impacted then return. If we return here then gaps cannot be filled.
-	if (g_hashVertices.size() == 0)
-		return;
-
-	//Input Arrays
-	vec3d n[6];
-	vec3d s[6];
-	//X. Left and Right
-	n[0] = vec3d(-1, 0, 0);
-	n[1] = vec3d(1, 0, 0);
-
-	//Y. Bottom and Top
-	n[2] = vec3d(0, -1, 0);
-	n[3] = vec3d(0, 1, 0);
-
-	//Z. Back and Front
-	n[4] = vec3d(0, 0, -1);
-	n[5] = vec3d(0, 0, 1);
-
-	//Sample Point to use
-	s[0] = lower;
-	s[1] = upper;
-	s[2] = lower;
-	s[3] = upper;
-	s[4] = lower;
-	s[5] = upper;
-
-	//Detect Collision Face
-	//Check against six faces of Avatar to find the intersection
-	//Previously Detected Face? If no then detect now
-	if (g_appSettings.idxCollisionFace < 0) {
-		//g_appSettings.hapticForceCoeff = DEFAULT_FORCE_COEFF;
-		double minDot = GetMaxLimit<double>();
-		int idxMin = 0;
-
-		//Iterate over vertices in collision
-		for (map<int, vec3d>::iterator it = g_hashVertices.begin();
-				it != g_hashVertices.end(); ++it) {
-			vec3d p = it->second;
-			for (int j = 0; j < 6; j++) {
-				double dot = vec3d::dot(s[j] - p, n[j]);
-				if (dot < minDot) {
-					minDot = dot;
-					idxMin = j;
-					g_appSettings.collisionClosestPoint = p;
-				}
-
-				g_appSettings.idxCollisionFace = idxMin;
-				g_appSettings.collisionDist = minDot;
-			}
-		}
-	} else {
-		double minDot = GetMaxLimit<double>();
-		int idxFace = g_appSettings.idxCollisionFace;
-		//Iterate over vertices in collision
-		for (map<int, vec3d>::iterator it = g_hashVertices.begin();
-				it != g_hashVertices.end(); ++it) {
-			double dot = vec3d::dot(s[idxFace] - it->second, n[idxFace]);
-			if (dot < minDot) {
-				minDot = dot;
-				g_appSettings.collisionDist = minDot;
-				g_appSettings.collisionClosestPoint = it->second;
-			}
-		}
-	}
-
-	//Compute Displacement
-	vector<vec3d> arrForces;
-	vector<int> arrIndices;
-	int idxCFace = g_appSettings.idxCollisionFace;
-	for (std::map<int, vec3d>::iterator it = g_hashVertices.begin();
-			it != g_hashVertices.end(); ++it) {
-		vec3d v = it->second;
-
-		//1000000
-		double dot = vec3d::dot(s[idxCFace] - v, n[idxCFace])
-				* g_appSettings.hapticForceCoeff;
-		dot = MATHMAX(dot, 0);
-
-//		 string arrFaces[] = { "LEFT", "RIGHT", "BOTTOM", "TOP", "NEAR", "FAR" };
-//		 printf("Face[%d] = %s, dot = %.4f, VERTEX USED: [%.4f, %.4f, %.4f], COEFF: %.2f \n",
-//		 idxCFace, arrFaces[idxCFace].c_str(), dot, v.x, v.y, v.z,
-//		 g_appSettings.hapticForceCoeff);
-
-		arrIndices.push_back(it->first);
-		arrForces.push_back(n[idxCFace] * dot);
-	}
-
-	//Apply displacements/forces to the model
-	g_lpDeformable->hapticSetCurrentForces(arrIndices, arrForces);
-
-
-	glutPostRedisplay();
-*/
 }
 
 void MouseMove(int x, int y)
@@ -337,6 +152,8 @@ void MouseWheel(int button, int dir, int x, int y)
 void ApplyDeformations(U32 dof, double* displacements) {
 	tbb::tick_count tsStart = tbb::tick_count::now();
 
+	if(TheSketchMachine::Instance().polygonizer())
+		TheSketchMachine::Instance().polygonizer()->applyFemDisplacements(dof, displacements);
 	//if(g_lpFastRBF)
 		//g_lpFastRBF->applyFemDisplacements(dof, displacements);
 
@@ -553,17 +370,17 @@ void SpecialKey(int key, int x, int y)
 
 		case(GLUT_KEY_F7):
 		{
-			//int radius = MATHMAX(g_lpDeformable->getHapticForceRadius() - 1, 1);
-			//g_lpDeformable->setHapticForceRadius(radius);
-			//LogInfoArg1("Decrease haptic force radius: %d", radius);
+			int radius = MATHMAX(g_lpDeformable->getHapticForceRadius() - 1, 1);
+			g_lpDeformable->setHapticForceRadius(radius);
+			LogInfoArg1("Decrease haptic force radius: %d", radius);
 			break;
 		}
 
 		case(GLUT_KEY_F8):
 		{
-			//int radius = MATHMIN(g_lpDeformable->getHapticForceRadius() + 1, 10);
-			//g_lpDeformable->setHapticForceRadius(radius);
-			//LogInfoArg1("Increase haptic force radius: %d", radius);
+			int radius = MATHMIN(g_lpDeformable->getHapticForceRadius() + 1, 10);
+			g_lpDeformable->setHapticForceRadius(radius);
+			LogInfoArg1("Increase haptic force radius: %d", radius);
 			break;
 		}
 
@@ -922,7 +739,7 @@ int main(int argc, char* argv[])
 		g_lpDeformable->setDeformCallback(ApplyDeformations);
 		g_lpDeformable->setHapticForceRadius(g_appSettings.hapticNeighborhoodPropagationRadius);
 		g_lpDeformable->setName("tissue");
-		g_lpDeformable->setAnimate(false);
+		//g_lpDeformable->setAnimate(false);
 
 		//Avatar
 		g_lpAvatarCube = new AvatarCube(g_lpDeformable);

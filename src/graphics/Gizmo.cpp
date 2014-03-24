@@ -45,7 +45,7 @@ namespace PS {
         };
 
         //////////////////////////////////////////////////////////
-    	IGizmoListener::IGizmoListener():m_id(-1) {
+    	IGizmoListener::IGizmoListener():IMouseListener(), m_id(-1)  {
     		assert(registerListener());
     	}
 
@@ -431,6 +431,10 @@ namespace PS {
             }
 
             m_pressedPos = vec2i(x, y);
+
+        	//Post Messages
+        	for(U32 i=0; i<m_clients.size(); i++)
+        		m_clients[i]->mousePress(button, state, x, y);
         }
 
         void GizmoManager::mouseMove(int x, int y) {
@@ -545,6 +549,15 @@ namespace PS {
             };
 
         	TheSceneGraph::Instance().headers()->updateHeaderLine("gizmo", buffer);
+
+        	for(U32 i=0; i<m_clients.size(); i++)
+        		m_clients[i]->mouseMove(x, y);
+        }
+
+        //MouseWheel
+        void GizmoManager::mouseWheel(int button, int dir, int x, int y) {
+        	for(U32 i=0; i<m_clients.size(); i++)
+        		m_clients[i]->mouseWheel(button, dir, x, y);
         }
 
         void GizmoManager::setNode(SGNode* node) {
