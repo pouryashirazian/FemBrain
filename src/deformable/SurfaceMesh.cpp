@@ -2,6 +2,7 @@
 #include <fstream>
 #include "SurfaceMesh.h"
 #include "base/Logger.h"
+#include "base/Profiler.h"
 #include "graphics/Mesh.h"
 #include "graphics/selectgl.h"
 
@@ -121,11 +122,12 @@ void SurfaceMesh::setupDrawBuffers() {
 
 	cleanupDrawBuffers();
 
-	U32 ctFaces = getFaceCount();
-	U32 ctVertices = getVertexCount();
-	bool bHasNormals = (m_vNormals.size() == m_vCurPos.size());
+	m_ctVertices = m_vCurPos.size() / 3;
+	m_ctFaceElements = m_faces.size();
 
+	bool bHasNormals = (m_vNormals.size() == m_vCurPos.size());
 	U32 szTotal = m_vCurPos.size() * sizeof(double);
+
 	m_lpMemVertices = new GLMemoryBuffer(mbtPosition, GL_DYNAMIC_DRAW, 3, GL_DOUBLE, szTotal, &m_vCurPos[0]);
 	if (bHasNormals)
 		m_lpMemNormal = new GLMemoryBuffer(mbtNormal, GL_DYNAMIC_DRAW, 3, GL_DOUBLE, szTotal, &m_vNormals[0]);
@@ -277,14 +279,6 @@ void SurfaceMesh::drawVertices() {
 	glPopAttrib();
 }
 
-//Count
-U32 SurfaceMesh::getVertexCount() const {
-	return (m_vCurPos.size() / 3);
-}
-U32 SurfaceMesh::getFaceCount() const {
-	return (m_faces.size() / 3);
-}
-
 //Access
 vec3d SurfaceMesh::vertexAt(U32 idx) const {
 	return vec3d(&m_vCurPos[idx * 3]);
@@ -309,10 +303,10 @@ vec3d SurfaceMesh::faceVertexAt(U32 idxFace, U8 idxWhichCorner) const {
 
 //Processes
 bool SurfaceMesh::computeAABB() {
-	if (getVertexCount() == 0 || getFaceCount() == 0)
+	if (countVertices() == 0 || countFaceElements() == 0)
 		return false;
 
-	U32 ctVertices = getVertexCount();
+	U32 ctVertices = countVertices();
 	vec3d lo = vec3d(&m_vCurPos[0]);
 	vec3d hi = lo;
 
@@ -332,22 +326,50 @@ void SurfaceMesh::resetToRest() {
 	m_vCurPos.assign(m_vRestPos.begin(), m_vRestPos.end());
 }
 
-int SurfaceMesh::getFixedVertices(vector<U32>& fixedVertices) {
+int SurfaceMesh::getFixedVertices(vector<int>& fixedVertices) {
 	fixedVertices.assign(m_vFixedVertices.begin(), m_vFixedVertices.end());
 	return (int) m_vFixedVertices.size();
 }
 
-void SurfaceMesh::setFixedVertices(const vector<U32>& fixedVertices) {
+void SurfaceMesh::setFixedVertices(const vector<int>& fixedVertices) {
 	m_vFixedVertices.assign(fixedVertices.begin(), fixedVertices.end());
 }
 
 void SurfaceMesh::applyDisplacements(double * u) {
+	ProfileAuto();
+	//Apply displacement
 	for (U32 i = 0; i < m_vCurPos.size(); i++)
 		m_vCurPos[i] = m_vRestPos[i] + u[i];
 
 	//Modify vertex buffer
 	m_lpMemVertices->modify(0, m_vCurPos.size() * sizeof(double),
 			&m_vCurPos[0]);
+
+	//Update AABB
+	updateAABB();
+}
+
+void SurfaceMesh::updateAABB() {
+	if(m_vCurPos.size() < 3)
+		return;
+
+	double vMin[3], vMax[3];
+//	vMin[0] = vMin[1] = vMin[2] = DBL_MAX;
+//	vMax[0] = vMax[1] = vMax[2] = DBL_MIN;
+
+	vMin[0] = vMax[0] = m_vCurPos[0];
+	vMin[1] = vMax[1] = m_vCurPos[1];
+	vMin[2] = vMax[2] = m_vCurPos[2];
+
+	U32 axis = 0;
+	for (U32 i = 3; i < m_vCurPos.size(); i++) {
+		axis = i % 3;
+		vMin[axis] = MATHMIN(vMin[axis], m_vCurPos[i]);
+		vMax[axis] = MATHMAX(vMax[axis], m_vCurPos[i]);
+	}
+
+	m_aabb.set(vec3f((float)vMin[0], (float)vMin[1], (float)vMin[2]),
+			   vec3f((float)vMax[0], (float)vMax[1], (float)vMax[2]));
 }
 
 void SurfaceMesh::updateFaceBuffer() {
@@ -358,7 +380,7 @@ void SurfaceMesh::updateFaceBuffer() {
 
 int SurfaceMesh::findClosestVertex(const vec3d& query, double& dist,
 		vec3d& outP) {
-	U32 ctVertices = getVertexCount();
+	U32 ctVertices = countVertices();
 	double minDist = GetMaxLimit<double>();
 	int idxFound = -1;
 	for (U32 i = 0; i < ctVertices; i++) {

@@ -20,6 +20,7 @@
 #include "graphics/Lerping.h"
 #include "graphics/MorphingSphere.h"
 #include "graphics/Particles.h"
+#include "graphics/SGQuad.h"
 
 #include "implicit/SketchMachine.h"
 #include "implicit/OclPolygonizer.h"
@@ -176,22 +177,6 @@ void Close()
 	SAFE_DELETE(g_lpAvatarCube);
 
 }
-
-string QueryOGL(GLenum name)
-{
-	string strOut = "N/A";
-	const char* lpRes = reinterpret_cast<const char*>(glGetString(name));
-	if(lpRes == NULL)
-		return strOut;
-	else
-	{
-		strOut = string(lpRes);
-		return strOut;
-	}
-}
-
-
-
 
 void NormalKey(unsigned char key, int x, int y)
 {
@@ -464,7 +449,7 @@ bool LoadSettings(const AnsiStr& strSimFP)
 
 	int ctFixed = 	cfg.readInt("MODEL", "FIXEDVERTICESCOUNT", 0);
 	if(ctFixed > 0) {
-		if(!cfg.readIntArrayU32("MODEL", "FIXEDVERTICES", ctFixed, g_appSettings.vFixedVertices))
+		if(!cfg.readIntArray("MODEL", "FIXEDVERTICES", ctFixed, g_appSettings.vFixedVertices))
 			LogError("Unable to read specified number of fixed vertices!");
 	}
 
@@ -499,7 +484,7 @@ bool LoadSettings(const AnsiStr& strSimFP)
 	g_appSettings.drawAffineWidgets = cfg.readBool("DISPLAY", "AFFINEWIDGETS", true);
 	g_appSettings.drawGround = cfg.readBool("DISPLAY", "GROUND", true);
 	g_appSettings.drawNormals = cfg.readBool("DISPLAY", "NORMALS", true);
-	g_appSettings.drawTetMesh = cfg.readBool("DISPLAY", "TETMESH", true);
+	g_appSettings.drawTetMesh = cfg.readInt("DISPLAY", "TETMESH", disFull);
 	g_appSettings.drawIsoSurface = cfg.readInt("DISPLAY", "ISOSURF", disFull);
 
 	return true;
@@ -532,13 +517,13 @@ bool SaveSettings(const AnsiStr& strSimFP)
 	cfg.writeBool("DISPLAY", "AFFINEWIDGETS", g_appSettings.drawAffineWidgets);
 	cfg.writeBool("DISPLAY", "GROUND", g_appSettings.drawGround);
 	cfg.writeBool("DISPLAY", "NORMALS", g_appSettings.drawNormals);
-	cfg.writeBool("DISPLAY", "TETMESH", g_appSettings.drawTetMesh);
+	cfg.writeInt("DISPLAY", "TETMESH", g_appSettings.drawTetMesh);
 	cfg.writeInt("DISPLAY", "ISOSURF", g_appSettings.drawIsoSurface);
 
 	//MODEL PROPS
 	if(g_appSettings.editConstrainedNodes) {
 		cfg.writeInt("MODEL", "FIXEDVERTICESCOUNT", g_appSettings.vFixedVertices.size());
-		cfg.writeIntArrayU32("MODEL", "FIXEDVERTICES", g_appSettings.vFixedVertices);
+		cfg.writeIntArray("MODEL", "FIXEDVERTICES", g_appSettings.vFixedVertices);
 	}
 
 	return true;
@@ -582,10 +567,13 @@ int main(int argc, char* argv[])
 		}
 	}
 
+
+
 	//Setup the event logger
 	//PS::TheEventLogger::Instance().setWriteFlags(PS_LOG_WRITE_EVENTTYPE | PS_LOG_WRITE_TIMESTAMP | PS_LOG_WRITE_SOURCE | PS_LOG_WRITE_TO_SCREEN);
 	PS::TheEventLogger::Instance().setWriteFlags(PS_LOG_WRITE_EVENTTYPE | PS_LOG_WRITE_SOURCE | PS_LOG_WRITE_TO_SCREEN);
 	PS::TheProfiler::Instance().setWriteFlags(Profiler::pbInjectToLogger);
+	TheProfiler::Instance().setInjectToLogFlag(false);
 	LogInfo("Starting FemBrain");
 
 	//Initialize app
@@ -642,8 +630,10 @@ int main(int argc, char* argv[])
 	}
 
 	//Build Shaders for drawing the mesh
-	AnsiStr strShaderRoot = ExtractOneLevelUp(ExtractFilePath(GetExePath())) + "data/shaders/";
-	AnsiStr strMeshesRoot = ExtractOneLevelUp(ExtractFilePath(GetExePath())) + "data/models/mesh/";
+	AnsiStr strRoot = ExtractOneLevelUp(ExtractFilePath(GetExePath()));
+	AnsiStr strShaderRoot = strRoot + "data/shaders/";
+	AnsiStr strMeshesRoot = strRoot + "data/models/mesh/";
+	AnsiStr strTexRoot = strRoot + "data/textures/";
 
 	//Load Shaders
 	TheShaderManager::Instance().addFromFolder(strShaderRoot.cptr());
@@ -653,13 +643,22 @@ int main(int argc, char* argv[])
 		exit(0);
 
 	//Ground and Room
-	//TheSceneGraph::Instance().addFloor(32, 32, 0.2f);
+	//TheSceneGraph::Instance().addFloor(32, 32, 0.5f);
+	//TheSceneGraph::Instance().get("floor")->transform()->translate(vec3f(0, -1, 0));
 	TheSceneGraph::Instance().addSceneBox(AABB(vec3f(-10,-10,-16), vec3f(10,10,16)));
 
+	//Textured Ground
+	TheTexManager::Instance().add(strTexRoot + "wood.png");
+	SGQuad* woodenFloor = new SGQuad(16.0f, 16.0f, TheTexManager::Instance().get("wood"));
+	woodenFloor->setName("floor");
+	woodenFloor->transform()->translate(vec3f(0, -1.0f, 0));
+	woodenFloor->transform()->rotate(vec3f(1.0f, 0.0f, 0.0f), 90.0f);
+	TheSceneGraph::Instance().add(woodenFloor);
+
 	//Add morphing sphere
-	MorphingSphere* m = new MorphingSphere(2.0f, 16, 16);
-	m->setName("floor");
-	TheSceneGraph::Instance().add(m);
+//	MorphingSphere* m = new MorphingSphere(2.0f, 16, 16);
+//	m->setName("floor");
+//	TheSceneGraph::Instance().add(m);
 
 	//Check the model file extension
 	AnsiStr strFileExt = ExtractFileExt(AnsiStr(g_appSettings.strModelFilePath.c_str()));
@@ -705,6 +704,8 @@ int main(int argc, char* argv[])
 
 		LogInfoArg1("Polygonizing BlobTree file with cellsize: %.2f", g_appSettings.cellsize);
 		TheSketchMachine::Instance().polygonizer()->setCellSize(g_appSettings.cellsize);
+		TheSketchMachine::Instance().polygonizer()->setVisible(g_appSettings.drawIsoSurface);
+		TheSketchMachine::Instance().polygonizer()->setWireFrameMode(g_appSettings.drawIsoSurface == disWireFrame);
 		TheSketchMachine::Instance().sync();
 
 		//Create the RBF representation
@@ -731,14 +732,13 @@ int main(int argc, char* argv[])
 
 		//Deformable
 		g_lpDeformable = new Deformable(tetVertices, tetElements, g_appSettings.vFixedVertices);
-
-
-		//Deformations will be applied using opencl kernel
-		LogInfoArg1("GRAVITY is: %d", g_appSettings.gravity);
-		g_lpDeformable->setGravity(g_appSettings.gravity);
+		g_lpDeformable->setGravity(true);
 		g_lpDeformable->setDeformCallback(ApplyDeformations);
 		g_lpDeformable->setHapticForceRadius(g_appSettings.hapticNeighborhoodPropagationRadius);
 		g_lpDeformable->setName("tissue");
+		g_lpDeformable->setCollisionObject(TheSceneGraph::Instance().get("floor"));
+		g_lpDeformable->setVisible(g_appSettings.drawTetMesh);
+		g_lpDeformable->setWireFrameMode(g_appSettings.drawTetMesh == disWireFrame);
 		//g_lpDeformable->setAnimate(false);
 
 		//Avatar

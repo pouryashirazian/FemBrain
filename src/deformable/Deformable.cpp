@@ -29,7 +29,7 @@ Deformable::Deformable()
 
 Deformable::Deformable(const char* lpVegFilePath,
 						  const char* lpObjFilePath,
-						  std::vector<U32>& vFixedVertices,
+						  std::vector<int>& vFixedVertices,
 						  int ctThreads,
 						  const char* lpModelTitle)
 {
@@ -39,7 +39,7 @@ Deformable::Deformable(const char* lpVegFilePath,
 
 Deformable::Deformable(const vector<double>& inTetVertices,
 				 	 const vector<U32>& inTetElements,
-				 	 const vector<U32>& vFixedVertices) {
+				 	 const vector<int>& vFixedVertices) {
 	init();
 	setupTetMesh(inTetVertices, inTetElements, vFixedVertices);
 }
@@ -71,13 +71,16 @@ void Deformable::cleanup()
 	SAFE_DELETE(m_lpTetMesh);
 
 	//Double Arrays
-	SAFE_DELETE_ARRAY(m_arrDisplacements);
+	SAFE_DELETE_ARRAY(m_q);
+	SAFE_DELETE_ARRAY(m_qVel);
+	SAFE_DELETE_ARRAY(m_qAcc);
 	SAFE_DELETE_ARRAY(m_arrExtForces);
 	SAFE_DELETE_ARRAY(m_arrElementVolumes);
 }
 
 void Deformable::init() {
 	m_strModelName = "FEMBRAIN";
+	m_collisionObj = NULL;
 	m_lpSurfaceMesh = NULL;
 	m_lpTetMesh = NULL;
 
@@ -111,7 +114,7 @@ void Deformable::init() {
 //Setup
 void Deformable::setup(const char* lpVegFilePath,
 						  const char* lpObjFilePath,
-						  std::vector<U32>& vFixedVertices,
+						  std::vector<int>& vFixedVertices,
 						  int ctThreads,
 						  const char* lpModelTitle)
 {
@@ -165,7 +168,9 @@ void Deformable::setup(const char* lpVegFilePath,
 
 	// total number of DOFs
 	m_dof = 3 * m_lpTetMesh->getNumVertices();
-	m_arrDisplacements = new double[m_dof];
+	m_q = new double[m_dof];
+	m_qVel = new double[m_dof];
+	m_qAcc = new double[m_dof];
 	m_arrExtForces = new double[m_dof];
 
 	//Create the integrator
@@ -184,13 +189,7 @@ void Deformable::setup(const char* lpVegFilePath,
 
 int Deformable::setupTetMesh(const vector<double>& inTetVertices,
 		 	 	 	 	 	 const vector<U32>& inTetElements,
-		 	 	 	 	 	 const vector<U32>& vFixedVertices) {
-
-	//Adapting to VegaFem input
-	vector<int> arrFixed;
-	arrFixed.resize(vFixedVertices.size());
-	for(U32 i=0; i<vFixedVertices.size(); i++)
-		arrFixed[i] = (int)vFixedVertices[i];
+		 	 	 	 	 	 const vector<int>& vFixedVertices) {
 
 	vector<int> arrElements;
 	arrElements.resize(inTetElements.size());
@@ -206,6 +205,10 @@ int Deformable::setupTetMesh(const vector<double>& inTetVertices,
 	m_lpSurfaceMesh->setupFromTetMesh(inTetVertices, inTetElements);
 	m_lpSurfaceMesh->resetToRest();
 	m_lpSurfaceMesh->setFixedVertices(vFixedVertices);
+
+	//Copy from the input fixed vertices
+	m_vFixedVertices.assign(vFixedVertices.begin(), vFixedVertices.end());
+
 
 	//Setup Volumetric Mesh
 	int ctVertices = inTetVertices.size() / 3;
@@ -226,13 +229,12 @@ int Deformable::setupTetMesh(const vector<double>& inTetVertices,
 	//Compute Mass Matrix
 	GenerateMassMatrix::computeMassMatrix(m_lpTetMesh, &m_lpMassMatrix, true);
 
-	//Copy from the input fixed vertices
-	m_vFixedVertices.assign(vFixedVertices.begin(), vFixedVertices.end());
-
-
 	// total number of DOFs
 	m_dof = 3 * m_lpTetMesh->getNumVertices();
-	m_arrDisplacements = new double[m_dof];
+	m_q = new double[m_dof];
+	m_qVel = new double[m_dof];
+	m_qAcc = new double[m_dof];
+
 	m_arrExtForces = new double[m_dof];
 
 
@@ -353,20 +355,25 @@ void Deformable::timestep()
 	// important: must always clear forces, as they remain in effect unless changed
 	m_lpIntegrator->SetExternalForcesToZero();
 
-	//Update the haptic external forces applied
-	this->applyAllExternalForces();
+	//Apply external forces
+	memset(m_arrExtForces, 0, sizeof(double) * m_dof);
+	applyCollisionForces();
+	applyHapticForces();
+	m_lpIntegrator->SetExternalForces(m_arrExtForces);
 
 	//Time Step
 	m_lpIntegrator->DoTimestep();
 
-	m_lpIntegrator->GetqState(m_arrDisplacements);
+	m_lpIntegrator->GetqState(m_q, m_qVel, m_qAcc);
 
-	m_lpSurfaceMesh->applyDisplacements(m_arrDisplacements);
-	//m_lpDeformableMesh->SetVertexDeformations(m_arrDisplacements);
+	m_lpSurfaceMesh->applyDisplacements(m_q);
+
+	//Update AABB
+	setAABB(m_lpSurfaceMesh->aabb());
 
 	//Apply deformations
 	if(m_fOnDeform)
-		m_fOnDeform(m_dof, m_arrDisplacements);
+		m_fOnDeform(m_dof, m_q);
 
 	//Increment time step
 	m_ctTimeStep++;
@@ -385,7 +392,7 @@ int Deformable::pickVertices(const AABB& box,
 				 	 	 	 vector<int>& arrPickedIndices) {
 	arrPickedVertices.resize(0);
 	arrPickedIndices.resize(0);
-	U32 ctVertices = m_lpSurfaceMesh->getVertexCount();
+	U32 ctVertices = m_lpSurfaceMesh->countVertices();
 	for(U32 i=0; i<ctVertices;i++)
 	{
 		vec3d v = m_lpSurfaceMesh->vertexAt(i);
@@ -404,7 +411,7 @@ int Deformable::pickVertices(const vec3d& boxLo, const vec3d& boxHi,
 {
 	arrFoundCoords.resize(0);
 	arrFoundIndices.resize(0);
-	U32 ctVertices = m_lpSurfaceMesh->getVertexCount();
+	U32 ctVertices = m_lpSurfaceMesh->countVertices();
 	for(U32 i=0; i<ctVertices;i++)
 	{
 		vec3d v = m_lpSurfaceMesh->vertexAt(i);
@@ -424,7 +431,7 @@ int Deformable::pickVertices(const vec3d& boxLo, const vec3d& boxHi)
 	m_vHapticIndices.resize(0);
 	m_vHapticDisplacements.resize(0);
 
-	U32 ctVertices = m_lpSurfaceMesh->getVertexCount();
+	U32 ctVertices = m_lpSurfaceMesh->countVertices();
 	for(U32 i=0; i<ctVertices;i++)
 	{
 		vec3d vv = m_lpSurfaceMesh->vertexAt(i);
@@ -448,7 +455,7 @@ bool Deformable::addFixedVertex(int index)
 	}
 
 	m_vFixedVertices.push_back(index);
-	this->setupIntegrator();
+	updateFixedVertices();
 
 	return true;
 }
@@ -469,7 +476,28 @@ bool Deformable::removeFixedVertex(int index){
 	if(!bChanged)
 		return false;
 
-	this->setupIntegrator();
+	updateFixedVertices();
+	return true;
+}
+
+bool Deformable::setFixedVertices(const std::vector<int>& vFixedVertices) {
+
+	m_vFixedVertices.assign(vFixedVertices.begin(), vFixedVertices.end());
+	return updateFixedVertices();
+}
+
+int  Deformable::getFixedVertices(vector<int>& vFixedVertices) {
+	vFixedVertices.assign(m_vFixedVertices.begin(), m_vFixedVertices.end());
+	return (int)m_vFixedVertices.size();
+}
+
+bool Deformable::updateFixedVertices() {
+	//Update DOFS
+	FixedVerticesToFixedDOF(m_vFixedVertices, m_vFixedDofs);
+
+	//Set fixed dofs
+	m_lpIntegrator->setConstrainedDOF(m_vFixedDofs.size(), &m_vFixedDofs[0]);
+
 	return true;
 }
 
@@ -480,22 +508,9 @@ void Deformable::setupIntegrator(int ctThreads)
 
 	//Rebuilt Integrator
 	SAFE_DELETE(m_lpIntegrator);
-
 	LogInfoArg1("Setup Integrator with %d threads.", ctThreads);
 
 	// initialize the Integrator
-/*
-	m_lpIntegrator = new OclVolConservedIntegrator(m_dof, m_timeStep,
-													 m_lpMassMatrix,
-													 m_lpDeformableForceModel,
-													 m_positiveDefiniteSolver,
-													 m_vFixedDofs.size(),
-													 &m_vFixedDofs[0],
-													 m_dampingMassCoeff,
-													 m_dampingStiffnessCoeff,
-													 1, 1E-6, ctThreads);
-*/
-
 	m_lpIntegrator = new VolumeConservingIntegrator(m_dof, m_timeStep,
 													 m_lpMassMatrix,
 													 m_lpDeformableForceModel,
@@ -548,28 +563,92 @@ void Deformable::hapticEnd()
 	cleanupCuttingStructures();
 }
 
-//Apply External Forces to the integerator
-bool Deformable::applyAllExternalForces()
-{
-	//Reset External Force
-	memset(m_arrExtForces, 0, sizeof(double) * m_dof);
+bool Deformable::applyCollisionForces() {
+	if(!m_collisionObj)
+		return false;
 
-	//1.Apply Gravity along global y direction: W = mg
-	if(m_bApplyGravity) {
-		for(U32 i=0; i < m_dof; i++) {
-			if(i % 3 == 1) {
-				m_arrExtForces[i] = -10;
+	AABB box2 = m_collisionObj->aabb();
+	box2.transform(m_collisionObj->transform()->forward());
+
+
+
+	if(this->aabb().intersect(box2)) {
+		vec3f c = m_collisionObj->transform()->forward().map(vec3f(0,0,0));
+		vec3d n = vec3d(0.0, 1.0, 0.0);
+
+		//Count collided vertices
+		U32 ctCollided = 0;
+		U32 dof = 0;
+		for (U32 i = 0; i < m_lpSurfaceMesh->countVertices(); i++) {
+			vec3d pc = m_lpSurfaceMesh->vertexAt(i);
+			if (pc.y <= (double)c.y)
+				ctCollided++;
+		}
+
+		if(ctCollided > 0) {
+			printf("Compensation!\n");
+
+			for (U32 i = 0; i < m_lpSurfaceMesh->countVertices(); i++) {
+				dof = i * 3;
+				vec3d pc = m_lpSurfaceMesh->vertexAt(i);
+				vec3d q   = vec3d(&m_q[dof]);
+				//vec3d acc = vec3d(&m_qAcc[dof]);
+				vec3d vel = vec3d(&m_qVel[dof]);
+
+				vec3d vn = n * vec3d::dot(vel, n);
+				vec3d vp = vel - vn;
+				vec3d vr = vp - vn * 0.8;
+
+				m_qAcc[dof] = 0.0;
+				m_qAcc[dof+1] = 0.0;
+				m_qAcc[dof+2] = 0.0;
+
+				//vel = vel * (-0.80);
+				m_qVel[dof] = vr.x;
+				m_qVel[dof+1] = vr.y;
+				m_qVel[dof+2] = vr.z;
+
+				//Collision
+				if (pc.y <= (double)c.y) {
+					ctCollided++;
+
+					double delta = (double)c.y - pc.y;
+
+					m_q[dof] = q.x;
+					m_q[dof+1] = q.y + delta;
+					m_q[dof+2] = q.z;
+				}
+			}
+		}
+
+
+		m_lpIntegrator->SetqState(m_q, m_qVel, m_qAcc);
+
+		//Collided
+//		if (ctCollided > 0) {
+//			for (U32 i = 0; i < m_lpSurfaceMesh->countVertices(); i++) {
+//				m_arrExtForces[i * 3] = force.x;
+//				m_arrExtForces[i * 3 + 1] = force.y;
+//				m_arrExtForces[i * 3 + 2] = force.z;
+//			}
+//		}
+
+
+		return true;
+	}
+	else {
+		//Apply Gravity along global y direction: W = mg
+		if(m_bApplyGravity) {
+			for(U32 i=0; i < m_dof; i++) {
+				if(i % 3 == 1) {
+					m_arrExtForces[i] += -10.0;
+				}
 			}
 		}
 	}
 
-	//2.Apply Haptics
-	applyHapticForces();
 
-	//Integrate
-	m_lpIntegrator->SetExternalForces(m_arrExtForces);
-
-	return true;
+	return false;
 }
 
 bool Deformable::applyHapticForces() {
@@ -657,15 +736,15 @@ bool Deformable::hapticUpdateDisplace()
 
 
 	//Reset Displacements Vector
-	memset(m_arrDisplacements, 0, sizeof(double) * m_dof);
+	memset(m_q, 0, sizeof(double) * m_dof);
 
 	//Instead of pulled vertex we may now have an array of vertices
 	for(size_t i=0; i<m_vHapticIndices.size(); i++)
 	{
 		int idxVertex = m_vHapticIndices[i];
-		m_arrDisplacements[3 * idxVertex + 0] = m_vHapticDisplacements[i].x;
-		m_arrDisplacements[3 * idxVertex + 1] = m_vHapticDisplacements[i].y;
-		m_arrDisplacements[3 * idxVertex + 2] = m_vHapticDisplacements[i].z;
+		m_q[3 * idxVertex + 0] = m_vHapticDisplacements[i].x;
+		m_q[3 * idxVertex + 1] = m_vHapticDisplacements[i].y;
+		m_q[3 * idxVertex + 2] = m_vHapticDisplacements[i].z;
 	}
 
 	//Distribute displace over the neighboring vertices
@@ -712,9 +791,9 @@ bool Deformable::hapticUpdateDisplace()
 			{
 
 				// apply force
-				m_arrDisplacements[3 * *iter + 0] += displaceMagnitude * displace.x;
-				m_arrDisplacements[3 * *iter + 1] += displaceMagnitude * displace.y;
-				m_arrDisplacements[3 * *iter + 2] += displaceMagnitude * displace.z;
+				m_q[3 * *iter + 0] += displaceMagnitude * displace.x;
+				m_q[3 * *iter + 1] += displaceMagnitude * displace.y;
+				m_q[3 * *iter + 2] += displaceMagnitude * displace.z;
 
 				// generate new layers
 				lastLayerVertices.insert(*iter);
@@ -725,7 +804,7 @@ bool Deformable::hapticUpdateDisplace()
 
 	//Compute external forces to be applied. Input: displacements, Output: forces
 	memset(m_arrExtForces, 0, sizeof(double) * m_dof);
-	m_lpDeformableForceModel->GetInternalForce(m_arrDisplacements, m_arrExtForces);
+	m_lpDeformableForceModel->GetInternalForce(m_q, m_arrExtForces);
 
 	//Negate forces
 	//for(U32 i=0; i < m_dof; i++)
@@ -779,7 +858,7 @@ int Deformable::performCuts(const vec3d& s0, const vec3d& s1)
 {
 	if(!m_lpSurfaceMesh || !m_lpTetMesh)
 		return -1;
-	U32 ctFaces = m_lpSurfaceMesh->getFaceCount();
+	U32 ctFaces = m_lpSurfaceMesh->countTriangles();
 	U32 ctTets = m_lpTetMesh->getNumElements();
 	if(ctFaces == 0)
 		return -1;
@@ -1181,7 +1260,7 @@ void Deformable::draw()
 	if(m_lpSurfaceMesh)
 		m_lpSurfaceMesh->draw();
 
-	if(m_idxPulledVertex >= 0  && m_idxPulledVertex < (int)m_lpSurfaceMesh->getVertexCount() ) {
+	if(m_idxPulledVertex >= 0  && m_idxPulledVertex < (int)m_lpSurfaceMesh->countVertices() ) {
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
 			glEnable(GL_POLYGON_OFFSET_POINT);
 			glPolygonOffset(-1.0f, -1.0f);
@@ -1193,4 +1272,6 @@ void Deformable::draw()
 			glDisable(GL_POLYGON_OFFSET_FILL);
 		glPopAttrib();
 	}
+
+	DrawAABB(this->aabb(), vec3f(0,0,0));
 }

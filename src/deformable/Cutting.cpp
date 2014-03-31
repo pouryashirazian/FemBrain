@@ -86,7 +86,7 @@ bool Cutting::createMemBuffers() {
 
 	//TetMesh Stats
 	m_meshInfo.ctTets = m_lpDeformable->getTetMesh()->getNumElements();
-	m_meshInfo.ctVertices = m_lpDeformable->getSurfMesh()->getVertexCount();
+	m_meshInfo.ctVertices = m_lpDeformable->getSurfMesh()->countVertices();
 
 
 	U32 szVertexBuffer = sizeof(float) * 4 * m_meshInfo.ctVertices;

@@ -98,6 +98,7 @@ public:
 
     void addCube(const vec3f& lower, const vec3f& upper);
     void addCube(const vec3f& center, float side);
+    void addSphere(float radius = 1.0f, int hseg = 8, int vseg = 8);
     
     /*!
      * Add a ring to the geometry

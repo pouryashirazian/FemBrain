@@ -69,6 +69,7 @@ public:
   virtual double GetKineticEnergy();
   virtual double GetTotalMass();
 
+  virtual bool setConstrainedDOF(int num, int* arrConstrainedDOFs_);
 protected:
   SparseMatrix * massMatrix; 
   ForceModel * forceModel;

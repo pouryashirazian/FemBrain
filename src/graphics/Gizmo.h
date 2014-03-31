@@ -31,9 +31,9 @@ class IGizmoListener : public IMouseListener {
 public:
 	IGizmoListener();
 	virtual ~IGizmoListener();
-	virtual void translate(const vec3f& delta, const vec3f& pos) {}
-	virtual void scale(const vec3f& delta, const vec3f& current) {}
-	virtual void rotate(const quatf& delta, const quatf& current) {}
+	virtual void onTranslate(const vec3f& delta, const vec3f& pos) {}
+	virtual void onScale(const vec3f& delta, const vec3f& current) {}
+	virtual void onRotate(const quatf& delta, const quatf& current) {}
 
 	bool registerListener();
 	void unregisterListener();

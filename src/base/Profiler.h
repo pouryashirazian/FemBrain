@@ -160,6 +160,8 @@ public:
 	//Flags
 	int flags() const { return m_flags;}
 	void setWriteFlags(int flags) {m_flags = flags;}
+	bool getInjectToLogFlag() const;
+	void setInjectToLogFlag(bool enable);
 
 
 	static tick GetTickCount();

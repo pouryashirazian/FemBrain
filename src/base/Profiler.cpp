@@ -179,7 +179,7 @@ int ProfileSession::writeToTextFile() {
 }
 
 int ProfileSession::writeToSqlDB() {
-	return 1;
+	return 0;
 }
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -238,6 +238,18 @@ double Profiler::endEvent() {
 tick Profiler::GetTickCount() {
 	return tbb::tick_count::now();
 }
+
+bool Profiler::getInjectToLogFlag() const {
+	return ((m_flags & pbInjectToLogger) != 0);
+}
+
+void Profiler::setInjectToLogFlag(bool enable) {
+	if(enable)
+		m_flags |= pbInjectToLogger;
+	else if(m_flags & pbInjectToLogger)
+		m_flags ^= pbInjectToLogger;
+}
+
 
 //////////////////////////////////////////////////////////////////////////////////////////
 void psProfileStart(const char* filename, const char* funcname, int line, const char* desc) {

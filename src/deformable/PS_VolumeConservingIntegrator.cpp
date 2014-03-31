@@ -234,8 +234,7 @@ int VolumeConservingIntegrator::DoTimestep() {
 		}
 
 		for (int i = 0; i < numConstrainedDOFs; i++)
-			q[constrainedDOFs[i]] = qvel[constrainedDOFs[i]] =
-					qaccel[constrainedDOFs[i]] = 0.0;
+			q[constrainedDOFs[i]] = qvel[constrainedDOFs[i]] = qaccel[constrainedDOFs[i]] = 0.0;
 
 		numIter++;
 	} while (numIter < maxIterations);

@@ -494,7 +494,7 @@ namespace PS {
 
                 	//Post Messages
                 	for(U32 i=0; i<m_clients.size(); i++)
-                		m_clients[i]->translate(delta, m_pos);
+                		m_clients[i]->onTranslate(delta, m_pos);
 
                 	sprintf(buffer,
                 			"translate del=(%.3f, %.3f, %.3f), cur=(%.3f, %0.3f, %.3f), axis=%s",
@@ -509,7 +509,7 @@ namespace PS {
 
                 	//Post Messages
                 	for(U32 i=0; i<m_clients.size(); i++)
-                		m_clients[i]->scale(delta, m_scale);
+                		m_clients[i]->onScale(delta, m_scale);
 
                 	sprintf(buffer,
                 			"scale del=(%.3f, %.3f, %.3f), cur=(%.3f, %0.3f, %.3f), axis=%s",
@@ -528,7 +528,7 @@ namespace PS {
 
                 	//Post Messages
                 	for(U32 i=0; i<m_clients.size(); i++)
-                		m_clients[i]->rotate(q, m_rotate);
+                		m_clients[i]->onRotate(q, m_rotate);
 
                 	sprintf(buffer,
                 			"rotate axis=(%.3f, %.3f, %.3f), angle=(%.3f), axis=%s",

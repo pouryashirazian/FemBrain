@@ -369,8 +369,8 @@ public:
 template<typename T>
 inline void Vec3<T>::normalize(){
 	T len = sqrt(x*x + y*y + z*z);
-	//if(len == 0.0)
-		//return;
+	if(len == 0.0)
+		return;
     T dInv = 1.0 / len;
     x *= dInv;
     y *= dInv;

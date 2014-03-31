@@ -29,6 +29,8 @@ using namespace PS;
 using namespace PS::GL;
 using namespace PS::MATH;
 
+#define FRAME_TIME_BUFFER_SIZE 32
+
 
 namespace PS {
 namespace SG {
@@ -105,7 +107,7 @@ private:
     int m_idAnimationHeader;
 
     //Stats
-    MovingAvg<double, 512> m_avgFrameTime;
+    MovingAvg<double, FRAME_TIME_BUFFER_SIZE> m_avgFrameTime;
     tbb::tick_count m_tick;
     double m_fps;
     U64 m_ctFrames;

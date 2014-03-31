@@ -93,7 +93,7 @@ void AvatarCube::mousePress(int button, int state, int x, int y) {
 	}
 }
 
-void AvatarCube::translate(const vec3f& delta, const vec3f& pos) {
+void AvatarCube::onTranslate(const vec3f& delta, const vec3f& pos) {
 
 	if(m_lpTissue == NULL)
 		return;
@@ -233,16 +233,18 @@ void AvatarCube::draw() {
 	glEnable(GL_LIGHTING);
 */
 
-	m_spTransform->bind();
+	//faces
     SGMesh::draw();
 
     //WireFrame
+    m_spTransform->bind();
     glPushAttrib(GL_ALL_ATTRIB_BITS);
     glDisable(GL_LIGHTING);
     glColor3f(0,0,0);
     	m_outline.draw();
     glEnable(GL_LIGHTING);
     glPopAttrib();
+
     m_spTransform->unbind();
 }
 

@@ -575,6 +575,54 @@ void Geometry::addCube(const vec3f& lower, const vec3f& upper) {
         addCube(lo, hi);
     }
     
+    void Geometry::addSphere(float radius, int hseg, int vseg) {
+    	float vSegInv = 1.0f / (float)vseg;
+    	float hSegInv = 1.0f / (float)hseg;
+    	int idxStart = countVertices();
+
+    	//Loop Over
+    	for(int v=0; v<vseg+1; v++) {
+    		float p = DEGTORAD((float)v * vSegInv * 180.0f);
+
+    		for(int h=0; h<hseg; h++) {
+    			float o = DEGTORAD((float)h * hSegInv * 360.0f);
+
+    			vec3f v1;
+    			v1.x = radius * sin(p) * sin(o);
+    			v1.z = radius * sin(p) * cos(o);
+    			v1.y = radius * cos(p);
+
+    			vec3f n = v1.normalized();
+
+    			//Add Vertex
+    			addVertex(v1);
+    			addNormal(n);
+    		}
+    	}
+
+    	//Indices
+    	int t[4];
+    	for(int v=0; v<vseg; v++) {
+    		for(int h=0; h<hseg; h++) {
+    			t[0] = h + v*hseg;
+    			t[1] = t[0] + 1;
+    			t[2] = h + (v+1)*hseg;
+    			t[3] = t[2] + 1;
+
+    			if(h == hseg-1) {
+    				t[1] = v*hseg;
+    				t[3] = (v+1)*hseg;
+    			}
+
+    			//Triangles
+    			addTriangle(vec3i(idxStart) + vec3i(t[0], t[2], t[1]));
+    			addTriangle(vec3i(idxStart) + vec3i(t[1], t[2], t[3]));
+    		}
+    	}
+
+
+    }
+
     bool Geometry::addRing(int sectors,
                            int xsections,
                            float innerRadius,

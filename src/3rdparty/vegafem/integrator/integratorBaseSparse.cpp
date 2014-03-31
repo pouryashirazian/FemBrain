@@ -70,3 +70,19 @@ double IntegratorBaseSparse::GetTotalMass()
   return massMatrix->SumEntries();
 }
 
+bool IntegratorBaseSparse::setConstrainedDOF(int num, int* arrConstrainedDOFs_) {
+	if(num == 0 || arrConstrainedDOFs_ == 0)
+		return false;
+
+	//Free previously allocated constrained nodes
+	if(constrainedDOFs)
+		free(constrainedDOFs);
+
+	//Add
+	numConstrainedDOFs = num;
+	constrainedDOFs = (int*) malloc (sizeof(int) * numConstrainedDOFs);
+	memcpy(constrainedDOFs, arrConstrainedDOFs_, sizeof(int) * numConstrainedDOFs);
+
+	return true;
+}
+

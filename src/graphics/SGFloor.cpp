@@ -76,6 +76,10 @@ SGFloor::SGFloor(int rows, int cols, float step) {
 		idxSecond += 6;
 	}
 
+	//Set AABB
+	m_aabb.set(vec3f(-0.5f * rows * step, 0.0, -0.5f * cols * step),
+			   vec3f(+0.5f * rows * step, 0.0, +0.5f * cols * step));
+
 	//Setup Mesh Buffers
 	setupVertexAttribs(arrVertices, 3, mbtPosition);
 	setupVertexAttribs(arrColors, 3, mbtColor);
@@ -89,7 +93,8 @@ SGFloor::~SGFloor() {
 
 void SGFloor::draw() {
 	glDisable(GL_LIGHTING);
-	GLMeshBuffer::draw();
+
+	SGMesh::draw();
 
 	glEnable(GL_LIGHTING);
 }

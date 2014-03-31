@@ -18,8 +18,6 @@ namespace FEM {
  * Synopsis: Surface mesh is the BRep for the volume mesh
  * The same vertex list is used in Surface mesh and Volume Mesh
  */
-
-
 class SurfaceMesh : public SGMesh {
 public:
 	SurfaceMesh();
@@ -39,11 +37,6 @@ public:
 	bool setupFromTetMesh(const vector<double>& inTetVertices,
 							const vector<U32>& inTetElements);
 
-	//Count
-	U32 getVertexCount() const;
-	U32 getFaceCount() const;
-
-
 	//Access
 	//bool isVertexIndex(U32 idx);
 
@@ -60,11 +53,12 @@ public:
 	int findClosestVertex(const vec3d& query, double& dist, vec3d& outP);
 
 	//Fixed Vertices
-	int getFixedVertices(vector<U32>& fixedVertices);
-	void setFixedVertices(const vector<U32>& fixedVertices);
+	int getFixedVertices(vector<int>& fixedVertices);
+	void setFixedVertices(const vector<int>& fixedVertices);
 
 	//Apply Displacements
 	void applyDisplacements(double * u);
+	void updateAABB();
 
 	//Topology Modification
 	void updateFaceBuffer();
@@ -98,7 +92,7 @@ private:
 
 	//Face Elements (Triangles or Quads)
 	vector<U32> m_faces;
-	vector<U32> m_vFixedVertices;
+	vector<int> m_vFixedVertices;
 
 };
 

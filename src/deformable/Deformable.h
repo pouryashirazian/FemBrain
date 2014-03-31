@@ -63,13 +63,13 @@ public:
 	 */
 	explicit Deformable(const char* lpVegFilePath,
 						   const char* lpObjFilePath,
-						   std::vector<U32>& vFixedVertices,
+						   std::vector<int>& vFixedVertices,
 						   int ctThreads = 0,
 						   const char* lpModelTitle = NULL);
 
 	explicit Deformable(const vector<double>& inTetVertices,
 					 	 const vector<U32>& inTetElements,
-					 	 const vector<U32>& vFixedVertices);
+					 	 const vector<int>& vFixedVertices);
 
 	virtual ~Deformable();
 
@@ -128,9 +128,14 @@ public:
 	void setDampingMassCoeff(double m);
 	double getDampingMassCoeff() const {return m_dampingMassCoeff;}
 
+	//Fixed dofs
 	bool addFixedVertex(int index);
 	bool removeFixedVertex(int index);
+	bool setFixedVertices(const std::vector<int>& vFixedVertices);
+	int  getFixedVertices(vector<int>& vFixedVertices);
+	bool updateFixedVertices();
 
+	//Volume
 	double computeVolume(double* arrStore = NULL, U32 count = 0) const;
 	bool isVolumeChanged() const { return  !EssentiallyEquald(this->computeVolume(), m_restVolume, 0.0001);}
 
@@ -146,9 +151,11 @@ public:
 	void setGravity(bool bGravity) {m_bApplyGravity = bGravity;}
 	bool getGravity() const {return m_bApplyGravity;}
 
-	//Apply External Forces
-	bool applyAllExternalForces();
+	bool applyCollisionForces();
 	bool applyHapticForces();
+
+	//Collision object
+	void setCollisionObject(SGNode* obj) {m_collisionObj = obj;}
 
 	//Set callbacks
 	void setDeformCallback(FOnApplyDeformations fOnDeform) {
@@ -160,7 +167,7 @@ public:
 	//Setup
 	int setupTetMesh(const vector<double>& inTetVertices,
 					 const vector<U32>& inTetElements,
-					 const vector<U32>& vFixedVertices);
+					 const vector<int>& vFixedVertices);
 
 	/*!
 	 * Return: Outputs number of dofs
@@ -173,7 +180,7 @@ private:
 	 */
 	void setup(const char* lpVegFilePath,
 			    const char* lpObjFilePath,
-			    std::vector<U32>& vFixedVertices,
+			    std::vector<int>& vFixedVertices,
 			    int ctThreads = 0,
 			    const char* lpModelTitle = NULL);
 
@@ -239,7 +246,9 @@ private:
 	U32 m_ctTimeStep;
 
 	U32 m_dof;
-	double* m_arrDisplacements;
+	double* m_q;
+	double* m_qVel;
+	double* m_qAcc;
 	double* m_arrExtForces;
 	double* m_arrElementVolumes;
 
@@ -264,6 +273,8 @@ private:
 	bool m_bApplyGravity;
 
 	string m_strModelName;
+
+	SGNode* m_collisionObj;
 };
 
 #endif /* PS_DEFORMABLE_H_ */

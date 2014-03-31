@@ -21,7 +21,7 @@ public:
 
 	//From Gizmo Manager
 	void mousePress(int button, int state, int x, int y);
-	void translate(const vec3f& delta, const vec3f& pos);
+	void onTranslate(const vec3f& delta, const vec3f& pos);
 
 	vec3f lower() const;
 	vec3f upper() const;
