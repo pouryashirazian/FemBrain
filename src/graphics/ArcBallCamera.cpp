@@ -7,6 +7,7 @@ namespace PS
 
 ArcBallCamera::ArcBallCamera()
 {
+	m_keyModifier = 0;
     m_omega = horizontalAngle;
     m_phi = verticalAngle;
     m_rho = zoom;
@@ -26,6 +27,7 @@ ArcBallCamera::ArcBallCamera(float roll, float tilt, float zoom)
     setOrigin(vec3f(0.0f, 0.0f, 0.0f));
     setCenter(vec3f(0.0f, 0.0f, 0.0f));
 
+    m_keyModifier = 0;
     m_mouseButton = mbNone;
     m_lastPos = vec2i(0, 0);
 }
@@ -135,10 +137,11 @@ void ArcBallCamera::mouseMove(int x, int y)
     {
         setRoll(this->getRoll() + dx);
         setTilt(this->getTilt() + dy);
-//        if() {
-//        	m_pan.x += 0.01f * dx;
-//        	m_pan.y += 0.01f * dy;
-//        }
+
+        if (m_keyModifier == GLUT_ACTIVE_CTRL) {
+        	m_pan.x += 0.01f * dx;
+        	m_pan.y += 0.01f * dy;
+        }
     }
 }
 

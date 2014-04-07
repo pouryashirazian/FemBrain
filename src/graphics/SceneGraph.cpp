@@ -142,6 +142,7 @@ mat44f SceneGraph::modelviewprojection() const {
 }
 
 void SceneGraph::mouseMove(int x, int y) {
+	m_camera.setKeyModifier(m_keyModifier);
 	m_camera.mouseMove(x, y);
 	updateCameraHeader();
 }

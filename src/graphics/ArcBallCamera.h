@@ -37,6 +37,7 @@ private:
     vec3f m_yAxis;
     vec3f m_zAxis;
 
+    int m_keyModifier;
     MouseButton m_mouseButton;
 public:
     //Default Constructor
@@ -94,8 +95,8 @@ public:
     //Last position
     vec2i getLastPos() const {return m_lastPos;}
     void setLastPos(const vec2i& lastPos) { m_lastPos = lastPos;}
+    void setKeyModifier(int mod) { m_keyModifier = mod;}
 
-    //
     //vec3f convertToWorld(const vec3f& pos);
     void computeLocalCoordinateSystem();
     void screenToWorld_OrientationOnly3D(const vec3f& ptScreen, vec3f& ptWorld);

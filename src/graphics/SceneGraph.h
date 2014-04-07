@@ -87,6 +87,10 @@ public:
     SGHeaders* headers() const {return m_headers;}
     void updateCameraHeader();
 
+    //Modifier
+    int getModifier() const {return m_keyModifier;}
+    void setModifier(int mod) {m_keyModifier = mod;}
+
     void update();
     static AnsiStr gpuInfo();
 
@@ -102,6 +106,8 @@ protected:
     void cleanup();
 
 private:
+    int m_keyModifier;
+
 	CopyStack<mat44f> m_stkProjection;
 	CopyStack<mat44f> m_stkModelView;
 	std::vector<SGNode*> m_vSceneNodes;

@@ -47,24 +47,5 @@ protected:
 	AABB m_aabbCurrent;
 };
 
-/*!
- * Synopsis: Scalpel is the tool to cut mesh
- * The path sweptby scalpel will be stored to perform cutting on the mesh
- */
-class AvatarScalpel : public GLMeshBuffer{
-public:
-	AvatarScalpel();
-	AvatarScalpel(const vec3d& lo, const vec3d& hi);
-	virtual ~AvatarScalpel();
-
-	vec3d lower() const {return m_lo;}
-	vec3d upper() const {return m_hi;}
-private:
-	void setup(const vec3d& lo, const vec3d& hi);
-
-private:
-	vec3d m_lo;
-	vec3d m_hi;
-};
 
 #endif

@@ -29,6 +29,7 @@
 
 #include "deformable/Deformable.h"
 #include "deformable/Avatar.h"
+#include "deformable/AvatarScalpel.h"
 #include "deformable/TetGenExporter.h"
 #include "deformable/MassSpringSystem.h"
 #include "deformable/Cutting.h"
@@ -399,6 +400,9 @@ void SpecialKey(int key, int x, int y)
 			break;
 		}
 	}
+
+	//Modifier
+	TheSceneGraph::Instance().setModifier(glutGetModifiers());
 
 	glutPostRedisplay();
 }
