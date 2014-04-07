@@ -692,6 +692,32 @@ namespace SKETCH {
 			m_lpGPU->finishAllCommands();
 			//PrintArray(lpCellElementsOffset, m_cellParam.ctTotalCells);
 
+
+			//Voxels: Count crossed voxels
+			U32 ctCrossedVoxels = 0;
+			for(U32 i=0; i < m_cellParam.ctTotalCells; i++) {
+				if(lpCellElementsOffset[i] > 0)
+					ctCrossedVoxels++;
+			}
+
+			//Voxels
+			m_voxels.reserve(ctCrossedVoxels);
+			vec3f lower = vec3f(&m_blob.arrHeader[0]);
+
+			U32 dx = m_cellParam.ctNeededCells[0];
+			U32 dxdy = dx * m_cellParam.ctNeededCells[1];
+			for(U32 i=0; i<m_cellParam.ctNeededCells[0]; i++) {
+				for(U32 j=0; j<m_cellParam.ctNeededCells[1]; j++) {
+					for(U32 k=0; k<m_cellParam.ctNeededCells[2]; k++) {
+						U32 idxCell = k * dxdy + j * dx + i;
+						if(lpCellElementsOffset[idxCell] > 0) {
+							m_voxels.push_back(lower + vec3f(i, j, k) * m_cellsize);
+						}
+					}
+				}
+			}
+
+
 			//6. SumScan to read all elements
 			m_ctFaceElements = m_lpOclSumScan->compute(lpCellElementsOffset, m_cellParam.ctTotalCells);
 			//PrintArray(lpCellElementsOffset, m_cellParam.ctTotalCells);

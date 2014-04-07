@@ -3,8 +3,8 @@
 #define CGLSHADER_H
 
 #include "base/String.h"
-#include <vector>
 #include "base/Vec.h"
+#include <vector>
 
 using namespace PS::MATH;
 #define GL_SUCCESS		   1

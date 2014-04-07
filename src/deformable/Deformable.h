@@ -150,12 +150,11 @@ public:
 	//Gravity
 	void setGravity(bool bGravity) {m_bApplyGravity = bGravity;}
 	bool getGravity() const {return m_bApplyGravity;}
-
-	bool applyCollisionForces();
 	bool applyHapticForces();
 
 	//Collision object
 	void setCollisionObject(SGNode* obj) {m_collisionObj = obj;}
+	bool collisionDetect();
 
 	//Set callbacks
 	void setDeformCallback(FOnApplyDeformations fOnDeform) {
@@ -271,6 +270,7 @@ private:
 	bool m_bRenderFixedVertices;
 	bool m_bRenderVertices;
 	bool m_bApplyGravity;
+	U32 m_ctCollided;
 
 	string m_strModelName;
 

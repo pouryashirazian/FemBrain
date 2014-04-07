@@ -1,7 +1,8 @@
 #include <iostream>
 #include <fstream>
 #include "GLShader.h"
-#include "selectgl.h"
+//#include "selectgl.h"
+#include "GL/glew.h"
 #include "base/FileDirectory.h"
 #include "base/Logger.h"
 
@@ -155,6 +156,7 @@ namespace PS {
             //Geometry Shader
             U32 uiGeometryShader;
             if(vGeometryCode) {
+            	/*
                 uiGeometryShader = glCreateShader(GL_GEOMETRY_SHADER);
                 glShaderSource(uiGeometryShader, 1, (const char**)&vGeometryCode, NULL);
                 glCompileShader(uiGeometryShader);
@@ -164,6 +166,7 @@ namespace PS {
                 if (!bShaderCompiled) {
                     reportShaderCompileErrors(uiGeometryShader, "geometry");
                 }
+                */
             }
             
             // Create the shader program

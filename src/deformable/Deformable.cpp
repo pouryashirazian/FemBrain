@@ -1,7 +1,7 @@
 //#include <tr1/unordered_map.h>
-#include "GL/glew.h"
 #include "Deformable.h"
 #include "base/Logger.h"
+#include "base/Profiler.h"
 #include "base/FileDirectory.h"
 #include "base/MathBase.h"
 #include "graphics/AABB.h"
@@ -19,6 +19,7 @@ using namespace __gnu_cxx;
 using namespace std;
 
 #define DEFAULT_TIME_STEP 0.0333
+
 
 using namespace PS::INTERSECTIONS;
 
@@ -79,6 +80,7 @@ void Deformable::cleanup()
 }
 
 void Deformable::init() {
+	m_ctCollided = 0;
 	m_strModelName = "FEMBRAIN";
 	m_collisionObj = NULL;
 	m_lpSurfaceMesh = NULL;
@@ -357,21 +359,89 @@ void Deformable::timestep()
 
 	//Apply external forces
 	memset(m_arrExtForces, 0, sizeof(double) * m_dof);
-	applyCollisionForces();
+
+	if(m_bApplyGravity && (m_ctCollided == 0)) {
+		for(U32 i=0; i < m_dof; i++) {
+			if(i % 3 == 1) {
+				m_arrExtForces[i] += -10.0;
+			}
+		}
+	}
+
+
+	//Haptic
 	applyHapticForces();
 	m_lpIntegrator->SetExternalForces(m_arrExtForces);
 
 	//Time Step
 	m_lpIntegrator->DoTimestep();
-
 	m_lpIntegrator->GetqState(m_q, m_qVel, m_qAcc);
 
-	m_lpSurfaceMesh->applyDisplacements(m_q);
+
+	//Collision
+	vec3f c = m_collisionObj->transform()->forward().map(vec3f(0,0,0));
+	vec3d n = vec3d(0.0, 1.0, 0.0);
+
+	//p current and rest
+	vec3d pc, pr;
+
+	//displacement and velocity
+	vec3d q, v;
+
+	m_ctCollided = 0;
+	for (U32 i = 0; i < m_lpSurfaceMesh->countVertices(); i++) {
+		pr = m_lpSurfaceMesh->vertexRestPosAt(i);
+		q = vec3d(&m_q[i*3]);
+
+		pc = pr + q;
+		if(pc.y <= c.y) {
+			m_ctCollided++;
+		}
+	}
+
+	//response
+	if(m_ctCollided > 0) {
+		U32 dof = 0;
+		for (U32 i = 0; i < m_lpSurfaceMesh->countVertices(); i++) {
+			dof = i*3;
+
+			pr = m_lpSurfaceMesh->vertexRestPosAt(i);
+			q = vec3d(&m_q[dof]);
+			pc = pr + q;
+
+
+			v = vec3d(&m_qVel[dof]);
+			vec3d vn = n * vec3d::dot(v, n);
+			vec3d vp = v - vn;
+			vec3d vr = vp - vn * 0.8;
+
+			//set
+			m_qAcc[dof] = 0.0;
+			m_qAcc[dof+1] = 0.0;
+			m_qAcc[dof+2] = 0.0;
+
+			m_qVel[dof] = vr.x;
+			m_qVel[dof+1] = vr.y;
+			m_qVel[dof+2] = vr.z;
+
+			//Collision
+			if(pc.y <= c.y) {
+				m_q[dof] = q.x;
+				m_q[dof+1] = c.y - pr.y;
+				m_q[dof+2] = q.z;
+			}
+		}
+
+
+		m_lpIntegrator->SetqState(m_q, m_qVel, m_qAcc);
+	}
+
 
 	//Update AABB
 	setAABB(m_lpSurfaceMesh->aabb());
 
-	//Apply deformations
+	//Apply displacements
+	m_lpSurfaceMesh->applyDisplacements(m_q);
 	if(m_fOnDeform)
 		m_fOnDeform(m_dof, m_q);
 
@@ -563,13 +633,13 @@ void Deformable::hapticEnd()
 	cleanupCuttingStructures();
 }
 
-bool Deformable::applyCollisionForces() {
+bool Deformable::collisionDetect() {
 	if(!m_collisionObj)
 		return false;
 
+	//ProfileAuto();
 	AABB box2 = m_collisionObj->aabb();
 	box2.transform(m_collisionObj->transform()->forward());
-
 
 
 	if(this->aabb().intersect(box2)) {

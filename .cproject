@@ -25,10 +25,7 @@
 							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="cdt.managedbuild.targetPlatform.gnu.cross.2010518615" isAbstract="false" osList="all" superClass="cdt.managedbuild.targetPlatform.gnu.cross"/>
 							<builder buildPath="${workspace_loc:/FemBrain}/Debug" id="cdt.managedbuild.builder.gnu.cross.1516156415" keepEnvironmentInBuildfile="false" name="Gnu Make Builder" parallelBuildOn="true" parallelizationNumber="optimal" superClass="cdt.managedbuild.builder.gnu.cross"/>
 							<tool id="cdt.managedbuild.tool.gnu.cross.c.compiler.792660676" name="Cross GCC Compiler" superClass="cdt.managedbuild.tool.gnu.cross.c.compiler">
-								<option id="gnu.c.compiler.option.include.paths.603433186" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="/home/pourya/Desktop/Projects/Dependencies/FREEGLUT/include"/>
-									<listOptionValue builtIn="false" value="/opt/AMDAPP/include"/>
-								</option>
+								<option id="gnu.c.compiler.option.include.paths.603433186" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths"/>
 								<option defaultValue="gnu.c.optimization.level.none" id="gnu.c.compiler.option.optimization.level.1554456327" name="Optimization Level" superClass="gnu.c.compiler.option.optimization.level" valueType="enumerated"/>
 								<option id="gnu.c.compiler.option.debugging.level.1020310146" name="Debug Level" superClass="gnu.c.compiler.option.debugging.level" value="gnu.c.debugging.level.max" valueType="enumerated"/>
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.666924804" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
@@ -40,9 +37,8 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty/eigen}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty/vegafem/include}&quot;"/>
 									<listOptionValue builtIn="false" value="/opt/intel/mkl/include"/>
-									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/OPENCL/common/inc"/>
+									<listOptionValue builtIn="false" value="/opt/AMDAPP/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLUI/src/include"/>
-									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLEW/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/TBB/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/LOKI/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/BOARD/include"/>
@@ -53,6 +49,7 @@
 								<option id="gnu.cpp.compiler.option.optimization.level.1492248665" name="Optimization Level" superClass="gnu.cpp.compiler.option.optimization.level" value="gnu.cpp.compiler.optimization.level.none" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.debugging.level.96620789" name="Debug Level" superClass="gnu.cpp.compiler.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.other.other.803746567" name="Other flags" superClass="gnu.cpp.compiler.option.other.other" value="-c -fmessage-length=0 -std=c++0x -std=gnu++0x -fopenmp" valueType="string"/>
+								<option id="gnu.cpp.compiler.option.dialect.std.632245965" name="Language standard" superClass="gnu.cpp.compiler.option.dialect.std" value="gnu.cpp.compiler.dialect.default" valueType="enumerated"/>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.947103318" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.cross.c.linker.1459836820" name="Cross GCC Linker" superClass="cdt.managedbuild.tool.gnu.cross.c.linker"/>
@@ -80,9 +77,8 @@
 								<option id="gnu.cpp.link.option.paths.185580923" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/TBB/build/linux_intel64_gcc_cc4.6_libc2.15_kernel3.2.0_release"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/BOARD/lib"/>
-									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLEW/lib"/>
 									<listOptionValue builtIn="false" value="&quot;${CPP_COMPONENTS}/LOKI/lib&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/AA_TetGen}&quot;"/>
+									<listOptionValue builtIn="false" value="/opt/AMDAPP/lib/x86_64"/>
 									<listOptionValue builtIn="false" value="/opt/intel/mkl/lib/intel64"/>
 									<listOptionValue builtIn="false" value="/opt/intel/lib/intel64"/>
 								</option>
@@ -139,9 +135,8 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty/eigen}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty/vegafem/include}&quot;"/>
 									<listOptionValue builtIn="false" value="/opt/intel/mkl/include"/>
-									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/OPENCL/common/inc"/>
+									<listOptionValue builtIn="false" value="/opt/AMDAPP/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLUI/src/include"/>
-									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLEW/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/TBB/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/LOKI/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/BOARD/include"/>
@@ -179,9 +174,8 @@
 								<option id="gnu.cpp.link.option.paths.536794980" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/TBB/build/linux_intel64_gcc_cc4.6_libc2.15_kernel3.2.0_release"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/BOARD/lib"/>
-									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLEW/lib"/>
 									<listOptionValue builtIn="false" value="&quot;${CPP_COMPONENTS}/LOKI/lib&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/AA_TetGen}&quot;"/>
+									<listOptionValue builtIn="false" value="/opt/AMDAPP/lib/x86_64"/>
 									<listOptionValue builtIn="false" value="/opt/intel/mkl/lib/intel64"/>
 									<listOptionValue builtIn="false" value="/opt/intel/lib/intel64"/>
 								</option>
@@ -252,15 +246,16 @@
 							<tool id="cdt.managedbuild.tool.gnu.archiver.macosx.base.1789410249" name="GCC Archiver" superClass="cdt.managedbuild.tool.gnu.archiver.macosx.base"/>
 							<tool id="cdt.managedbuild.tool.gnu.cpp.compiler.macosx.base.1508405256" name="GCC C++ Compiler" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.macosx.base">
 								<option id="gnu.cpp.compiler.option.include.paths.964579236" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/AA_VegaFem/include}&quot;"/>
-									<listOptionValue builtIn="false" value="/System/Library/Frameworks/OpenGL.framework/Headers"/>
-									<listOptionValue builtIn="false" value="/opt/X11/include"/>
-									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/LOKI/include"/>
-									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/OPENCL/common/inc"/>
-									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/TBB/include"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;/src"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty/eigen}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty/vegafem/include}&quot;"/>
+									<listOptionValue builtIn="false" value="/opt/intel/mkl/include"/>
+									<listOptionValue builtIn="false" value="/opt/AMDAPP/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLUI/src/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLEW/include"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/TBB/include"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/LOKI/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/BOARD/include"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.53134013" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">
@@ -338,15 +333,16 @@
 							<tool id="cdt.managedbuild.tool.gnu.archiver.macosx.base.301645360" name="GCC Archiver" superClass="cdt.managedbuild.tool.gnu.archiver.macosx.base"/>
 							<tool id="cdt.managedbuild.tool.gnu.cpp.compiler.macosx.base.980946519" name="GCC C++ Compiler" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.macosx.base">
 								<option id="gnu.cpp.compiler.option.include.paths.1262295066" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/AA_VegaFem/include}&quot;"/>
-									<listOptionValue builtIn="false" value="/System/Library/Frameworks/OpenGL.framework/Headers"/>
-									<listOptionValue builtIn="false" value="/opt/X11/include"/>
-									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/LOKI/include"/>
-									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/OPENCL/common/inc"/>
-									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/TBB/include"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;/src"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty/eigen}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty/vegafem/include}&quot;"/>
+									<listOptionValue builtIn="false" value="/opt/intel/mkl/include"/>
+									<listOptionValue builtIn="false" value="/opt/AMDAPP/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLUI/src/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/GLEW/include"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/TBB/include"/>
+									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/LOKI/include"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/BOARD/include"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.1173552599" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">

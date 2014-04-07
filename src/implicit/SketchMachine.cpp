@@ -134,16 +134,15 @@ void SketchMachine::sync() {
 	sprintf(buf, "Poly Grid [%d, %d, %d]", g.x, g.y, g.z);
 	LogInfo(buf);
     
-    
-    
-    
+
+	/*
     vec3f dim = m_blob.aabb().extent();
     dim.z = 0;
     vec3f c = m_blob.aabb().center();
     vec3f lo = c - vec3f::mul(0.5, dim);
     vec3f hi = c + vec3f::mul(0.5, dim);
     m_lpPolyModel->computeFieldImage(lo, hi, m_lpTexFields);
-    
+    */
     
 	glutPostRedisplay();
 }

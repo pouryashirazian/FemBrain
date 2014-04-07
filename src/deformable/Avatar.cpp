@@ -75,7 +75,6 @@ vec3f AvatarCube::upper() const {
 }
 
 void AvatarCube::mousePress(int button, int state, int x, int y) {
-	printf("Press %d\n", state);
 	//Down Start
 	if(state == 0) {
 		if(m_lpTissue) {

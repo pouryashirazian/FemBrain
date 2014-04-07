@@ -336,7 +336,7 @@ void SurfaceMesh::setFixedVertices(const vector<int>& fixedVertices) {
 }
 
 void SurfaceMesh::applyDisplacements(double * u) {
-	ProfileAuto();
+	//ProfileAuto();
 	//Apply displacement
 	for (U32 i = 0; i < m_vCurPos.size(); i++)
 		m_vCurPos[i] = m_vRestPos[i] + u[i];

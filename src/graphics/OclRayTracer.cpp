@@ -67,6 +67,7 @@ bool RayTracer::run(){
 	imageFormat.image_channel_data_type = CL_FLOAT;
 
 #ifdef CL_API_SUFFIX__VERSION_1_2
+
 	cl_int errNum;
 	cl_image_desc desc;
 	desc.image_type = CL_MEM_OBJECT_IMAGE2D;
@@ -84,7 +85,7 @@ bool RayTracer::run(){
 	if (errNum != CL_SUCCESS) {
 		char buffer[1024];
 		sprintf(buffer, "Error: Failed to create image! (%s)",
-				ComputeDevice::oclErrorString(errNum));
+				PS::CL::oclErrorString(errNum));
 		LogError(buffer);
 		cerr << buffer << endl;
 		return false;

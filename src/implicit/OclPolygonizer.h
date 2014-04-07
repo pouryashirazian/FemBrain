@@ -103,6 +103,9 @@ public:
 
 	ComputeDevice* computeDevice() const {return m_lpGPU;}
 	vec3i voxelGridDim() const;
+	U32 countSurfaceVoxels() const {return m_voxels.size();}
+	const vector<vec3f>& surfaceVoxels() const {return m_voxels;}
+
 private:
 	/*!
 	 * Init shaders and opencl kernels
@@ -131,6 +134,7 @@ private:
 
 	void clearBlobBuffer();
 private:
+	vector<vec3f> m_voxels;
 
     struct CellParam{
 		U8 corner1[12];

@@ -16,7 +16,7 @@ Geometry::Geometry():m_stepVertex(3), m_stepColor(4), m_stepTexCoord(2), m_stepF
 	this->init();
 }
 
-Geometry::Geometry(const Geometry& other) {
+Geometry::Geometry(const Geometry& other):m_stepVertex(3), m_stepColor(4), m_stepTexCoord(2), m_stepFace(3), m_faceMode(ftTriangles) {
 	this->copyFrom(other);
 }
 

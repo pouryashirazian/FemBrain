@@ -35,6 +35,11 @@ using namespace PS::MATH;
 namespace PS {
 namespace SG {
 
+struct LightSource {
+	vec4f pos;
+	vec4f color;
+};
+
 /*!
  * Scene Graph
  */

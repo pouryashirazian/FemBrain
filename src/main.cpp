@@ -19,8 +19,9 @@
 #include "graphics/CLMeshBuffer.h"
 #include "graphics/Lerping.h"
 #include "graphics/MorphingSphere.h"
-#include "graphics/Particles.h"
 #include "graphics/SGQuad.h"
+#include "graphics/SGSphere.h"
+#include "graphics/SGVoxels.h"
 
 #include "implicit/SketchMachine.h"
 #include "implicit/OclPolygonizer.h"
@@ -36,6 +37,8 @@
 #include "volumetricMeshLoader.h"
 #include "generateSurfaceMesh.h"
 #include "settings.h"
+
+//#include <vexcl/vector.hpp>
 
 using namespace std;
 using namespace PS;
@@ -155,6 +158,20 @@ void ApplyDeformations(U32 dof, double* displacements) {
 
 	if(TheSketchMachine::Instance().polygonizer())
 		TheSketchMachine::Instance().polygonizer()->applyFemDisplacements(dof, displacements);
+
+	//Compute MAX Displacement
+	/*
+	double dx, dy, dz;
+	dx = dy = dz = 0.0;
+	for(U32 i=0; i < dof; i+=3) {
+		dx = MATHMAX(dx, displacements[i]);
+		dy = MATHMAX(dy, displacements[i+1]);
+		dz = MATHMAX(dz, displacements[i+2]);
+	}
+
+	//Transform voxels
+	TheSceneGraph::Instance().get("voxels")->transform()->translate(vec3f(dx, dy, dz));
+	*/
 	//if(g_lpFastRBF)
 		//g_lpFastRBF->applyFemDisplacements(dof, displacements);
 
@@ -243,11 +260,16 @@ void NormalKey(unsigned char key, int x, int y)
 	case('d'): {
 		g_appSettings.drawGround = !g_appSettings.drawGround;
 		LogInfoArg1("Draw ground checkerboard set to: %d", g_appSettings.drawGround);
-		SGNode* floor = TheSceneGraph::Instance().get("floor");
-		if(floor)
-			floor->setVisible(g_appSettings.drawGround);
+		TheSceneGraph::Instance().get("floor")->setVisible(g_appSettings.drawGround);
 	}
 	break;
+	case('v'): {
+		g_appSettings.drawVoxels = !g_appSettings.drawVoxels;
+		LogInfoArg1("Draw voxels set to: %d", g_appSettings.drawVoxels);
+		TheSceneGraph::Instance().get("voxels")->setVisible(g_appSettings.drawVoxels);
+	}
+	break;
+
 	case('n'): {
 		g_appSettings.drawNormals = !g_appSettings.drawNormals;
 		LogInfoArg1("Draw Model Normals set to: %d", g_appSettings.drawNormals);
@@ -484,6 +506,7 @@ bool LoadSettings(const AnsiStr& strSimFP)
 	g_appSettings.drawAffineWidgets = cfg.readBool("DISPLAY", "AFFINEWIDGETS", true);
 	g_appSettings.drawGround = cfg.readBool("DISPLAY", "GROUND", true);
 	g_appSettings.drawNormals = cfg.readBool("DISPLAY", "NORMALS", true);
+	g_appSettings.drawVoxels = cfg.readBool("DISPLAY", "VOXELS", true);
 	g_appSettings.drawTetMesh = cfg.readInt("DISPLAY", "TETMESH", disFull);
 	g_appSettings.drawIsoSurface = cfg.readInt("DISPLAY", "ISOSURF", disFull);
 
@@ -517,8 +540,10 @@ bool SaveSettings(const AnsiStr& strSimFP)
 	cfg.writeBool("DISPLAY", "AFFINEWIDGETS", g_appSettings.drawAffineWidgets);
 	cfg.writeBool("DISPLAY", "GROUND", g_appSettings.drawGround);
 	cfg.writeBool("DISPLAY", "NORMALS", g_appSettings.drawNormals);
+	cfg.writeBool("DISPLAY", "VOXELS", g_appSettings.drawVoxels);
 	cfg.writeInt("DISPLAY", "TETMESH", g_appSettings.drawTetMesh);
 	cfg.writeInt("DISPLAY", "ISOSURF", g_appSettings.drawIsoSurface);
+
 
 	//MODEL PROPS
 	if(g_appSettings.editConstrainedNodes) {
@@ -573,7 +598,7 @@ int main(int argc, char* argv[])
 	//PS::TheEventLogger::Instance().setWriteFlags(PS_LOG_WRITE_EVENTTYPE | PS_LOG_WRITE_TIMESTAMP | PS_LOG_WRITE_SOURCE | PS_LOG_WRITE_TO_SCREEN);
 	PS::TheEventLogger::Instance().setWriteFlags(PS_LOG_WRITE_EVENTTYPE | PS_LOG_WRITE_SOURCE | PS_LOG_WRITE_TO_SCREEN);
 	PS::TheProfiler::Instance().setWriteFlags(Profiler::pbInjectToLogger);
-	TheProfiler::Instance().setInjectToLogFlag(false);
+	//TheProfiler::Instance().setInjectToLogFlag(false);
 	LogInfo("Starting FemBrain");
 
 	//Initialize app
@@ -591,6 +616,11 @@ int main(int argc, char* argv[])
 	glutSpecialFunc(SpecialKey);
 	glutCloseFunc(Close);
 	glutIdleFunc(timestep);
+
+
+//	const long N = 1024 * 1024;
+//	std::vector<real> A = random_vector < real > (N);
+//	std::vector<real> B(N);
 
 	//Setup Shading Environment
 	static const GLfloat lightColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -647,6 +677,7 @@ int main(int argc, char* argv[])
 	//TheSceneGraph::Instance().get("floor")->transform()->translate(vec3f(0, -1, 0));
 	TheSceneGraph::Instance().addSceneBox(AABB(vec3f(-10,-10,-16), vec3f(10,10,16)));
 
+
 	//Textured Ground
 	TheTexManager::Instance().add(strTexRoot + "wood.png");
 	SGQuad* woodenFloor = new SGQuad(16.0f, 16.0f, TheTexManager::Instance().get("wood"));
@@ -655,8 +686,13 @@ int main(int argc, char* argv[])
 	woodenFloor->transform()->rotate(vec3f(1.0f, 0.0f, 0.0f), 90.0f);
 	TheSceneGraph::Instance().add(woodenFloor);
 
+	//Light source
+	SGSphere* s = new SGSphere(0.3f, 8, 8);
+	s->transform()->translate(vec3f(&lightPos[0]));
+	TheSceneGraph::Instance().add(s);
+
 	//Add morphing sphere
-//	MorphingSphere* m = new MorphingSphere(2.0f, 16, 16);
+	//MorphingSphere* m = new MorphingSphere(2.0f, 16, 16);
 //	m->setName("floor");
 //	TheSceneGraph::Instance().add(m);
 
@@ -707,6 +743,13 @@ int main(int argc, char* argv[])
 		TheSketchMachine::Instance().polygonizer()->setVisible(g_appSettings.drawIsoSurface);
 		TheSketchMachine::Instance().polygonizer()->setWireFrameMode(g_appSettings.drawIsoSurface == disWireFrame);
 		TheSketchMachine::Instance().sync();
+
+		//Show voxels
+		SGVoxels* voxels = new SGVoxels(TheSketchMachine::Instance().polygonizer()->surfaceVoxels(), g_appSettings.cellsize);
+		voxels->setName("voxels");
+		voxels->setWireFrameMode(true);
+		voxels->setVisible(g_appSettings.drawVoxels);
+		TheSceneGraph::Instance().add(voxels);
 
 		//Create the RBF representation
 		//g_lpFastRBF = new FastRBF(lpBlobRender);
