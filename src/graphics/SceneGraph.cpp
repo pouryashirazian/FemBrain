@@ -208,7 +208,7 @@ Ray SceneGraph::screenToWorldRay(int x, int y) {
 	int screenHeight = vp[3];
 
 	//Select Gizmo First
-	vec3f ns(x, screenWidth - y, 0.0f);
+	vec3f ns(x, screenHeight - y, 0.0f);
 	vec3f fs(x, screenHeight - y, 1.0f);
 	vec3f nw;
 	vec3f fw;

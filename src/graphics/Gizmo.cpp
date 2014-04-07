@@ -11,6 +11,7 @@
 
 #define DEFAULT_AXIS_LENGTH 2.0f
 #define DEFAULT_AXIS_THICKNESS 0.05f
+#define GIZMO_SCALE_FACTOR 0.005f
 
 using namespace PS::GL;
 
@@ -441,34 +442,25 @@ namespace PS {
         	if(m_buttonState != ArcBallCamera::bsDown)
         		return;
 
-
-        	float dx = m_pressedPos.x - x;
-        	float dy = m_pressedPos.y - y;
-
-        	dx *= 0.005f;
-        	dy *= 0.005f;
+        	string strAxis;
+        	vec3f gizmoAxis[4] = {vec3f(1,0,0), vec3f(0,1,0), vec3f(0,0,1), vec3f(1,1,1)};
+        	Ray r1 = TheSceneGraph::Instance().screenToWorldRay(m_pressedPos.x, m_pressedPos.y);
+        	Ray r2 = TheSceneGraph::Instance().screenToWorldRay(x, y);
+        	vec3f delta = vec3f::mul((r2.start - r1.start), gizmoAxis[m_gizmoAxis]) * 1000;
         	m_pressedPos = vec2i(x, y);
 
-        	string strAxis;
-        	vec3f delta(0.0f);
-        	vec3f rotAxis[3] = {vec3f(1,0,0), vec3f(0,1,0), vec3f(0,0,1)};
 
         	switch (m_gizmoAxis) {
         	case axisX:
-        		delta.x = dx;
         		strAxis = "X";
         		break;
         	case axisY:
-        		delta.y = dy;
         		strAxis = "Y";
         		break;
         	case axisZ:
-        		delta.z = dx;
         		strAxis = "Z";
         		break;
-
         	case axisFree:
-        		delta = delta + vec3f(dx, dy, 0.0);
         		strAxis = "FREE";
         		break;
 
@@ -519,7 +511,7 @@ namespace PS {
                 break;
                 case gtRotate: {
                 	quatf q;
-                	vec3f axis = rotAxis[m_gizmoAxis];
+                	vec3f axis = gizmoAxis[m_gizmoAxis];
                 	q.fromAxisAngle(axis, delta[m_gizmoAxis]);
                 	m_rotate = m_rotate.mul(q);
 
