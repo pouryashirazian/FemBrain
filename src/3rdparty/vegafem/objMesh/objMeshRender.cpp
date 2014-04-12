@@ -133,11 +133,12 @@ void ObjMeshRender::render(int geometryMode, int renderMode)
       Vec3d Ka = materialHandle->getKa();
       Vec3d Kd = materialHandle->getKd();
       Vec3d Ks = materialHandle->getKs();
+
       float shininess = materialHandle->getShininess();
       float alpha = materialHandle->getAlpha();
-      float ambient[4] = { Ka[0], Ka[1], Ka[2], alpha };
-      float diffuse[4] = { Kd[0], Kd[1], Kd[2], alpha };
-      float specular[4] = { Ks[0], Ks[1], Ks[2], alpha };
+      float ambient[4] = { static_cast<float>(Ka[0]), static_cast<float>(Ka[1]), static_cast<float>(Ka[2]), alpha };
+      float diffuse[4] = { static_cast<float>(Kd[0]), static_cast<float>(Kd[1]), static_cast<float>(Kd[2]), alpha };
+      float specular[4] = { static_cast<float>(Ks[0]), static_cast<float>(Ks[1]), static_cast<float>(Ks[2]), alpha };
       if(renderMode & OBJMESHRENDER_MATERIAL)
       {
         glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, ambient);
