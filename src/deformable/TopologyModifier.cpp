@@ -9,23 +9,101 @@
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
 #include "graphics/selectgl.h"
-
+#include "graphics/Intersections.h"
 
 using namespace OpenMesh;
+using namespace PS::INTERSECTIONS;
 
 namespace PS {
 
-typedef OpenMesh::TriMesh_ArrayKernelT<>  Mesh;
+// Define my personal traits
+struct MyTraits : OpenMesh::DefaultTraits
+{
+  // Let Point and Normal be a vector of doubles
+  typedef OpenMesh::Vec3d Point;
+  typedef OpenMesh::Vec3d Normal;
+
+  // Already defined in OpenMesh::DefaultTraits
+  // HalfedgeAttributes( OpenMesh::Attributes::PrevHalfedge );
+
+  // Uncomment next line to disable attribute PrevHalfedge
+  // HalfedgeAttributes( OpenMesh::Attributes::None );
+  //
+  // or
+  //
+  // HalfedgeAttributes( 0 );
+};
+
+typedef OpenMesh::TriMesh_ArrayKernelT<MyTraits>  Mesh;
+
 class TopologyImpl {
 public:
 	TopologyImpl() {}
+
+	int cut(const vector<vec3d>& bladePath0,
+		    const vector<vec3d>& bladePath1,
+		    vec3d sweptSurface[4]);
 public:
 	Mesh mesh;
 
 	//Cut Nodes
+	vector<Mesh::VertexHandle> cutNodes;
 
 	//Cut Edges
+	vector<Mesh::EdgeHandle> cutEdges;
 };
+
+int TopologyImpl::cut(const vector<vec3d>& bladePath0,
+	    			  const vector<vec3d>& bladePath1,
+	    			  vec3d sweptSurface[4]) {
+
+	//1.Compute all cut-edges
+	//2.Compute cut nodes and remove all incident edges to cut nodes from cut edges
+	//3.split cut edges and compute the reference position of the split point
+	//4.duplicate cut nodes and incident edges
+
+	// iterate over all edges
+
+	vec3d uvw, xyz, ss0, ss1;
+
+	vec3d tri1[3] = {sweptSurface[0], sweptSurface[1], sweptSurface[2]};
+	vec3d tri2[3] = {sweptSurface[0], sweptSurface[2], sweptSurface[3]};
+
+	for (Mesh::EdgeIter e_it=mesh.edges_begin(); e_it!=mesh.edges_end(); ++e_it) {
+
+		Mesh::HalfedgeHandle heh0 = mesh.halfedge_handle(e_it, 0);
+		Mesh::HalfedgeHandle heh1 = mesh.halfedge_handle(e_it, 1);
+
+		/*
+		heh0.
+
+
+		Mesh::Point s0 = mesh.edge (e.halfedges_[0].vertex_handle_);
+		Mesh::Point s1 = mesh.point(e.halfedges_[1].vertex_handle_);
+
+		ss0 = vec3d(s0.data());
+		ss1 = vec3d(s1.data());
+
+		int res = IntersectSegmentTriangle(ss0, ss1, tri1, uvw, xyz);
+		if(res > 0) {
+			cutEdges.push_back(e_it);
+		}
+		*/
+	}
+//	// iterate over all vertices
+//	for (Mesh::VertexIter v_it=mesh.vertices_begin(); v_it!=mesh.vertices_end(); ++v_it) {
+//
+//	}
+
+//	// iterate over all halfedges
+//	for (MyMesh::HalfedgeIter h_it=mesh.halfedges_begin(); h_it!=mesh.halfedges_end(); ++h_it)
+//	   ...; // do something with *h_it, h_it->, or h_it.handle()
+//
+//
+//	// iterator over all faces
+//	for (MyMesh::FaceIter f_it=mesh.faces_begin(); f_it!=mesh.faces_end(); ++f_it)
+//	   ...; // do something with *f_it, f_it->, or f_it.handle()
+}
 
 ///////////////////////////////////////////////////////////////////////////
 CuttableMesh::CuttableMesh(const vector<double>& inTetVertices,
