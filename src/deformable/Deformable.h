@@ -16,6 +16,7 @@
 #include "graphics/SGMesh.h"
 #include "graphics/AABB.h"
 
+
 #include "SurfaceMesh.h"
 #include "VolumeMesh.h"
 #include "corotationalLinearFEM.h"
@@ -26,6 +27,7 @@
 #include "sceneObjectDeformable.h"
 #include "graph.h"
 #include "DBLogger.h"
+#include "TopologyModifier.h"
 
 using namespace std;
 using namespace Loki;
@@ -217,9 +219,11 @@ private:
 	vector<vec3d> m_vEdgeIntersectionsBarycoords;
 	*/
 
+	//Modifier
+	CuttableMesh* m_lpModifier;
+
 	//Surface Mesh
 	SurfaceMesh* m_lpSurfaceMesh;
-	//SceneObjectDeformable * m_lpDeformableMesh;
 
 
 	//Mesh Graph

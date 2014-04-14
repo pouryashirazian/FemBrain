@@ -11,6 +11,7 @@
 namespace PS{
 namespace MATH{
 
+typedef enum ScalarType {stFloat, stDouble};
 typedef float psreal;
 
 /*!

@@ -94,6 +94,9 @@ public:
     void update();
     static AnsiStr gpuInfo();
 
+    //print structure
+    void print(const char* switches = "-a") const;
+
     //Timing and Profiling services
 
     //Object Selection

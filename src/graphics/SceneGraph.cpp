@@ -250,6 +250,23 @@ AnsiStr SceneGraph::gpuInfo() {
 	return  AnsiStr("GPU: ") + strVendorName + ", " + strRenderer + ", " + strVersion;
 }
 
+void SceneGraph::print(const char* switches) const {
+	U32 ctVisible = 0;
+	for(U32 i=0; i<m_vSceneNodes.size(); i++) {
+		if(m_vSceneNodes[i]->isVisible()) ctVisible++;
+	}
+
+	//Stats
+	printf("scenegraph tree. Node# %d, Visible# %d\n", (int)m_vSceneNodes.size(), ctVisible);
+	printf("Name \t\t Visible \t\t Pos\n");
+	printf("----------------------------------------------------------------------------\n");
+	for(U32 i=0; i<m_vSceneNodes.size(); i++) {
+		SGNode* node = m_vSceneNodes[i];
+		vec3f pos = node->transform()->getTranslate();
+		printf("%s \t\t %d \t\t [%.2f %.2f %.2f]\n", node->name().c_str(), node->isVisible(), pos.x, pos.y, pos.z);
+	}
+
+}
 }
 }
 

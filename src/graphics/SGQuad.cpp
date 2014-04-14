@@ -54,8 +54,8 @@ namespace PS {
             g.addTexCoord(vec2f(1, 0));
             g.addTexCoord(vec2f(1, 1));
             g.addTexCoord(vec2f(0, 1));
-            g.addTriangle(vec3i(0, 1, 2));
-            g.addTriangle(vec3i(2, 3, 0));
+            g.addTriangle(vec3u32(0, 1, 2));
+            g.addTriangle(vec3u32(2, 3, 0));
             this->setup(g);
             
             if(TheShaderManager::Instance().has("textured")) {

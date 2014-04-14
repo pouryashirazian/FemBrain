@@ -11,11 +11,11 @@ using namespace PS::SG;
 /*!
  * Synopsis: Haptics Avatar guide
  */
-class AvatarCube : public SGMesh, public IGizmoListener {
+class AvatarProbe : public SGMesh, public IGizmoListener {
 public:
-	AvatarCube();
-	AvatarCube(Deformable* tissue);
-	virtual ~AvatarCube();
+	AvatarProbe();
+	AvatarProbe(Deformable* tissue);
+	virtual ~AvatarProbe();
 
 	void draw();
 

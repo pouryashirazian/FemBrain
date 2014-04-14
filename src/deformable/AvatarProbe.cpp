@@ -4,7 +4,7 @@
  *  Created on: Oct 14, 2012
  *      Author: pourya
  */
-#include "Avatar.h"
+#include "AvatarProbe.h"
 #include "base/Vec.h"
 
 #define DEFAULT_HAPTIC_FORCE_COEFF 200000
@@ -12,24 +12,24 @@
 using namespace PS::MATH;
 using namespace PS::SG;
 
-AvatarCube::AvatarCube():SGMesh(), IGizmoListener()
+AvatarProbe::AvatarProbe():SGMesh(), IGizmoListener()
 {
 	m_lpTissue = NULL;
 	setup();
 }
 
-AvatarCube::AvatarCube(Deformable* tissue):SGMesh(), IGizmoListener() {
+AvatarProbe::AvatarProbe(Deformable* tissue):SGMesh(), IGizmoListener() {
 	m_lpTissue = tissue;
 	setup();
 }
 
-AvatarCube::~AvatarCube(){
+AvatarProbe::~AvatarProbe(){
 	SGMesh::cleanup();
 }
 
-void AvatarCube::setup()
+void AvatarProbe::setup()
 {
-	this->setName("cubeavatar");
+	this->setName("probe");
 	m_idxContactFace = -1;
 	m_hapticForceCoeff = DEFAULT_HAPTIC_FORCE_COEFF;
 
@@ -60,26 +60,26 @@ void AvatarCube::setup()
 	TheSceneGraph::Instance().headers()->addHeaderLine("avatar", "avatar");
 }
 
-vec3f AvatarCube::lower() const {
+vec3f AvatarProbe::lower() const {
 	if(m_spTransform)
 		return m_spTransform->forward().map(m_lower);
 	else
 		return m_lower;
 }
 
-vec3f AvatarCube::upper() const {
+vec3f AvatarProbe::upper() const {
 	if(m_spTransform)
 		return m_spTransform->forward().map(m_upper);
 	else
 		return m_upper;
 }
 
-void AvatarCube::mousePress(int button, int state, int x, int y) {
+void AvatarProbe::mousePress(int button, int state, int x, int y) {
 	//Down Start
 	if(state == 0) {
 		if(m_lpTissue) {
 			m_lpTissue->hapticStart(0);
-			TheSceneGraph::Instance().headers()->updateHeaderLine("avatar", "avatar: start haptic on tissue");
+			TheSceneGraph::Instance().headers()->updateHeaderLine("avatar", "avatar: start probing");
 		}
 	}
 	else {
@@ -87,12 +87,12 @@ void AvatarCube::mousePress(int button, int state, int x, int y) {
 		if (m_lpTissue->isHapticInProgress()) {
 			m_lpTissue->hapticEnd();
 			m_hashVertices.clear();
-			TheSceneGraph::Instance().headers()->updateHeaderLine("avatar", "avatar: ended haptic on tissue");
+			TheSceneGraph::Instance().headers()->updateHeaderLine("avatar", "avatar: end probing");
 		}
 	}
 }
 
-void AvatarCube::onTranslate(const vec3f& delta, const vec3f& pos) {
+void AvatarProbe::onTranslate(const vec3f& delta, const vec3f& pos) {
 
 	if(m_lpTissue == NULL)
 		return;
@@ -221,7 +221,7 @@ void AvatarCube::onTranslate(const vec3f& delta, const vec3f& pos) {
 	m_lpTissue->hapticSetCurrentForces(arrIndices, arrForces);
 }
 
-void AvatarCube::draw() {
+void AvatarProbe::draw() {
 /*
 	glDisable(GL_LIGHTING);
 	DrawAABB(m_aabbCurrent, vec3f(1,0,0));

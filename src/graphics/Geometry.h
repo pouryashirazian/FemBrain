@@ -68,16 +68,19 @@ public:
     void addNormal(const vec3f& n);
     
     
-	bool addTriangle(const vec3i& f);
-	bool addQuad(const vec4i& f);
+	bool addTriangle(const vec3u32& f);
+	bool addQuad(const vec4u32& f);
 	void extrude(const vec3f& v);
 	void transform(const mat44f& m);
 
 	//Add Arrays
 	bool addVertexAttribs(const vector<float>& arrAttribs, int step = 3, MemoryBufferType attribKind = mbtPosition);
-	void addPerVertexColor(const vec4f& color, U32 ctVertices);
+	void addPerVertexColor(const vec4f& color, U32 ctVertices = 0);
 	bool addFaceIndices(const vector<U32>& arrIndex, int faceMode = ftTriangles);
 	bool computeNormalsFromFaces();
+
+	//Clear Buffers
+	void clearBuffer(MemoryBufferType btype);
 
     //Lines
     bool addLine(const vec3f& start, const vec3f& end);
@@ -99,6 +102,9 @@ public:
     void addCube(const vec3f& lower, const vec3f& upper);
     void addCube(const vec3f& center, float side);
     void addSphere(float radius = 1.0f, int hseg = 8, int vseg = 8);
+    void addTetrahedra(vec3f v[4]);
+    void addTetrahedra(const vector<float>& vertices, const vector<U32>& tets);
+
     
     /*!
      * Add a ring to the geometry

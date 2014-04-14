@@ -29,6 +29,7 @@ void Geometry::cleanup() {
 	m_vertices.resize(0);
 	m_normals.resize(0);
 	m_texCoords.resize(0);
+	m_indices.resize(0);
 }
 
 
@@ -166,7 +167,7 @@ void Geometry::addNormal(const vec3f& n) {
     m_normals.push_back(n.z);
 }
 
-bool Geometry::addTriangle(const vec3i& f) {
+bool Geometry::addTriangle(const vec3u32& f) {
 	if(m_stepFace != 3)
 		return false;
 
@@ -176,7 +177,7 @@ bool Geometry::addTriangle(const vec3i& f) {
 	return true;
 }
 
-bool Geometry::addQuad(const vec4i& f) {
+bool Geometry::addQuad(const vec4u32& f) {
 	if(m_stepFace != 4)
 		return false;
 	m_indices.push_back(f.x);
@@ -230,8 +231,8 @@ void Geometry::extrude(const vec3f& v) {
 
 	//Add Side Walls
 	for(U32 i=0; i<idxStart - 1; i++) {
-		addTriangle(vec3i(i, i + 1, idxStart + i));
-		addTriangle(vec3i(i + 1, idxStart + i + 1, idxStart + i));
+		addTriangle(vec3u32(i, i + 1, idxStart + i));
+		addTriangle(vec3u32(i + 1, idxStart + i + 1, idxStart + i));
 	}
 
 	//Copy Normals
@@ -305,7 +306,37 @@ bool Geometry::addVertexAttribs(const vector<float>& arrAttribs, int step, Memor
 	return true;
 }
 
+void Geometry::clearBuffer(MemoryBufferType btype) {
+	switch(btype) {
+	case(mbtPosition):
+		m_vertices.resize(0);
+	break;
+
+	case(mbtColor):
+		m_colors.resize(0);
+	break;
+
+	case(mbtNormal):
+		m_normals.resize(0);
+	break;
+
+	case(mbtTexCoord):
+		m_texCoords.resize(0);
+	break;
+
+    case(mbtFaceIndices):
+    	m_indices.resize(0);
+    break;
+    case(mbtCount):
+    break;
+	}
+}
+
 void Geometry::addPerVertexColor(const vec4f& color, U32 ctVertices) {
+
+	if(ctVertices == 0)
+		ctVertices = countVertices();
+
 	vector<float> colors;
 	colors.reserve(ctVertices * m_stepColor);
 	for(U32 i=0; i < ctVertices; i++) {
@@ -495,7 +526,7 @@ bool Geometry::addCircle3D(int sectors,
 	float oneOverSector = 1.0f / static_cast<float>(sectors);
 	for(int i=0; i<sectors; i++) {
 		this->addVertex(o + vec3f::mul(radius, vec3f(0.0f, cos(i * (TwoPi * oneOverSector)), sin(i * (TwoPi * oneOverSector)))));
-		this->addTriangle(vec3i(idxStart + i + 2, idxStart + i + 1, idxStart));
+		this->addTriangle(vec3u32(idxStart + i + 2, idxStart + i + 1, idxStart));
 	}
 	this->addVertex(o + vec3f(0.0f, radius, 0.0f));
 
@@ -515,7 +546,7 @@ bool Geometry::addCone(int sectors,
 
 	int idxEnd = countVertices()-1;
 	for(int i=idxStart+1; i < idxEnd; i++) {
-		addTriangle(vec3i(i+1, idxStart, i));
+		addTriangle(vec3u32(i+1, idxStart, i));
 	}
 
 	return true;
@@ -531,7 +562,7 @@ void Geometry::addCube(const vec3f& lower, const vec3f& upper) {
         {r, t, n}, {r, b, n}};
     
     
-    int indices[24] = {1, 2, 3, 0, 7, 6, 5, 4,
+    U32 indices[24] = {1, 2, 3, 0, 7, 6, 5, 4,
         7, 4, 0, 3, 5, 6, 2, 1,
         6, 7, 3, 2, 1, 0, 4, 5};
     
@@ -548,12 +579,12 @@ void Geometry::addCube(const vec3f& lower, const vec3f& upper) {
     }
     
     //Add Face Indices
-    vec4i quad;
+    vec4u32 quad;
     if(m_faceMode == ftQuads) {
 		for(int i=0; i<6; i++) {
 			quad.load(&indices[i*4]);
-			quad = quad + vec4i(idxStart);
-			quad = vec4i(quad.w, quad.z, quad.y, quad.x);
+			quad = quad + vec4u32(idxStart);
+			quad = vec4u32(quad.w, quad.z, quad.y, quad.x);
 			addQuad(quad);
 		}
     }
@@ -561,9 +592,9 @@ void Geometry::addCube(const vec3f& lower, const vec3f& upper) {
     {
 		for(int i=0; i<6; i++) {
 			quad.load(&indices[i*4]);
-			quad = quad + vec4i(idxStart);
-			addTriangle(vec3i(quad.x, quad.z, quad.y));
-			addTriangle(vec3i(quad.x, quad.w, quad.z));
+			quad = quad + vec4u32(idxStart);
+			addTriangle(vec3u32(quad.x, quad.z, quad.y));
+			addTriangle(vec3u32(quad.x, quad.w, quad.z));
 		}
     }
 
@@ -615,12 +646,63 @@ void Geometry::addCube(const vec3f& lower, const vec3f& upper) {
     			}
 
     			//Triangles
-    			addTriangle(vec3i(idxStart) + vec3i(t[0], t[2], t[1]));
-    			addTriangle(vec3i(idxStart) + vec3i(t[1], t[2], t[3]));
+    			addTriangle(vec3u32(idxStart) + vec3u32(t[0], t[2], t[1]));
+    			addTriangle(vec3u32(idxStart) + vec3u32(t[1], t[2], t[3]));
     		}
     	}
+    }
 
+    void Geometry::addTetrahedra(vec3f v[4]) {
+    	int idxStart = countVertices();
 
+    	for(int i=0; i<4; i++)
+    		addVertex(v[i]);
+
+		float det = vec3f::dot(v[1] - v[0], vec3f::cross(v[2] - v[0], v[3] - v[0]));
+		if (det >= 0) {
+			addTriangle(vec3u32(1, 2, 3) + vec3u32(idxStart));
+			addTriangle(vec3u32(2, 0, 3) + vec3u32(idxStart));
+			addTriangle(vec3u32(3, 0, 1) + vec3u32(idxStart));
+			addTriangle(vec3u32(1, 0, 2) + vec3u32(idxStart));
+		} else {
+			addTriangle(vec3u32(3, 2, 1) + vec3u32(idxStart));
+			addTriangle(vec3u32(3, 0, 2) + vec3u32(idxStart));
+			addTriangle(vec3u32(1, 0, 3) + vec3u32(idxStart));
+			addTriangle(vec3u32(2, 0, 1) + vec3u32(idxStart));
+		}
+    }
+
+    void Geometry::addTetrahedra(const vector<float>& vertices, const vector<U32>& tets) {
+    	int idxStart = countVertices();
+
+    	U32 ctVertices = vertices.size() / 3;
+    	U32 ctTets = tets.size() / 4;
+    	addVertexAttribs(vertices, 3, mbtPosition);
+
+    	vec3f v[4];
+    	for(U32 i=0; i<ctTets; i++) {
+
+    		vec4u32 e = vec4u32(&tets[i*4]);
+    		v[0] = vec3f(&vertices[e.x * 3]);
+    		v[1] = vec3f(&vertices[e.y * 3]);
+    		v[2] = vec3f(&vertices[e.z * 3]);
+    		v[3] = vec3f(&vertices[e.w * 3]);
+
+    		e = e + vec4u32(idxStart);
+
+    		float det = vec3f::dot(v[1] - v[0], vec3f::cross(v[2] - v[0], v[3] - v[0]));
+    		if(det >= 0) {
+    			addTriangle(vec3u32(e[1], e[2], e[3]));
+    			addTriangle(vec3u32(e[2], e[0], e[3]));
+    			addTriangle(vec3u32(e[3], e[0], e[1]));
+    			addTriangle(vec3u32(e[1], e[0], e[2]));
+    		} else {
+    			addTriangle(vec3u32(e[3], e[2], e[1]));
+    			addTriangle(vec3u32(e[3], e[0], e[2]));
+    			addTriangle(vec3u32(e[1], e[0], e[3]));
+    			addTriangle(vec3u32(e[2], e[0], e[1]));
+    		}
+    	}
     }
 
     bool Geometry::addRing(int sectors,
@@ -651,7 +733,7 @@ void Geometry::addCube(const vec3f& lower, const vec3f& upper) {
         float oneOverSector = 1.0f / static_cast<float>(sectors);
         for(int i=0; i<sectors; i++) {
             this->addVertex(o + vec3f::mul(radius, vec3f(0.0f, cos(i * (TwoPi * oneOverSector)), sin(i * (TwoPi * oneOverSector)))));
-            this->addTriangle(vec3i(idxStart + i + 2, idxStart + i + 1, idxStart));
+            this->addTriangle(vec3u32(idxStart + i + 2, idxStart + i + 1, idxStart));
         }
         this->addVertex(o + vec3f(0.0f, radius, 0.0f));
         

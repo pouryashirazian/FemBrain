@@ -28,7 +28,7 @@
 #include "implicit/RBF.h"
 
 #include "deformable/Deformable.h"
-#include "deformable/Avatar.h"
+#include "deformable/AvatarProbe.h"
 #include "deformable/AvatarScalpel.h"
 #include "deformable/TetGenExporter.h"
 #include "deformable/MassSpringSystem.h"
@@ -48,7 +48,8 @@ using namespace PS::CL;
 
 
 //Visual Cues
-AvatarCube* g_lpAvatarCube = NULL;
+AvatarProbe* g_lpProbe = NULL;
+AvatarScalpel* g_lpScalpel = NULL;
 GLMeshBuffer* g_lpDrawNormals = NULL;
 
 //SpringDumble* g_lpMassSpring = NULL;
@@ -57,7 +58,6 @@ GLMeshBuffer* g_lpDrawNormals = NULL;
 //SimulationObjects
 //PS::CL::FastRBF*	g_lpFastRBF = NULL;
 Deformable* 		g_lpDeformable = NULL;
-Cutting* 			g_lpCutting = NULL;
 
 //Info Lines
 AppSettings g_appSettings;
@@ -191,8 +191,8 @@ void Close()
 	SAFE_DELETE(g_lpDrawNormals);
 	//SAFE_DELETE(g_lpFastRBF);
 	SAFE_DELETE(g_lpDeformable);
-	SAFE_DELETE(g_lpCutting);
-	SAFE_DELETE(g_lpAvatarCube);
+	SAFE_DELETE(g_lpProbe);
+	SAFE_DELETE(g_lpScalpel);
 
 }
 
@@ -274,6 +274,12 @@ void NormalKey(unsigned char key, int x, int y)
 	case('n'): {
 		g_appSettings.drawNormals = !g_appSettings.drawNormals;
 		LogInfoArg1("Draw Model Normals set to: %d", g_appSettings.drawNormals);
+	}
+	break;
+
+	case('p'): {
+		LogInfo("print scene graph tree");
+		TheSceneGraph::Instance().print();
 	}
 	break;
 
@@ -535,8 +541,8 @@ bool SaveSettings(const AnsiStr& strSimFP)
 	cfg.writeBool("SYSTEM", "GRAVITY", g_appSettings.drawGround);
 
 	//Avatar
-	cfg.writeVec3f("AVATAR", "POS", g_lpAvatarCube->transform()->getTranslate());
-	cfg.writeVec3f("AVATAR", "THICKNESS", g_lpAvatarCube->transform()->getScale());
+	cfg.writeVec3f("AVATAR", "POS", g_lpProbe->transform()->getTranslate());
+	cfg.writeVec3f("AVATAR", "THICKNESS", g_lpProbe->transform()->getScale());
 	cfg.writeInt("AVATAR", "AXIS", TheGizmoManager::Instance().axis());
 
 	//DISPLAY SETTINGS
@@ -692,6 +698,7 @@ int main(int argc, char* argv[])
 
 	//Light source
 	SGSphere* s = new SGSphere(0.3f, 8, 8);
+	s->setName("light0");
 	s->transform()->translate(vec3f(&lightPos[0]));
 	TheSceneGraph::Instance().add(s);
 
@@ -788,22 +795,28 @@ int main(int argc, char* argv[])
 		g_lpDeformable->setWireFrameMode(g_appSettings.drawTetMesh == disWireFrame);
 		//g_lpDeformable->setAnimate(false);
 
-		//Avatar
-		g_lpAvatarCube = new AvatarCube(g_lpDeformable);
-		g_lpAvatarCube->setName("avatar");
-		g_lpAvatarCube->transform()->translate(g_appSettings.avatarPos);
-		g_lpAvatarCube->transform()->scale(g_appSettings.avatarThickness);
-		TheGizmoManager::Instance().setNode(g_lpAvatarCube);
+		//Probe
+		g_lpProbe = new AvatarProbe(g_lpDeformable);
+		g_lpProbe->transform()->translate(g_appSettings.avatarPos);
+		g_lpProbe->transform()->scale(g_appSettings.avatarThickness);
+		g_lpProbe->unregisterListener();
+
+		//Scalpel and cuttable mesh
+		CuttableMesh* oneTetra = CuttableMesh::CreateOneTetra();
+		oneTetra->setName("onetetra");
+		TheSceneGraph::Instance().add(oneTetra);
+
+		g_lpScalpel = new AvatarScalpel(oneTetra);
+		g_lpScalpel->transform()->translate(g_appSettings.avatarPos);
+
+
+		TheGizmoManager::Instance().setNode(g_lpScalpel);
 		TheGizmoManager::Instance().setAxis((GizmoAxis)g_appSettings.avatarAxis);
 
 
 		//Cutting
-		//g_lpCutting = new Cutting(g_lpDeformable);
-
-		//Add to scene graph
-		//TheSceneGraph::Instance().add(g_lpCutting);
 		TheSceneGraph::Instance().add(g_lpDeformable);
-		TheSceneGraph::Instance().add(g_lpAvatarCube);
+		TheSceneGraph::Instance().add(g_lpScalpel);
 
 		char chrMsg[1024];
 

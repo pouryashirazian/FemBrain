@@ -11,6 +11,7 @@
 #include "graphics/SGMesh.h"
 #include "graphics/Gizmo.h"
 #include "Deformable.h"
+#include "TopologyModifier.h"
 
 using namespace PS;
 using namespace PS::SG;
@@ -18,22 +19,40 @@ using namespace PS::SG;
 /*!
  * Synopsis: Haptics Avatar guide
  */
-class Scalpel : public SGMesh, public IGizmoListener {
+class AvatarScalpel : public SGMesh, public IGizmoListener {
 public:
-	Scalpel(Deformable* tissue);
-	virtual ~Scalpel();
+	AvatarScalpel(CuttableMesh* tissue);
+	virtual ~AvatarScalpel();
 
 	void draw();
+
+
+	//Tool
+	bool isActive() const {return m_isToolActive;}
+	void clearCutContext();
+
 
 	//From Gizmo Manager
 	void mousePress(int button, int state, int x, int y);
 	void onTranslate(const vec3f& delta, const vec3f& pos);
 
 protected:
-	Deformable* m_lpTissue;
+	AABB m_aabbCurrent;
+	CuttableMesh* m_lpTissue;
 
 	//Outline mesh for easier view
 	SGMesh m_outline;
+
+	//blade edges
+	vec3f m_edgeref0;
+	vec3f m_edgeref1;
+
+	//cut info
+	vector<vec3d> m_vCuttingPathEdge0;
+	vector<vec3d> m_vCuttingPathEdge1;
+	vec3d m_sweptQuad[4];
+	bool m_isSweptQuadValid;
+	bool m_isToolActive;
 };
 
 

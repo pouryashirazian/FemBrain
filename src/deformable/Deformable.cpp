@@ -13,8 +13,6 @@
 #include <algorithm>
 #include "tbb/task_scheduler_init.h"
 
-
-
 using namespace __gnu_cxx;
 using namespace std;
 
@@ -22,6 +20,8 @@ using namespace std;
 
 
 using namespace PS::INTERSECTIONS;
+
+CuttableMesh* g_lpModifier = NULL;
 
 Deformable::Deformable()
 {
@@ -198,6 +198,8 @@ int Deformable::setupTetMesh(const vector<double>& inTetVertices,
 	for(U32 i=0; i<inTetElements.size(); i++)
 		arrElements[i] = (int)inTetElements[i];
 
+	//Topology
+	//m_lpModifier = new CuttableMesh(inTetVertices, inTetElements);
 
 	//Setup Boundary Mesh
 	if(m_lpSurfaceMesh == NULL)

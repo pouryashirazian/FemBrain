@@ -200,6 +200,8 @@ namespace SKETCH {
 
 	int GPUPoly::init()
 	{
+		setName("polygonizer");
+
 		//Cellsize
 		m_cellsize = DEFAULT_CELL_SIZE;
 

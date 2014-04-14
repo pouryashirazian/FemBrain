@@ -425,7 +425,8 @@ namespace PS {
         void GizmoManager::mousePress(int button, int state, int x, int y) {
             ArcBallCamera::MouseButton b = (ArcBallCamera::MouseButton)button;
             m_buttonState = (ArcBallCamera::ButtonState)state;
-            if(b == ArcBallCamera::mbLeft && m_buttonState == ArcBallCamera::bsDown) {
+            if(b == ArcBallCamera::mbLeft && m_buttonState == ArcBallCamera::bsDown && isVisible()) {
+            	LogInfoArg2("Select gizmo axis using mouse coords: [%d, %d]", x, y);
                 Ray r = TheSceneGraph::Instance().screenToWorldRay(x, y);
                 r.setStart(r.getStart() - m_pos);
                 setAxis(r);
