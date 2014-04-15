@@ -39,7 +39,11 @@ typedef OpenMesh::TriMesh_ArrayKernelT<MyTraits>  Mesh;
 class TopologyImpl {
 public:
 	TopologyImpl() {}
+	virtual ~TopologyImpl() {
+		clear();
+	}
 
+	void clear();
 	int cut(const vector<vec3d>& bladePath0,
 		    const vector<vec3d>& bladePath1,
 		    vec3d sweptSurface[4]);
@@ -52,6 +56,11 @@ public:
 	//Cut Edges
 	vector<Mesh::EdgeHandle> cutEdges;
 };
+
+void TopologyImpl::clear() {
+	cutEdges.resize(0);
+	cutNodes.resize(0);
+}
 
 int TopologyImpl::cut(const vector<vec3d>& bladePath0,
 	    			  const vector<vec3d>& bladePath1,
@@ -69,27 +78,31 @@ int TopologyImpl::cut(const vector<vec3d>& bladePath0,
 	vec3d tri1[3] = {sweptSurface[0], sweptSurface[1], sweptSurface[2]};
 	vec3d tri2[3] = {sweptSurface[0], sweptSurface[2], sweptSurface[3]};
 
+	int ctEdgesCut = 0;
 	for (Mesh::EdgeIter e_it=mesh.edges_begin(); e_it!=mesh.edges_end(); ++e_it) {
 
 		Mesh::HalfedgeHandle heh0 = mesh.halfedge_handle(e_it, 0);
-		Mesh::HalfedgeHandle heh1 = mesh.halfedge_handle(e_it, 1);
+		//Mesh::HalfedgeHandle heh1 = mesh.halfedge_handle(e_it, 1);
 
-		/*
-		heh0.
-
-
-		Mesh::Point s0 = mesh.edge (e.halfedges_[0].vertex_handle_);
-		Mesh::Point s1 = mesh.point(e.halfedges_[1].vertex_handle_);
+		Mesh::Point s0 = mesh.point(mesh.from_vertex_handle(heh0));
+		Mesh::Point s1 = mesh.point(mesh.to_vertex_handle(heh0));
 
 		ss0 = vec3d(s0.data());
 		ss1 = vec3d(s1.data());
 
 		int res = IntersectSegmentTriangle(ss0, ss1, tri1, uvw, xyz);
+		res += IntersectSegmentTriangle(ss0, ss1, tri2, uvw, xyz);
 		if(res > 0) {
 			cutEdges.push_back(e_it);
+			ctEdgesCut ++;
 		}
-		*/
 	}
+
+	if(ctEdgesCut > 0) {
+		printf("Cut %d edges\n", ctEdgesCut);
+	}
+
+	return ctEdgesCut;
 //	// iterate over all vertices
 //	for (Mesh::VertexIter v_it=mesh.vertices_begin(); v_it!=mesh.vertices_end(); ++v_it) {
 //
@@ -189,8 +202,8 @@ void CuttableMesh::draw() {
 int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 					  const vector<vec3d>& bladePath1,
 					  vec3d sweptSurface[4]) {
-	return -1;
 
+	return m_impl->cut(bladePath0, bladePath1, sweptSurface);
 }
 
 CuttableMesh* CuttableMesh::CreateOneTetra() {
