@@ -85,8 +85,8 @@ bool Cutting::createMemBuffers() {
 	this->cleanupMemBuffers();
 
 	//TetMesh Stats
-	m_meshInfo.ctTets = m_lpDeformable->getTetMesh()->getNumElements();
-	m_meshInfo.ctVertices = m_lpDeformable->getSurfMesh()->countVertices();
+	m_meshInfo.ctTets = m_lpDeformable->getMesh()->getNumElements();
+	m_meshInfo.ctVertices = m_lpDeformable->getMesh()->countVertices();
 
 
 	U32 szVertexBuffer = sizeof(float) * 4 * m_meshInfo.ctVertices;
@@ -121,7 +121,7 @@ bool Cutting::createMemBuffers() {
 	U32* arrIndices = new U32[m_meshInfo.ctTets * 4];
 	for(U32 el=0; el<m_meshInfo.ctTets; el++) {
 		for(U32 i=0; i<4; i++) {
-			arrIndices[el*4 + i] = m_lpDeformable->getTetMesh()->getVertexIndex(el, i);
+			arrIndices[el*4 + i] = m_lpDeformable->getMesh()->getVertexIndex(el, i);
 		}
 	}
 
@@ -132,7 +132,7 @@ bool Cutting::createMemBuffers() {
 
 	float* arrVertices = new float[m_meshInfo.ctVertices * 4];
 	for(U32 i = 0; i<m_meshInfo.ctVertices; i++) {
-		vec3d v = m_lpDeformable->getSurfMesh()->vertexAt(i);
+		vec3d v = m_lpDeformable->getMesh()->vertexAt(i);
 		arrVertices[i * 4] = static_cast<float>(v.x);
 		arrVertices[i * 4 + 1] = static_cast<float>(v.y);
 		arrVertices[i * 4 + 2] = static_cast<float>(v.z);

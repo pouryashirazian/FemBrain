@@ -109,6 +109,9 @@ void AvatarScalpel::clearCutContext() {
 	m_vCuttingPathEdge0.resize(0);
 	m_vCuttingPathEdge1.resize(0);
 	m_isSweptQuadValid = false;
+
+	if(m_lpTissue)
+		m_lpTissue->clear();
 }
 
 //From Gizmo Manager
@@ -156,6 +159,10 @@ void AvatarScalpel::onTranslate(const vec3f& delta, const vec3f& pos) {
 	vec3d edge0 = vec3d(e0.x, e0.y, e0.z);
 	vec3d edge1 = vec3d(e1.x, e1.y, e1.z);
 
+	//delete path if direction changed
+
+
+
 	m_isSweptQuadValid = false;
 	m_sweptQuad[0] = edge0;
 	m_sweptQuad[1] = edge1;
@@ -176,11 +183,11 @@ void AvatarScalpel::onTranslate(const vec3f& delta, const vec3f& pos) {
 	}
 
 	//Insert new scalpal position into buffer
-	vec3d a1, a2;
-
 	m_vCuttingPathEdge0.push_back(edge0);
 	m_vCuttingPathEdge1.push_back(edge1);
 
+
+	//delete last if overflow buffer
 	if (m_vCuttingPathEdge0.size() > maxNodes)
 		m_vCuttingPathEdge0.erase(m_vCuttingPathEdge0.begin());
 	if (m_vCuttingPathEdge1.size() > maxNodes)
@@ -188,6 +195,8 @@ void AvatarScalpel::onTranslate(const vec3f& delta, const vec3f& pos) {
 
 
 	if(m_isSweptQuadValid) {
+
+		//call the cut method if the tool has passed through the tissue
 		int res = m_lpTissue->cut(m_vCuttingPathEdge0, m_vCuttingPathEdge1, m_sweptQuad);
 	}
 

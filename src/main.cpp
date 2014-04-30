@@ -787,7 +787,7 @@ int main(int argc, char* argv[])
 		//Deformable
 		g_lpDeformable = new Deformable(tetVertices, tetElements, g_appSettings.vFixedVertices);
 		g_lpDeformable->setGravity(true);
-		g_lpDeformable->setDeformCallback(ApplyDeformations);
+//		g_lpDeformable->setDeformCallback(ApplyDeformations);
 		g_lpDeformable->setHapticForceRadius(g_appSettings.hapticNeighborhoodPropagationRadius);
 		g_lpDeformable->setName("tissue");
 		g_lpDeformable->setCollisionObject(TheSceneGraph::Instance().get("floor"));
@@ -825,8 +825,8 @@ int main(int argc, char* argv[])
 					g_appSettings.cellsize,
 					poly->countVertices(),
 					poly->countTriangles(),
-					g_lpDeformable->getTetMesh()->getNumVertices(),
-					g_lpDeformable->getTetMesh()->getNumElements());
+					g_lpDeformable->getMesh()->getNumVertices(),
+					g_lpDeformable->getMesh()->getNumElements());
 		TheSceneGraph::Instance().headers()->addHeaderLine("mesh", chrMsg);
 	}
 

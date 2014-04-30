@@ -11,7 +11,7 @@
 #include "graphics/SGMesh.h"
 #include "graphics/Gizmo.h"
 #include "Deformable.h"
-#include "TopologyModifier.h"
+#include "CuttableMesh.h"
 
 using namespace PS;
 using namespace PS::SG;

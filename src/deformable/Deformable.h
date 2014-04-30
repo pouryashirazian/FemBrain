@@ -27,7 +27,7 @@
 #include "sceneObjectDeformable.h"
 #include "graph.h"
 #include "DBLogger.h"
-#include "TopologyModifier.h"
+#include "CuttableMesh.h"
 
 using namespace std;
 using namespace Loki;
@@ -58,17 +58,6 @@ struct EdgeIntersection {
 class Deformable : public SGMesh {
 public:
 	Deformable();
-
-	/*!
-	 * Constructs a deformable model from the veg file and the rendereable mesh
-	 * from the obj file. Fixed vertices are setup in the ini file.
-	 */
-	explicit Deformable(const char* lpVegFilePath,
-						   const char* lpObjFilePath,
-						   std::vector<int>& vFixedVertices,
-						   int ctThreads = 0,
-						   const char* lpModelTitle = NULL);
-
 	explicit Deformable(const vector<double>& inTetVertices,
 					 	 const vector<U32>& inTetElements,
 					 	 const vector<int>& vFixedVertices);
@@ -78,12 +67,10 @@ public:
 
 	//Draw
 	void draw();
-	void drawCuttingArea();
-	void drawTetElement(U32 el, vec4f& color);
 
 	//Cutting
 	void cleanupCuttingStructures();
-	int  performCuts(const vec3d& s0, const vec3d& s1);
+	//int  performCuts(const vec3d& s0, const vec3d& s1);
 
 	//TimeStep
 	void timestep();
@@ -91,13 +78,8 @@ public:
 	//Pick a vertex
 	int pickVertex(const vec3d& wpos, vec3d& vertex);
 
-	int pickVertices(const AABB& box,
-					 vector<vec3f>& arrPickedVertices,
-					 vector<int>& arrPickedIndices);
-
 	int pickVertices(const vec3d& boxLo, const vec3d& boxHi,
 					   vector<vec3d>& arrFoundCoords, vector<int>& arrFoundIndices) const;
-	int pickVertices(const vec3d& boxLo, const vec3d& boxHi);
 
 	//Fill Record for
 	void statFillRecord(DBLogger::Record& rec) const;
@@ -107,7 +89,6 @@ public:
 	bool hapticStart(int index);
 	bool hapticStart(const vec3d& wpos);
 	void hapticEnd();
-	bool hapticUpdateDisplace();
 	void hapticSetCurrentForces(const vector<int>& indices,
 									const vector<vec3d>& forces);
 
@@ -142,8 +123,7 @@ public:
 	bool isVolumeChanged() const { return  !EssentiallyEquald(this->computeVolume(), m_restVolume, 0.0001);}
 
 	//Access TetMesh for stats
-	TetMesh* getTetMesh() const {return m_lpTetMesh;}
-	SurfaceMesh* getSurfMesh() const{return m_lpSurfaceMesh;}
+	CuttableMesh* getMesh() const { return m_lpMesh;}
 
 	//ModelName
 	string getModelName() const {return m_strModelName;}
@@ -199,38 +179,11 @@ private:
 	double m_timeStep;
 	double m_restVolume;
 
-
-	//Cutting
-	vector<vec3d> m_vCuttingPathEdge0;
-	vector<vec3d> m_vCuttingPathEdge1;
-	vector<U32> m_vCrossedFaces;
-	vector<U32> m_vCrossedTets;
-	vec3d m_sweptQuad[4];
-	bool m_isSweptQuadValid;
-
-	typedef std::unordered_map<U32, FaceIntersection*>::iterator MAPFACE_ITER;
-	typedef std::unordered_map<U32, EdgeIntersection*>::iterator MAPEDGE_ITER;
-	std::unordered_map<U32, FaceIntersection*> m_mapElementFaceIntersection;
-	std::unordered_map<U32, EdgeIntersection*> m_mapElementEdgeIntersection;
-	/*
-	vector<vec3d> m_vFaceIntersections;
-	vector<vec3d> m_vFaceIntersectionsBarycoords;
-	vector<vec3d> m_vEdgeIntersections;
-	vector<vec3d> m_vEdgeIntersectionsBarycoords;
-	*/
-
 	//Modifier
-	CuttableMesh* m_lpModifier;
+	CuttableMesh* m_lpMesh;
 
-	//Surface Mesh
-	SurfaceMesh* m_lpSurfaceMesh;
-
-
-	//Mesh Graph
+//	//Mesh Graph
 	Graph* m_lpMeshGraph;
-
-	//Tetrahedra input mesh
-	TetMesh* m_lpTetMesh;
 
 	//Deformable Model
 	CorotationalLinearFEM* m_lpDeformable;
