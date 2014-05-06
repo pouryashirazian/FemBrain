@@ -31,7 +31,8 @@ public:
 	void drawTetElement(U32 el, vec4f& color);
 
 	//cutting
-	int cut(const vector<vec3d>& bladePath0, const vector<vec3d>& bladePath1, vec3d sweptSurface[4]);
+	int cut(const vector<vec3d>& bladePath0, const vector<vec3d>& bladePath1,
+			vec3d sweptSurface[4], bool modifyMesh);
 
 	//apply displacements
 	void displace(double * u);
@@ -42,6 +43,8 @@ public:
 	vec3d vertexRestPosAt(U32 i) const;
 	vec3d vertexAt(U32 i) const;
 	int findClosestVertex(const vec3d& query, double& dist, vec3d& outP) const;
+
+	int countCompletedCuts() const {return m_ctCompletedCuts;}
 
 	void clear();
 
@@ -59,6 +62,7 @@ protected:
 private:
 	TopologyImpl* m_impl;
 	SGMesh* m_lpTetMesh;
+	int m_ctCompletedCuts;
 
 	//rest pos
 	vector<double> m_vRestPos;

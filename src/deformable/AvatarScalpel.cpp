@@ -6,6 +6,9 @@
  */
 
 #include "AvatarScalpel.h"
+#include "base/Logger.h"
+
+using namespace PS;
 
 AvatarScalpel::AvatarScalpel(CuttableMesh* tissue):SGMesh(), IGizmoListener() {
 	setName("scalpel");
@@ -88,7 +91,10 @@ void AvatarScalpel::draw() {
 		{
 			glPushAttrib(GL_ALL_ATTRIB_BITS);
 				glDisable(GL_CULL_FACE);
-				glColor3d(1.0, 0.0, 1.0);
+				glEnable(GL_BLEND);
+				glBlendFunc(GL_SRC_ALPHA,GL_ONE);
+
+				glColor4d(1.0, 0.0, 1.0, 0.5);
 				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 				glBegin(GL_QUADS);
 					glVertex3dv(m_sweptQuad[0].cptr());
@@ -97,6 +103,8 @@ void AvatarScalpel::draw() {
 					glVertex3dv(m_sweptQuad[3].cptr());
 				glEnd();
 				//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+				glDisable(GL_BLEND);
 				glEnable(GL_CULL_FACE);
 			glPopAttrib();
 		}
@@ -116,13 +124,18 @@ void AvatarScalpel::clearCutContext() {
 
 //From Gizmo Manager
 void AvatarScalpel::mousePress(int button, int state, int x, int y) {
+	if(button == ArcBallCamera::mbRight) {
+		LogInfo("Right clicked cleared cut context!");
+		clearCutContext();
+		return;
+	}
+
 	if(button != ArcBallCamera::mbLeft)
 		return;
 
 	//Down Start
 	if(state == 0) {
 		if(m_lpTissue) {
-			clearCutContext();
 			m_isToolActive = true;
 			TheSceneGraph::Instance().headers()->updateHeaderLine("avatar", "avatar: start cutting");
 		}
@@ -144,14 +157,22 @@ void AvatarScalpel::onTranslate(const vec3f& delta, const vec3f& pos) {
 	m_aabbCurrent = this->aabb();
 	m_aabbCurrent.transform(m_spTransform->forward());
 
-	//1.If boxes donot intersect return
+	//1.If boxes donot intersect and sweptquad is invalid then return
 	if (!m_lpTissue->aabb().intersect(m_aabbCurrent)) {
+
+		if(m_isSweptQuadValid) {
+			//call the cut method if the tool has passed through the tissue
+			int res = m_lpTissue->cut(m_vCuttingPathEdge0, m_vCuttingPathEdge1, m_sweptQuad, true);
+			clearCutContext();
+			LogInfoArg1("Tissue cut. res = %d", res);
+		}
+
 		return;
 	}
 
 	//consts
 	const double minSweptLength = 0.4;
-	const U32 maxNodes = 512;
+	const U32 maxNodes = 1024;
 
 	//edges
 	vec3f e0 = m_spTransform->forward().map(m_edgeref0);
@@ -160,12 +181,47 @@ void AvatarScalpel::onTranslate(const vec3f& delta, const vec3f& pos) {
 	vec3d edge1 = vec3d(e1.x, e1.y, e1.z);
 
 	//delete path if direction changed
+	if(m_vCuttingPathEdge0.size() > 8) {
+
+		//U32 len = m_vCuttingPathEdge0.size();
+		vec3d o = m_vCuttingPathEdge0[0];
+		vec3d prevDir = (m_vCuttingPathEdge0[4] - o).normalized();
+		vec3d dir;
+		double angle = 0;
+		double maxAngle = 0;
+
+		for(U32 i=4; i < m_vCuttingPathEdge0.size(); i+=4) {
+			dir = (m_vCuttingPathEdge0[i] - o).normalized();
+			angle = RADTODEG(abs(acos(vec3d::dot(dir, prevDir))));
+			maxAngle = MATHMAX(maxAngle, angle);
+
+			o = m_vCuttingPathEdge0[i];
+			prevDir = dir;
+		}
+
+		if(maxAngle > 60) {
+			m_vCuttingPathEdge0.resize(0);
+			m_vCuttingPathEdge1.resize(1);
+			m_isSweptQuadValid = false;
+			LogInfoArg1("Cutting trajectory changed %.2f degrees. Resetting path.", maxAngle);
+		}
+	}
 
 
-
+	//Swept quad: starts when blade crosses the tissue first and ends where the blade leaves the body
 	m_isSweptQuadValid = false;
-	m_sweptQuad[0] = edge0;
-	m_sweptQuad[1] = edge1;
+	if(m_vCuttingPathEdge0.size() == 0) {
+		m_sweptQuad[0] = edge0;
+		m_sweptQuad[1] = edge1;
+	}
+	else {
+		m_sweptQuad[2] = edge1;
+		m_sweptQuad[3] = edge0;
+		m_isSweptQuadValid = true;
+	}
+
+
+	/*
 	if (m_vCuttingPathEdge0.size() > 1) {
 		//Loop over the path from the recently added to the first one
 		for (int i = (int) m_vCuttingPathEdge0.size() - 1; i >= 0; i--) {
@@ -181,6 +237,7 @@ void AvatarScalpel::onTranslate(const vec3f& delta, const vec3f& pos) {
 			}
 		}
 	}
+	*/
 
 	//Insert new scalpal position into buffer
 	m_vCuttingPathEdge0.push_back(edge0);
@@ -193,13 +250,8 @@ void AvatarScalpel::onTranslate(const vec3f& delta, const vec3f& pos) {
 	if (m_vCuttingPathEdge1.size() > maxNodes)
 		m_vCuttingPathEdge1.erase(m_vCuttingPathEdge1.begin());
 
-
-	if(m_isSweptQuadValid) {
-
-		//call the cut method if the tool has passed through the tissue
-		int res = m_lpTissue->cut(m_vCuttingPathEdge0, m_vCuttingPathEdge1, m_sweptQuad);
-	}
-
+	int res = m_lpTissue->cut(m_vCuttingPathEdge0, m_vCuttingPathEdge1, m_sweptQuad, false);
+	LogInfoArg1("Progressive cutting not implemented. res = %d", res);
 }
 
 
