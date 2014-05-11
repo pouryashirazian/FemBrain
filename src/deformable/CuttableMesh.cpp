@@ -129,6 +129,9 @@ TopologyImpl::TopologyImpl(int ctVertices, double* vertices, int ctElements, int
 		for(int j=0; j<4; j++)
 			tetsVertexHandles[i * 4 + j] = vHandles[e[j]];
 
+		//Face Mask
+		//int faceMask[4][3] = { {0, 1, 2}, {1, 2, 3}, {2, 3, 0}, {0, 1, 3} };
+
 		//Determinant
 		double det = vec3d::dot(v[1] - v[0], vec3d::cross(v[2] - v[0], v[3] - v[0]));
 		if (det >= 0) {
@@ -386,12 +389,6 @@ int TopologyImpl::cut(const vector<vec3d>& bladePath0,
 	int faceMask[4][3] = { {0, 1, 2}, {1, 2, 3}, {2, 3, 0}, {0, 1, 3} };
 
 	for(U32 i=0; i<ctTets; i++) {
-
-
-
-		//fh[j] = tetsFaceHandles[i * 4 + j];
-
-		// Assuming faceHandle contains the face handle of the target face
 		for(int j=0; j<4; j++) {
 			Mesh::FaceHandle fh = tetsFaceHandles[i * 4 + j];
 			Mesh::FaceHalfedgeIter fh_it = mesh.fh_iter(fh);
@@ -457,6 +454,10 @@ void CuttableMesh::setup(int ctVertices, double* vertices, int ctElements, int* 
 	if(TheShaderManager::Instance().has("phong")) {
         m_spEffect = SmartPtrSGEffect(new SGEffect(TheShaderManager::Instance().get("phong")));
     }
+
+	//HEMesh
+	if(ctVertices < 10)
+		m_lpHEMesh = new HalfEdgeTetMesh(ctVertices, vertices, ctElements, (U32*)elements);
 
 	//Mesh Topology Impl
 	m_impl = new TopologyImpl(ctVertices, vertices, ctElements, elements);
@@ -576,6 +577,7 @@ int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 
 	return res;
 }
+
 
 void CuttableMesh::displace(double * u) {
 

@@ -10,11 +10,12 @@
 
 #include "vegafem/include/tetMesh.h"
 #include "graphics/SGMesh.h"
+#include "HalfEdgeTetMesh.h"
 #include "base/Vec.h"
 
 
 using namespace PS::MATH;
-
+using namespace PS::FEM;
 
 namespace PS {
 
@@ -62,6 +63,8 @@ protected:
 private:
 	TopologyImpl* m_impl;
 	SGMesh* m_lpTetMesh;
+	HalfEdgeTetMesh* m_lpHEMesh;
+
 	int m_ctCompletedCuts;
 
 	//rest pos
