@@ -420,35 +420,10 @@ CuttableMesh::CuttableMesh(int ctVertices, double* vertices, int ctElements, int
 }
 
 CuttableMesh::~CuttableMesh() {
-	SAFE_DELETE(m_impl);
-	SAFE_DELETE(m_lpTetMesh);
+	SAFE_DELETE(m_lpHEMesh);
 }
 
 void CuttableMesh::setup(int ctVertices, double* vertices, int ctElements, int* elements) {
-
-	U32 dof = ctVertices * 3;
-
-	vector<float> fvertices;
-	fvertices.resize(dof);
-	m_vRestPos.resize(dof);
-
-	for(U32 i=0;i<dof; i++) {
-		m_vRestPos[i] = vertices[i];
-		fvertices[i] = static_cast<float>(vertices[i]);
-	}
-
-	//elements
-	vector<U32> uelems;
-	uelems.resize(ctElements*4);
-	for(U32 i=0; i<(U32)ctElements*4; i++)
-		uelems[i] = elements[i];
-
-	//main
-	Geometry g;
-	g.init(3, 4, 2, ftTriangles);
-	g.addTetrahedra(fvertices, uelems);
-	g.addPerVertexColor(vec4f(0, 0, 1, 1));
-	m_lpTetMesh = new SGMesh(g);
 
 	resetTransform();
 	if(TheShaderManager::Instance().has("phong")) {
@@ -456,45 +431,35 @@ void CuttableMesh::setup(int ctVertices, double* vertices, int ctElements, int* 
     }
 
 	//HEMesh
-	if(ctVertices < 10)
-		m_lpHEMesh = new HalfEdgeTetMesh(ctVertices, vertices, ctElements, (U32*)elements);
-
-	//Mesh Topology Impl
-	m_impl = new TopologyImpl(ctVertices, vertices, ctElements, elements);
-
-	//aabb
-	updateAABB();
-
+	m_lpHEMesh = new HalfEdgeTetMesh(ctVertices, vertices, ctElements, (U32*)elements);
+	m_aabb = m_lpHEMesh->aabb();
 	m_ctCompletedCuts = 0;
 }
 
-void CuttableMesh::updateAABB() {
-	m_aabb = m_impl->aabb();
+void CuttableMesh::clearCutContext() {
+	m_mapCutEdges.clear();
+	m_mapCutNodes.clear();
 }
 
 void CuttableMesh::draw() {
 
-	glDisable(GL_LIGHTING);
-	m_lpTetMesh->setWireFrameMode(false);
-	m_lpTetMesh->draw();
-	glEnable(GL_LIGHTING);
-
-	m_lpTetMesh->setWireFrameMode(true);
-	m_lpTetMesh->draw();
+	//draw tetmesh
+	if(m_lpHEMesh)
+		m_lpHEMesh->draw();
 
 
-	int ctCutNodes = m_impl->mapCutNodes.size();
-	int ctCutEdges = m_impl->mapCutEdges.size();
+	//draw cut context
+	int ctCutEdges = m_mapCutEdges.size();
+	int ctCutNodes = m_mapCutNodes.size();
 	if(ctCutNodes > 0 || ctCutEdges > 0) {
 		glDisable(GL_LIGHTING);
-
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
 
 			//Draw cut edges
 			glColor3f(0.7, 0.7, 0.7);
 			glLineWidth(5.0f);
 			glBegin(GL_LINES);
-				for(TopologyImpl::CUTEDGEITER it = m_impl->mapCutEdges.begin(); it != m_impl->mapCutEdges.end(); ++it) {
+				for(CUTEDGEITER it = m_mapCutEdges.begin(); it != m_mapCutEdges.end(); ++it) {
 					glVertex3dv(it->second.e0.cptr());
 					glVertex3dv(it->second.e1.cptr());
 				}
@@ -507,12 +472,12 @@ void CuttableMesh::draw() {
 			glBegin(GL_POINTS);
 
 			//Draw cutedges crossing
-			for(TopologyImpl::CUTEDGEITER it = m_impl->mapCutEdges.begin(); it != m_impl->mapCutEdges.end(); ++it) {
+			for(CUTEDGEITER it = m_mapCutEdges.begin(); it != m_mapCutEdges.end(); ++it) {
 				glVertex3dv(it->second.pos.cptr());
 			}
 
 			//Draw cutnodes
-			for(TopologyImpl::CUTNODEITER it = m_impl->mapCutNodes.begin(); it != m_impl->mapCutNodes.end(); ++it) {
+			for(CUTNODEITER it = m_mapCutNodes.begin(); it != m_mapCutNodes.end(); ++it) {
 				glVertex3dv(it->second.pos.cptr());
 			}
 
@@ -557,62 +522,192 @@ void CuttableMesh::drawTetElement(U32 el, vec4f& color) {
 
 }
 
-void CuttableMesh::clear() {
-	if(m_impl)
-		m_impl->clear();
-}
-
 int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 					  const vector<vec3d>& bladePath1,
 					  vec3d sweptSurface[4], bool modifyMesh) {
+	//1.Compute all cut-edges
+	//2.Compute cut nodes and remove all incident edges to cut nodes from cut edges
+	//3.split cut edges and compute the reference position of the split point
+	//4.duplicate cut nodes and incident edges
 
-	int res = m_impl->cut(bladePath0, bladePath1, sweptSurface, modifyMesh);
+	// iterate over all edges
 
-	//sync physics mesh
+	vec3d uvw, xyz, ss0, ss1;
 
-	//sync rendering bo
+	vec3d tri1[3] = {sweptSurface[0], sweptSurface[1], sweptSurface[2]};
+	vec3d tri2[3] = {sweptSurface[0], sweptSurface[2], sweptSurface[3]};
 
-	if(modifyMesh)
-		m_ctCompletedCuts++;
+	//Radios of Influence in percent
+	const double roi = 0.2;
 
-	return res;
+	//Cut-Edges
+	for (U32 i=0; i < m_lpHEMesh->countEdges(); i++) {
+
+		U32 hei = m_lpHEMesh->halfedge_from_edge(i, 0);
+		HalfEdgeTetMesh::HEDGE he = m_lpHEMesh->halfedgeAt(hei);
+
+		ss0 = m_lpHEMesh->const_nodeAt(he.from).pos;
+		ss1 = m_lpHEMesh->const_nodeAt(he.to).pos;
+
+		int res = IntersectSegmentTriangle(ss0, ss1, tri1, uvw, xyz);
+		res += IntersectSegmentTriangle(ss0, ss1, tri2, uvw, xyz);
+		if(res > 0) {
+			CutEdge ce;
+			ce.pos = xyz;
+			ce.uvw = uvw;
+			ce.e0 = ss0;
+			ce.e1 = ss1;
+			ce.idxE0 = he.from;
+			ce.idxE1 = he.to;
+			ce.idxEdge = i;
+
+			m_mapCutEdges.insert( std::pair<U32, CutEdge>(ce.idxEdge, ce) );
+		}
+	}
+
+
+	//blade
+	vec3d blade0 = bladePath0[bladePath0.size() - 1];
+	vec3d blade1 = bladePath1[bladePath1.size() - 1];
+	const double edgelen2 = (blade1 - blade0).length2();
+
+	std::map< U32, CutEdge > finalCutEdges;
+	finalCutEdges.insert(m_mapCutEdges.begin(), m_mapCutEdges.end());
+
+	int ctRemovedCutEdges = 0;
+	m_mapCutNodes.clear();
+
+	//detect all cut-nodes and remove the cut-edges that emanate from a cut-node
+	CUTEDGEITER it = m_mapCutEdges.begin();
+	for(it = m_mapCutEdges.begin(); it != m_mapCutEdges.end(); ++it ) {
+
+		ss0 = it->second.e0;
+		ss1 = it->second.e1;
+		double d0 = pointLineDistance(blade0, blade1, edgelen2, ss0);
+		double d1 = pointLineDistance(blade0, blade1, edgelen2, ss1);
+		double denom = (ss1 - ss0).length();
+		if(denom == 0)
+			denom = 1;
+
+		double t = 10.0;
+		if(d0 < d1)
+			t = (it->second.pos - ss0).length() / denom;
+		else
+			t = (it->second.pos - ss1).length() / denom;
+
+		//If the start of edge is close to the swept surface remove all incident edges from Ec
+		if(d0 < d1 && t < roi) {
+			CutNode cn;
+			cn.idxNode = it->second.idxE0;
+			cn.pos = it->second.e0;
+			m_mapCutNodes.insert( std::pair<U32, CutNode>(cn.idxNode, cn) );
+
+			//iterate over all incoming half-edges
+			vector<U32> incomingHE;
+			m_lpHEMesh->getIncomingHalfEdges(cn.idxNode, incomingHE);
+
+			for(U32 i=0; i < incomingHE.size(); i++) {
+				finalCutEdges.erase(m_lpHEMesh->edge_from_halfedge(incomingHE[i]));
+				ctRemovedCutEdges++;
+			}
+		}
+		//If the end of edge close to the swept surface remove all incident edges from Ec
+		else if(d0 > d1 && t < roi) {
+			CutNode cn;
+			cn.idxNode = it->second.idxE1;
+			cn.pos = it->second.e1;
+			m_mapCutNodes.insert( std::pair<U32, CutNode>(cn.idxNode, cn) );
+
+			//iterate over all incoming half-edges
+			vector<U32> incomingHE;
+			m_lpHEMesh->getIncomingHalfEdges(cn.idxNode, incomingHE);
+
+			for(U32 i=0; i < incomingHE.size(); i++) {
+				finalCutEdges.erase(m_lpHEMesh->edge_from_halfedge(incomingHE[i]));
+				ctRemovedCutEdges++;
+			}
+		}
+	}
+
+	//Copy
+	m_mapCutEdges.clear();
+	m_mapCutEdges.insert(finalCutEdges.begin(), finalCutEdges.end());
+	if(m_mapCutNodes.size() > 0)
+		printf("Cut nodes count %d.\n", (int)m_mapCutNodes.size());
+	if(m_mapCutEdges.size() > 0)
+		printf("Cut edges count %d. removed %d\n", (int)m_mapCutEdges.size(), ctRemovedCutEdges);
+
+	//Return if the tool has not left the body
+	if(!modifyMesh)
+		return -1;
+
+	//Splitting cut-edges
+	for(CUTEDGEITER it = m_mapCutEdges.begin(); it != m_mapCutEdges.end(); it++) {
+		//set the rest position pint0 for this new vertex
+		double denom = (it->second.e1 - it->second.e0).length();
+		double t = (it->second.pos - it->second.e0).length() / (denom == 0 ? 1 : denom);
+
+		m_lpHEMesh->split_edge(it->second.idxEdge, t);
+	}
+
+	//Duplicated cut-nodes
+	for(CUTNODEITER it = m_mapCutNodes.begin(); it != m_mapCutNodes.end(); it++) {
+		//copy cutnode
+	}
+
+	//Find the list of all tets impacted
+	vector<U8> cutEdgeCodes;
+	vector<U8> cutNodeCodes;
+	cutEdgeCodes.resize(m_lpHEMesh->countElements());
+	cutNodeCodes.resize(m_lpHEMesh->countElements());
+
+	//count of tets cut
+	int ctCutTet = 0;
+
+	//	int edgeMaskPos[6][2] = { {1, 2}, {2, 3}, {3, 1}, {2, 0}, {0, 3}, {0, 1} };
+	//	int edgeMaskNeg[6][2] = { {3, 2}, {2, 1}, {1, 3}, {3, 0}, {0, 2}, {1, 0} };
+	for(U32 i=0; i < m_lpHEMesh->countElements(); i++) {
+		const HalfEdgeTetMesh::ELEM& tet = m_lpHEMesh->const_elemAt(i);
+
+		U8 code = 0;
+		for(int e=0; e < 6; e++) {
+			U32 edge = m_lpHEMesh->edge_from_halfedge(tet.halfedge[e]);
+			if(m_mapCutEdges.find(edge) != m_mapCutEdges.end())
+				code |= (1 << e);
+		}
+		cutEdgeCodes[i] = code;
+
+		if(code != 0)
+			ctCutTet++;
+
+		//cut node code
+		code = 0;
+		for(int e=0; e < 4; e++) {
+			U32 node = tet.nodes[e];
+			if(m_mapCutNodes.find(node) != m_mapCutNodes.end())
+				code |= (1 << e);
+		}
+		cutNodeCodes[i] = code;
+	}
+
+
+	//Return number of tets cut
+	return ctCutTet;
 }
 
 
 void CuttableMesh::displace(double * u) {
-
-	U32 i = 0;
-	for(Mesh::VertexIter v_it = m_impl->mesh.vertices_begin();
-		v_it != m_impl->mesh.vertices_end(); ++v_it) {
-
-		m_impl->mesh.set_point( *v_it, Mesh::Point(&m_vRestPos[i]) + Mesh::Point(&u[i*3]));
-		i++;
-	}
-
-	updateAABB();
+	m_lpHEMesh->displace(u);
+	m_aabb = m_lpHEMesh->aabb();
 }
 
-U32 CuttableMesh::getVertexNeighbors(U32 i, vector<U32>& nbors) {
-
-//	Mesh::VertexIter vb = m_impl->mesh.vertices_begin();
-//	Mesh::VertexIter v_it = vb + i;
-//	nbors.clear();
-//	nbors.reserve(5);
-//
-//	for (Mesh::VertexVertexIter vv_it= m_impl->mesh.vv_iter(v_it.handle()); vv_it; ++vv_it) {
-//		nbors.push_back(vv_it - vb);
-//	}
-
-	return nbors.size();
-}
 
 U32 CuttableMesh::countVertices() const {
-	return TetMesh::getNumVertices();
+	return m_lpHEMesh->countNodes();
 }
 
 vec3d CuttableMesh::vertexRestPosAt(U32 i) const {
-	//assert(i < (m_vRestPos.size() / 3));
-	return vec3d(m_vRestPos[i * 3]);
+	return m_lpHEMesh->const_nodeAt(i).restpos;
 }
 
 vec3d CuttableMesh::vertexAt(U32 i) const {
@@ -624,25 +719,43 @@ vec3d CuttableMesh::vertexAt(U32 i) const {
 int CuttableMesh::findClosestVertex(const vec3d& query, double& dist, vec3d& outP) const {
 	double minDist = GetMaxLimit<double>();
 	int idxFound = -1;
-	int i = 0;
-
-	for(Mesh::VertexIter v_it = m_impl->mesh.vertices_begin();
-		v_it != m_impl->mesh.vertices_end(); ++v_it) {
-
-		Mesh::Point mp = m_impl->mesh.point(v_it);
-		vec3d p = vec3d(mp.data());
+	for(U32 i=0; i < m_lpHEMesh->countNodes(); i++) {
+		vec3d p = m_lpHEMesh->const_nodeAt(i).pos;
 		double dist2 = (query - p).length2();
 		if (dist2 < minDist) {
 			minDist = dist2;
 			outP = p;
 			idxFound = i;
 		}
-		i++;
 	}
 
 	//Distance
 	dist = sqrt(minDist);
 	return idxFound;
+}
+
+double CuttableMesh::pointLineDistance(const vec3d& v1, const vec3d& v2, const vec3d& p) {
+	const double d2 = (v2 - v1).length2();
+	if(d2 == 0.0) return vec3d::distance(p, v1);
+	return pointLineDistance(v1, v2, d2, p);
+}
+
+double CuttableMesh::pointLineDistance(const vec3d& v1, const vec3d& v2,
+									   const double len2, const vec3d& p, double* outT) {
+	// Consider the line extending the segment, parameterized as v1 + t (v2 - v1).
+	// We find projection of point p onto the line.
+	// It falls where t = [(p-1) . (v2-v1)] / |v2-v1|^2
+	const double t = vec3d::dot(p - v1, v2 - v1) / len2;
+	if(outT)
+		*outT = t;
+	if (t < 0.0)
+		return vec3d::distance(p, v1);
+	else if (t > 1.0)
+		return vec3d::distance(p, v2);
+
+	// Projection falls on the segment
+	const vec3d projection = v1 + (v2 - v1) * t;
+	return vec3d::distance(p, projection);
 }
 
 

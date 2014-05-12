@@ -114,6 +114,7 @@ int Deformable::setupTetMesh(const vector<double>& inTetVertices,
 	m_vFixedVertices.assign(vFixedVertices.begin(), vFixedVertices.end());
 
 	//Setup Volumetric Mesh
+	m_lpMesh = NULL;
 	m_lpMesh = new CuttableMesh(inTetVertices, inTetElements);
 	m_lpMeshGraph = GenerateMeshGraph::Generate(m_lpMesh);
 

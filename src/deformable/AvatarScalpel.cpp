@@ -119,7 +119,7 @@ void AvatarScalpel::clearCutContext() {
 	m_isSweptQuadValid = false;
 
 	if(m_lpTissue)
-		m_lpTissue->clear();
+		m_lpTissue->clearCutContext();
 }
 
 //From Gizmo Manager

@@ -42,11 +42,30 @@ public:
 	struct ELEM {
 		U32 faces[4];
 		U32 nodes[4];
+		U32 halfedge[6];
+		bool posDet;
+
+		ELEM& operator = (const ELEM& A) {
+			for(int i=0; i<4; i++) {
+				faces[i] = A.faces[i];
+				nodes[i] = A.nodes[i];
+			}
+			for(int i=0; i<6; i++)
+				halfedge[i] = A.halfedge[i];
+			posDet = A.posDet;
+			return (*this);
+		}
 	};
 
 	//faces
 	struct FACE {
 		U32 halfedge[3];
+
+		FACE& operator = (const FACE& A) {
+			for(int i=0; i<3; i++)
+				halfedge[i] = A.halfedge[i];
+			return (*this);
+		}
 	};
 
 	//vertices
@@ -54,6 +73,13 @@ public:
 		vec3d pos;
 		vec3d restpos;
 		U32 outHE;
+
+		NODE& operator = (const NODE& A) {
+			pos = A.pos;
+			restpos = A.restpos;
+			outHE = A.outHE;
+			return (*this);
+		}
 	};
 
 	//edges
@@ -134,6 +160,7 @@ public:
 	virtual ~HalfEdgeTetMesh();
 
 	//Build
+	bool setup(const vector<double>& vertices, const vector<U32>& elements);
 	bool setup(U32 ctVertices, const double* vertices, U32 ctElements, const U32* elements);
 	void cleanup();
 	void printInfo() const;
@@ -167,14 +194,27 @@ public:
 
 	inline U32 vertex_from_hedge(U32 he) const { return m_vHalfEdges[he].from;}
 	inline U32 vertex_to_hedge(U32 he) const {return m_vHalfEdges[he].to;}
-
+	inline U32 halfedge_from_edge(U32 edge, U8 which) const { return edge * 2 + which;}
+	inline U32 edge_from_halfedge(U32 he) const { return he / 2;}
 
 
 	//algorithm
 	//splits an edge e at parametric point t
-	int split_edge(int idxEdge, double t);
+	void displace(double * u);
+	bool split_edge(int idxEdge, double t);
 	int getFirstRing(int idxNode, vector<U32>& ringNodes) const;
+	int getIncomingHalfEdges(int idxNode, vector<U32>& incomingHE) const;
+	int getOutgoingHalfEdges(int idxNode, vector<U32>& outgoingHE) const;
 
+	bool checkMeshConnectivity() const;
+
+
+	//serialize
+	bool readVegaFormat(const AnsiStr& strFP);
+	bool writeVegaFormat(const AnsiStr& strFP) const;
+
+
+	//draw
 	void draw();
 protected:
 	vector<ELEM> m_vElements;
@@ -189,7 +229,7 @@ protected:
 	inline bool isEdgeIndex(U32 i) const { return (i < countEdges());}
 	inline bool isNodeIndex(U32 i) const { return (i < m_vNodes.size());}
 
-
+	AABB computeAABB();
 };
 
 }
