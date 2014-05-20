@@ -207,7 +207,7 @@ public:
 	int getOutgoingHalfEdges(int idxNode, vector<U32>& outgoingHE) const;
 
 	bool checkMeshConnectivity() const;
-
+	bool checkMeshFaceDirections() const;
 
 	//serialize
 	bool readVegaFormat(const AnsiStr& strFP);

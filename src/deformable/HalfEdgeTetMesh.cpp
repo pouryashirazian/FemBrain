@@ -288,6 +288,7 @@ bool HalfEdgeTetMesh::setup(U32 ctVertices, const double* vertices, U32 ctElemen
 
 	//Compute AABB
 	computeAABB();
+	//checkMeshFaceDirections();
 
 	this->printInfo();
 	return true;
@@ -522,6 +523,42 @@ bool HalfEdgeTetMesh::checkMeshConnectivity() const {
 	return false;
 }
 
+bool HalfEdgeTetMesh::checkMeshFaceDirections() const {
+
+	U32 ctNonTriangle = 0;
+	U32 ctNotCCW = 0;
+	vec3d p[3];
+
+	HalfEdgeTetMesh::HEDGE hedge;
+
+	for(U32 i = 0; i < countFaces(); i++) {
+		HalfEdgeTetMesh::FACE face = const_faceAt(i);
+		U32 he0 = face.halfedge[0];
+		U32 he1 = he0;
+		U32 ctEdges = 0;
+
+		do {
+			hedge = const_halfedgeAt(he1);
+			if(ctEdges < 3)
+				p[ctEdges] = const_nodeAt(hedge.from).pos;
+
+			he1 = hedge.next;
+			ctEdges ++;
+		}
+		while(he0 != he1);
+
+		if(ctEdges > 3) {
+			LogErrorArg2("Face %d is not triangulated. Num Edges: %d", i, ctEdges);
+			ctNonTriangle++;
+		}
+	}
+
+	if(ctNonTriangle > 0 || ctNotCCW > 0)
+		return false;
+	else
+		return true;
+}
+
 bool HalfEdgeTetMesh::readVegaFormat(const AnsiStr& strFP) {
 	if(!FileExists(strFP))
 		return false;
@@ -696,6 +733,9 @@ bool HalfEdgeTetMesh::writeVegaFormat(const AnsiStr& strFP) const {
 
 
 void HalfEdgeTetMesh::draw() {
+	vec3d p0;
+	HalfEdgeTetMesh::HEDGE hedge;
+	int count = 0;
 
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glDisable(GL_LIGHTING);
@@ -704,40 +744,80 @@ void HalfEdgeTetMesh::draw() {
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glColor3f(0.0f, 0.0f, 1.0f);
 	glBegin(GL_TRIANGLES);
+		for(U32 i=0; i<m_vFaces.size(); i++) {
+			HalfEdgeTetMesh::FACE face = const_faceAt(i);
+			HalfEdgeTetMesh::HEDGE he0 = const_halfedgeAt(face.halfedge[0]);
+			HalfEdgeTetMesh::HEDGE he1 = const_halfedgeAt(face.halfedge[1]);
+			HalfEdgeTetMesh::HEDGE he2 = const_halfedgeAt(face.halfedge[2]);
+			vec3d p0 = const_nodeAt(he0.from).pos;
+			vec3d p1 = const_nodeAt(he1.from).pos;
+			vec3d p2 = const_nodeAt(he2.from).pos;
+
+			glVertex3d(p0.x, p0.y, p0.z);
+			glVertex3d(p1.x, p1.y, p1.z);
+			glVertex3d(p2.x, p2.y, p2.z);
+		}
+	glEnd();
+
+	/*
+	glBegin(GL_POLYGON);
 	for(U32 i=0; i<m_vFaces.size(); i++) {
 		HalfEdgeTetMesh::FACE face = const_faceAt(i);
-		HalfEdgeTetMesh::HEDGE he0 = const_halfedgeAt(face.halfedge[0]);
-		HalfEdgeTetMesh::HEDGE he1 = const_halfedgeAt(face.halfedge[1]);
-		HalfEdgeTetMesh::HEDGE he2 = const_halfedgeAt(face.halfedge[2]);
-		vec3d p0 = const_nodeAt(he0.from).pos;
-		vec3d p1 = const_nodeAt(he1.from).pos;
-		vec3d p2 = const_nodeAt(he2.from).pos;
+		U32 he0 = face.halfedge[0];
+		U32 he1 = he0;
+		count = 0;
 
-		glVertex3d(p0.x, p0.y, p0.z);
-		glVertex3d(p1.x, p1.y, p1.z);
-		glVertex3d(p2.x, p2.y, p2.z);
+		do {
+			hedge = halfedgeAt(he1);
+			p0 = const_nodeAt(hedge.from).pos;
+			glVertex3d(p0.x, p0.y, p0.z);
+
+			he1 = hedge.next;
+			count ++;
+		}
+		while(he0 != he1);
 	}
 	glEnd();
+	*/
 
 	//Draw outlined faces
 	glLineWidth(3.0f);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	glColor3f(0.0f, 0.0f, 0.0f);
 	glBegin(GL_TRIANGLES);
+		for(U32 i=0; i<m_vFaces.size(); i++) {
+			HalfEdgeTetMesh::FACE face = const_faceAt(i);
+			HalfEdgeTetMesh::HEDGE he0 = const_halfedgeAt(face.halfedge[0]);
+			HalfEdgeTetMesh::HEDGE he1 = const_halfedgeAt(face.halfedge[1]);
+			HalfEdgeTetMesh::HEDGE he2 = const_halfedgeAt(face.halfedge[2]);
+			vec3d p0 = const_nodeAt(he0.from).pos;
+			vec3d p1 = const_nodeAt(he1.from).pos;
+			vec3d p2 = const_nodeAt(he2.from).pos;
+
+			glVertex3d(p0.x, p0.y, p0.z);
+			glVertex3d(p1.x, p1.y, p1.z);
+			glVertex3d(p2.x, p2.y, p2.z);
+		}
+	glEnd();
+
+	/*
+	glBegin(GL_POLYGON);
 	for(U32 i=0; i<m_vFaces.size(); i++) {
 		HalfEdgeTetMesh::FACE face = const_faceAt(i);
-		HalfEdgeTetMesh::HEDGE he0 = const_halfedgeAt(face.halfedge[0]);
-		HalfEdgeTetMesh::HEDGE he1 = const_halfedgeAt(face.halfedge[1]);
-		HalfEdgeTetMesh::HEDGE he2 = const_halfedgeAt(face.halfedge[2]);
-		vec3d p0 = const_nodeAt(he0.from).pos;
-		vec3d p1 = const_nodeAt(he1.from).pos;
-		vec3d p2 = const_nodeAt(he2.from).pos;
+		U32 he0 = face.halfedge[0];
+		U32 he1 = he0;
 
-		glVertex3d(p0.x, p0.y, p0.z);
-		glVertex3d(p1.x, p1.y, p1.z);
-		glVertex3d(p2.x, p2.y, p2.z);
+		do {
+			hedge = halfedgeAt(he1);
+			p0 = const_nodeAt(hedge.from).pos;
+			glVertex3d(p0.x, p0.y, p0.z);
+
+			he1 = hedge.next;
+		}
+		while(he0 != he1);
 	}
 	glEnd();
+	*/
 
 	//Draw vertices
 	glPointSize(5.0f);

@@ -467,8 +467,8 @@ void CuttableMesh::draw() {
 
 
 			//Draw nodes
-			glColor3f(1, 0, 0);
-			glPointSize(5.0f);
+			glColor3f(1, 1, 0);
+			glPointSize(7.0f);
 			glBegin(GL_POINTS);
 
 			//Draw cutedges crossing
@@ -550,7 +550,8 @@ int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 		ss1 = m_lpHEMesh->const_nodeAt(he.to).pos;
 
 		int res = IntersectSegmentTriangle(ss0, ss1, tri1, uvw, xyz);
-		res += IntersectSegmentTriangle(ss0, ss1, tri2, uvw, xyz);
+		if(res == 0)
+			res = IntersectSegmentTriangle(ss0, ss1, tri2, uvw, xyz);
 		if(res > 0) {
 			CutEdge ce;
 			ce.pos = xyz;
