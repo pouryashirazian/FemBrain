@@ -30,12 +30,29 @@ public:
 		U32 idxE0;
 		U32 idxE1;
 		U32 idxEdge;
+
+		CutEdge& operator = (const CutEdge& A) {
+			pos = A.pos;
+			uvw = A.uvw;
+			e0 	= A.e0;
+			e1 	= A.e1;
+			idxE0 = A.idxE0;
+			idxE1 = A.idxE1;
+			idxEdge = A.idxEdge;
+			return (*this);
+		}
 	};
 
 	//CutNode
 	struct CutNode {
 		vec3d pos;
 		U32 idxNode;
+
+		CutNode& operator = (const CutNode& A) {
+			pos = A.pos;
+			idxNode = A.idxNode;
+			return (*this);
+		}
 	};
 
 public:

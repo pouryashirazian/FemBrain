@@ -443,10 +443,64 @@ void CuttableMesh::clearCutContext() {
 
 void CuttableMesh::draw() {
 
+	/*
+	vec3d ss0 = vec3d(0, 0, -1);
+	vec3d ss1 = vec3d(0, 1, 0);
+
+	vec3d p[4];
+	p[0] = vec3d(-2.944, 0.997, -0.653);
+	p[1] = vec3d(1.055, 0.997, -0.653);
+	p[2] = vec3d(1.055, 0.344, -0.653);
+	p[3] = vec3d(-2.944, 0.344, -0.653);
+
+	vec3d tri1[3] = { p[0], p[1], p[2]};
+	vec3d tri2[3] = { p[0], p[2], p[3]};
+
+	vec3d uvw, xyz;
+	int res = IntersectSegmentTriangle(ss0, ss1, tri1, uvw, xyz);
+	if(res == 0)
+		res = IntersectSegmentTriangle(ss0, ss1, tri2, uvw, xyz);
+	if(res > 0) {
+		glDisable(GL_LIGHTING);
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+			glDisable(GL_CULL_FACE);
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA,GL_ONE);
+
+			glColor4d(1.0, 0.0, 1.0, 0.5);
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			glBegin(GL_QUADS);
+				glVertex3dv(p[0].cptr());
+				glVertex3dv(p[1].cptr());
+				glVertex3dv(p[2].cptr());
+				glVertex3dv(p[3].cptr());
+			glEnd();
+			//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+			glDisable(GL_BLEND);
+			glEnable(GL_CULL_FACE);
+
+			glColor3d(1.0, 1.0, 1.0);
+			glLineWidth(3.0);
+			glBegin(GL_LINES);
+				glVertex3dv(ss0.cptr());
+				glVertex3dv(ss1.cptr());
+			glEnd();
+
+			glColor3d(0.0, 0.0, 0.0);
+			glPointSize(8.0);
+			glBegin(GL_POINTS);
+				glVertex3dv(xyz.cptr());
+			glEnd();
+
+		glPopAttrib();
+		glEnable(GL_LIGHTING);
+	}
+	*/
+
 	//draw tetmesh
 	if(m_lpHEMesh)
 		m_lpHEMesh->draw();
-
 
 	//draw cut context
 	int ctCutEdges = m_mapCutEdges.size();
@@ -457,7 +511,7 @@ void CuttableMesh::draw() {
 
 			//Draw cut edges
 			glColor3f(0.7, 0.7, 0.7);
-			glLineWidth(5.0f);
+			glLineWidth(6.0f);
 			glBegin(GL_LINES);
 				for(CUTEDGEITER it = m_mapCutEdges.begin(); it != m_mapCutEdges.end(); ++it) {
 					glVertex3dv(it->second.e0.cptr());
@@ -467,20 +521,21 @@ void CuttableMesh::draw() {
 
 
 			//Draw nodes
-			glColor3f(1, 1, 0);
 			glPointSize(7.0f);
+			glColor3f(0, 1, 0);
 			glBegin(GL_POINTS);
-
 			//Draw cutedges crossing
 			for(CUTEDGEITER it = m_mapCutEdges.begin(); it != m_mapCutEdges.end(); ++it) {
 				glVertex3dv(it->second.pos.cptr());
 			}
+			glEnd();
 
+			glColor3f(0, 0, 0);
+			glBegin(GL_POINTS);
 			//Draw cutnodes
 			for(CUTNODEITER it = m_mapCutNodes.begin(); it != m_mapCutNodes.end(); ++it) {
 				glVertex3dv(it->second.pos.cptr());
 			}
-
 			glEnd();
 
 		glPopAttrib();
@@ -525,6 +580,17 @@ void CuttableMesh::drawTetElement(U32 el, vec4f& color) {
 int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 					  const vector<vec3d>& bladePath1,
 					  vec3d sweptSurface[4], bool modifyMesh) {
+
+	//if the swept surface is degenerate then return
+	double area = (sweptSurface[1] - sweptSurface[0]).length2() * (sweptSurface[2] - sweptSurface[1]).length2();
+	if(area < EPSILON)
+		return -1;
+	double l2 = (sweptSurface[3] - sweptSurface[2]).length2();
+	if(l2 < EPSILON)
+		return -1;
+
+
+
 	//1.Compute all cut-edges
 	//2.Compute cut nodes and remove all incident edges to cut nodes from cut edges
 	//3.split cut edges and compute the reference position of the split point
@@ -540,11 +606,15 @@ int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 	//Radios of Influence in percent
 	const double roi = 0.2;
 
+	//Swept Surf
+	printf("SWEPT SURF[0]: %.3f, %.3f, %.3f\n", sweptSurface[0].x, sweptSurface[0].y, sweptSurface[0].z);
+	printf("SWEPT SURF[2]: %.3f, %.3f, %.3f\n", sweptSurface[2].x, sweptSurface[2].y, sweptSurface[2].z);
+
 	//Cut-Edges
 	for (U32 i=0; i < m_lpHEMesh->countEdges(); i++) {
 
 		U32 hei = m_lpHEMesh->halfedge_from_edge(i, 0);
-		HalfEdgeTetMesh::HEDGE he = m_lpHEMesh->halfedgeAt(hei);
+		HalfEdgeTetMesh::HEDGE he = m_lpHEMesh->const_halfedgeAt(hei);
 
 		ss0 = m_lpHEMesh->const_nodeAt(he.from).pos;
 		ss1 = m_lpHEMesh->const_nodeAt(he.to).pos;
@@ -562,7 +632,7 @@ int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 			ce.idxE1 = he.to;
 			ce.idxEdge = i;
 
-			m_mapCutEdges.insert( std::pair<U32, CutEdge>(ce.idxEdge, ce) );
+			m_mapCutEdges[ce.idxEdge] = ce;
 		}
 	}
 
