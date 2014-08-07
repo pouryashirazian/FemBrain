@@ -7,12 +7,26 @@
 
 #include "AvatarScalpel.h"
 #include "base/Logger.h"
+#include "graphics/selectgl.h"
 
 using namespace PS;
 
+AvatarScalpel::AvatarScalpel():SGMesh(), IGizmoListener() {
+	init();
+}
+
 AvatarScalpel::AvatarScalpel(CuttableMesh* tissue):SGMesh(), IGizmoListener() {
-	setName("scalpel");
 	m_lpTissue = tissue;
+	init();
+}
+
+AvatarScalpel::~AvatarScalpel() {
+	SGMesh::cleanup();
+}
+
+void AvatarScalpel::init() {
+	setName("scalpel");
+
 	m_isSweptQuadValid = false;
 	m_isToolActive = false;
 
@@ -43,10 +57,6 @@ AvatarScalpel::AvatarScalpel(CuttableMesh* tissue):SGMesh(), IGizmoListener() {
 
 	//Add a header
 	TheSceneGraph::Instance().headers()->addHeaderLine("scalpel", "scalpel");
-}
-
-AvatarScalpel::~AvatarScalpel() {
-	SGMesh::cleanup();
 }
 
 void AvatarScalpel::draw() {
@@ -122,6 +132,10 @@ void AvatarScalpel::clearCutContext() {
 		m_lpTissue->clearCutContext();
 }
 
+void AvatarScalpel::setTissue(CuttableMesh* tissue) {
+	m_lpTissue = tissue;
+}
+
 //From Gizmo Manager
 void AvatarScalpel::mousePress(int button, int state, int x, int y) {
 	if(button == ArcBallCamera::mbRight) {
@@ -133,18 +147,18 @@ void AvatarScalpel::mousePress(int button, int state, int x, int y) {
 	if(button != ArcBallCamera::mbLeft)
 		return;
 
-	//Down Start
+	//Down = Start
 	if(state == 0) {
 		if(m_lpTissue) {
 			m_isToolActive = true;
-			TheSceneGraph::Instance().headers()->updateHeaderLine("avatar", "avatar: start cutting");
+			TheSceneGraph::Instance().headers()->updateHeaderLine("scalpel", "scalpel: start cutting");
 		}
 	}
 	else {
-		//Up Stop
+		//Up = Stop
 		if (m_lpTissue) {
 			m_isToolActive = false;
-			TheSceneGraph::Instance().headers()->updateHeaderLine("avatar", "avatar: end cutting");
+			TheSceneGraph::Instance().headers()->updateHeaderLine("scalpel", "scalpel: end cutting");
 		}
 	}
 }
@@ -169,10 +183,6 @@ void AvatarScalpel::onTranslate(const vec3f& delta, const vec3f& pos) {
 
 		return;
 	}
-
-	//consts
-	const double minSweptLength = 0.4;
-	const U32 maxNodes = 1024;
 
 	//edges
 	vec3f e0 = m_spTransform->forward().map(m_edgeref0);
@@ -199,9 +209,9 @@ void AvatarScalpel::onTranslate(const vec3f& delta, const vec3f& pos) {
 			prevDir = dir;
 		}
 
-		if(maxAngle > 60) {
+		if(maxAngle > MAX_SCALPEL_TRAJECTORY_ANGLE) {
 			m_vCuttingPathEdge0.resize(0);
-			m_vCuttingPathEdge1.resize(1);
+			m_vCuttingPathEdge1.resize(0);
 			m_isSweptQuadValid = false;
 			LogInfoArg1("Cutting trajectory changed %.2f degrees. Resetting path.", maxAngle);
 		}
@@ -221,37 +231,19 @@ void AvatarScalpel::onTranslate(const vec3f& delta, const vec3f& pos) {
 	}
 
 
-	/*
-	if (m_vCuttingPathEdge0.size() > 1) {
-		//Loop over the path from the recently added to the first one
-		for (int i = (int) m_vCuttingPathEdge0.size() - 1; i >= 0; i--) {
-			double d = vec3d::distance(m_vCuttingPathEdge0[i], edge0);
-			if (d >= minSweptLength) {
-				m_sweptQuad[2] = m_vCuttingPathEdge1[i];
-				m_sweptQuad[3] = m_vCuttingPathEdge0[i];
-				m_isSweptQuadValid = true;
-
-
-				//printf("swept quad is valid\n");
-				break;
-			}
-		}
-	}
-	*/
-
 	//Insert new scalpal position into buffer
 	m_vCuttingPathEdge0.push_back(edge0);
 	m_vCuttingPathEdge1.push_back(edge1);
 
 
 	//delete last if overflow buffer
-	if (m_vCuttingPathEdge0.size() > maxNodes)
+	if (m_vCuttingPathEdge0.size() > MAX_SCALPEL_TRAJECTORY_NODES)
 		m_vCuttingPathEdge0.erase(m_vCuttingPathEdge0.begin());
-	if (m_vCuttingPathEdge1.size() > maxNodes)
+	if (m_vCuttingPathEdge1.size() > MAX_SCALPEL_TRAJECTORY_NODES)
 		m_vCuttingPathEdge1.erase(m_vCuttingPathEdge1.begin());
 
-	int res = m_lpTissue->cut(m_vCuttingPathEdge0, m_vCuttingPathEdge1, m_sweptQuad, false);
-	LogInfoArg1("Progressive cutting not implemented. res = %d", res);
+	//int res = m_lpTissue->cut(m_vCuttingPathEdge0, m_vCuttingPathEdge1, m_sweptQuad, false);
+	//LogInfoArg1("Progressive cutting not implemented. res = %d", res);
 }
 
 

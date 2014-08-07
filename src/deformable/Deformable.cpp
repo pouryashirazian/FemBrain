@@ -281,7 +281,7 @@ void Deformable::timestep()
 
 	m_ctCollided = 0;
 
-	for (U32 i = 0; i < m_lpMesh->countVertices(); i++) {
+	for (U32 i = 0; i < m_lpMesh->countNodes(); i++) {
 		pr = m_lpMesh->vertexRestPosAt(i);
 
 		q = vec3d(&m_q[i*3]);
@@ -295,7 +295,7 @@ void Deformable::timestep()
 	//response
 	if(m_ctCollided > 0) {
 		U32 dof = 0;
-		for (U32 i = 0; i < m_lpMesh->countVertices(); i++) {
+		for (U32 i = 0; i < m_lpMesh->countNodes(); i++) {
 			dof = i*3;
 
 			pr = m_lpMesh->vertexRestPosAt(i);
@@ -357,7 +357,7 @@ int Deformable::pickVertices(const vec3d& boxLo, const vec3d& boxHi,
 {
 	arrFoundCoords.resize(0);
 	arrFoundIndices.resize(0);
-	U32 ctVertices = m_lpMesh->countVertices();
+	U32 ctVertices = m_lpMesh->countNodes();
 	for(U32 i=0; i<ctVertices;i++)
 	{
 		vec3d v = m_lpMesh->vertexAt(i);
@@ -502,7 +502,7 @@ bool Deformable::collisionDetect() {
 		//Count collided vertices
 		U32 ctCollided = 0;
 		U32 dof = 0;
-		for (U32 i = 0; i < m_lpMesh->countVertices(); i++) {
+		for (U32 i = 0; i < m_lpMesh->countNodes(); i++) {
 			vec3d pc = m_lpMesh->vertexAt(i);
 			if (pc.y <= (double)c.y)
 				ctCollided++;
@@ -511,7 +511,7 @@ bool Deformable::collisionDetect() {
 		if(ctCollided > 0) {
 			printf("Compensation!\n");
 
-			for (U32 i = 0; i < m_lpMesh->countVertices(); i++) {
+			for (U32 i = 0; i < m_lpMesh->countNodes(); i++) {
 				dof = i * 3;
 				vec3d pc = m_lpMesh->vertexAt(i);
 				vec3d q   = vec3d(&m_q[dof]);
@@ -672,7 +672,7 @@ void Deformable::draw()
 	if(m_lpMesh)
 		m_lpMesh->draw();
 
-	if(m_idxPulledVertex >= 0  && m_idxPulledVertex < (int)m_lpMesh->countVertices() ) {
+	if(m_idxPulledVertex >= 0  && m_idxPulledVertex < (int)m_lpMesh->countNodes() ) {
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
 			glEnable(GL_POLYGON_OFFSET_POINT);
 			glPolygonOffset(-1.0f, -1.0f);

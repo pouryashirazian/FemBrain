@@ -85,8 +85,8 @@ bool Cutting::createMemBuffers() {
 	this->cleanupMemBuffers();
 
 	//TetMesh Stats
-	m_meshInfo.ctTets = m_lpDeformable->getMesh()->getNumElements();
-	m_meshInfo.ctVertices = m_lpDeformable->getMesh()->countVertices();
+	m_meshInfo.ctTets = m_lpDeformable->getMesh()->countCells();
+	m_meshInfo.ctVertices = m_lpDeformable->getMesh()->countNodes();
 
 
 	U32 szVertexBuffer = sizeof(float) * 4 * m_meshInfo.ctVertices;
@@ -407,13 +407,14 @@ int Cutting::computeFaceSegmentIntersectionTest() {
 	vec3f s0, s1;
 	vec3f p[3];
 	vec3f xyz, uvw;
+	float t;
 
 	s0.load(&scalpelEdge[0]);
 	s1.load(&scalpelEdge[4]);
 	for(int i=0;i<3; i++)
 		p[i].load(&tri[i * 4]);
 
-	int res = PS::INTERSECTIONS::IntersectSegmentTriangleF(s0, s1, p, uvw, xyz);
+	int res = PS::INTERSECTIONS::IntersectSegmentTriangleF(s0, s1, p, t, uvw, xyz);
 
 	float* arrFacePoints = new float[4 * minfo.ctTets];
 	m_lpDevice->enqueueReadBuffer(inoutMemFacePoints, sizeof(float) * 4 * minfo.ctTets, arrFacePoints);

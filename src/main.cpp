@@ -810,7 +810,7 @@ int main(int argc, char* argv[])
 		g_lpScalpel->transform()->translate(g_appSettings.avatarPos);
 
 
-		TheGizmoManager::Instance().setNode(g_lpScalpel);
+		TheGizmoManager::Instance().setFocusedNode(g_lpScalpel);
 		TheGizmoManager::Instance().setAxis((GizmoAxis)g_appSettings.avatarAxis);
 
 
@@ -825,8 +825,8 @@ int main(int argc, char* argv[])
 					g_appSettings.cellsize,
 					poly->countVertices(),
 					poly->countTriangles(),
-					g_lpDeformable->getMesh()->getNumVertices(),
-					g_lpDeformable->getMesh()->getNumElements());
+					g_lpDeformable->getMesh()->countNodes(),
+					g_lpDeformable->getMesh()->countCells());
 		TheSceneGraph::Instance().headers()->addHeaderLine("mesh", chrMsg);
 	}
 

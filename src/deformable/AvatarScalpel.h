@@ -10,31 +10,38 @@
 
 #include "graphics/SGMesh.h"
 #include "graphics/Gizmo.h"
-#include "Deformable.h"
 #include "CuttableMesh.h"
 
 using namespace PS;
 using namespace PS::SG;
+
+#define MAX_SCALPEL_TRAJECTORY_ANGLE  60.0
+#define MAX_SCALPEL_TRAJECTORY_NODES 1024
 
 /*!
  * Synopsis: Haptics Avatar guide
  */
 class AvatarScalpel : public SGMesh, public IGizmoListener {
 public:
+	AvatarScalpel();
 	AvatarScalpel(CuttableMesh* tissue);
 	virtual ~AvatarScalpel();
 
+	void init();
 	void draw();
 
 
 	//Tool
 	bool isActive() const {return m_isToolActive;}
 	void clearCutContext();
+	void setTissue(CuttableMesh* tissue);
 
 
 	//From Gizmo Manager
 	void mousePress(int button, int state, int x, int y);
 	void onTranslate(const vec3f& delta, const vec3f& pos);
+
+public:
 
 protected:
 	AABB m_aabbCurrent;
