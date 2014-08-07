@@ -67,7 +67,7 @@ public:
 	};
 
 public:
-//	CuttableMesh(const VolMesh& hemesh);
+	//CuttableMesh(const VolMesh& hemesh);
 	CuttableMesh(const vector<double>& vertices, const vector<U32>& elements);
 	CuttableMesh(int ctVertices, double* vertices, int ctElements, int* elements);
 	virtual ~CuttableMesh();

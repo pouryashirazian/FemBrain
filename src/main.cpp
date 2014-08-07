@@ -35,6 +35,7 @@
 #include "deformable/Cutting.h"
 #include "deformable/Cutting_CPU.h"
 
+#include "graphics/Intersections.h"
 #include "volumetricMeshLoader.h"
 #include "generateSurfaceMesh.h"
 #include "settings.h"
@@ -43,6 +44,7 @@
 
 using namespace std;
 using namespace PS;
+using namespace PS::INTERSECTIONS;
 using namespace PS::FILESTRINGUTILS;
 using namespace PS::CL;
 
@@ -564,6 +566,30 @@ bool SaveSettings(const AnsiStr& strSimFP)
 	return true;
 }
 
+void testX() {
+
+	vec3d ss0 = vec3d(0, 0, -1);
+	vec3d ss1 = vec3d(0, 1, 0);
+
+	vec3d p[4];
+	p[0] = vec3d(-2.944, 0.997, -0.653);
+	p[1] = vec3d(1.055, 0.997, -0.653);
+	p[2] = vec3d(1.055, 0.344, -0.653);
+	p[3] = vec3d(-2.944, 0.344, -0.653);
+
+	vec3d tri1[3] = { p[0], p[1], p[2]};
+	vec3d tri2[3] = { p[0], p[2], p[3]};
+
+	vec3d uvw, xyz;
+	double t;
+	int res = IntersectSegmentTriangle(ss0, ss1, tri1, t, uvw, xyz);
+	if(res == 0)
+		res = IntersectSegmentTriangle(ss0, ss1, tri2, t, uvw, xyz);
+
+	if(res > 0) {
+		printf("Intersected xyz = %.3f, %.3f, %.3f\n", xyz.x, xyz.y, xyz.z);
+	}
+}
 
 //Main Loop of Application
 int main(int argc, char* argv[])
@@ -575,6 +601,7 @@ int main(int argc, char* argv[])
 	printf("***************************************************************************************\n");
 	printf("FEMBrain - GPU-Accelerated Animation of Implicit Surfaces using Finite Element Methods.\n");
 	printf("[Pourya Shirazian] Email: pouryash@cs.uvic.ca\n");
+
 
 	//SIM files define the simulation parameters
 	//Parse Input Args

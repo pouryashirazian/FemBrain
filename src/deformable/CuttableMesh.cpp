@@ -19,22 +19,6 @@ using namespace PS::INTERSECTIONS;
 namespace PS {
 
 ///////////////////////////////////////////////////////////////////////////
-/*
-CuttableMesh::CuttableMesh(const VolMesh& hemesh) {
-	resetTransform();
-	if(TheShaderManager::Instance().has("phong")) {
-        m_spEffect = SmartPtrSGEffect(new SGEffect(TheShaderManager::Instance().get("phong")));
-    }
-
-	//HEMesh
-	m_lpVolMesh = new VolMesh(hemesh);
-	m_lpSubD = new TetSubdivider(m_lpVolMesh);
-
-	m_aabb = m_lpVolMesh->aabb();
-	m_ctCompletedCuts = 0;
-	m_doSplit = false;
-}
-*/
 
 CuttableMesh::CuttableMesh(const vector<double>& vertices, const vector<U32>& elements)
   : TetMesh(vertices.size() / 3, const_cast<double *>(&vertices[0]), elements.size() / 4, (int*) &elements[0])  {
@@ -43,7 +27,7 @@ CuttableMesh::CuttableMesh(const vector<double>& vertices, const vector<U32>& el
 }
 
 CuttableMesh::CuttableMesh(int ctVertices, double* vertices, int ctElements, int* elements)
-	: TetMesh(ctVertices, vertices, ctElements, elements) {
+  : TetMesh(ctVertices, vertices, ctElements, elements) {
 
 	setup(ctVertices, vertices, ctElements, elements);
 }
@@ -593,5 +577,4 @@ CuttableMesh* CuttableMesh::CreateTruthCube(int nx, int ny, int nz, double cells
 }
 
 }
-
 
