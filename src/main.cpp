@@ -829,11 +829,11 @@ int main(int argc, char* argv[])
 		g_lpProbe->unregisterListener();
 
 		//Scalpel and cuttable mesh
-		CuttableMesh* oneTetra = CuttableMesh::CreateOneTetra();
-		oneTetra->setName("onetetra");
-		TheSceneGraph::Instance().add(oneTetra);
+//		CuttableMesh* oneTetra = CuttableMesh::CreateOneTetra();
+//		oneTetra->setName("onetetra");
+//		TheSceneGraph::Instance().add(oneTetra);
 
-		g_lpScalpel = new AvatarScalpel(oneTetra);
+		g_lpScalpel = new AvatarScalpel(g_lpDeformable);
 		g_lpScalpel->transform()->translate(g_appSettings.avatarPos);
 
 

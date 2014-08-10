@@ -21,8 +21,6 @@ using namespace std;
 
 using namespace PS::INTERSECTIONS;
 
-CuttableMesh* g_lpModifier = NULL;
-
 Deformable::Deformable()
 {
 	init();
@@ -114,7 +112,6 @@ int Deformable::setupTetMesh(const vector<double>& inTetVertices,
 	m_vFixedVertices.assign(vFixedVertices.begin(), vFixedVertices.end());
 
 	//Setup Volumetric Mesh
-	m_lpMesh = NULL;
 	m_lpMesh = new CuttableMesh(inTetVertices, inTetElements);
 	m_lpMeshGraph = GenerateMeshGraph::Generate(m_lpMesh);
 
@@ -610,6 +607,8 @@ bool Deformable::applyHapticForces() {
 			{
 				// traverse all neighbors and check if they were already previously inserted
 				int vtx = *iter;
+
+				m_lpMesh->getMesh()->get_incident_edges()
 				int deg = m_lpMeshGraph->GetNumNeighbors(vtx);
 				for (int k = 0; k < deg; k++) {
 					int vtxNeighbor = m_lpMeshGraph->GetNeighbor(vtx, k);
