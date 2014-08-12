@@ -33,7 +33,9 @@
 #include "deformable/TetGenExporter.h"
 #include "deformable/MassSpringSystem.h"
 #include "deformable/Cutting.h"
+#include "deformable/VolMeshSamples.h"
 #include "deformable/Cutting_CPU.h"
+#include "deformable/VolMeshSamples.h"
 
 #include "graphics/Intersections.h"
 #include "volumetricMeshLoader.h"
@@ -110,26 +112,35 @@ void MousePress(int button, int state, int x, int y)
 	g_appSettings.screenDragStart = vec2i(x, y);
 	g_appSettings.screenDragEnd = vec2i(x, y);
 
-	if (button == GLUT_LEFT_BUTTON)
+	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
 	{
-		if (state == GLUT_DOWN)
+		if (g_appSettings.selectFixedNodes)
 		{
-			//Check if the user intended to pick a model vertex
-			vec3d wpos;
-			int stencilValue = ScreenToWorldReadStencil(x, y, wpos);
-			if (stencilValue == 1) {
-				vec3d closestVertex;
-				//int idxVertex = g_lpDeformable->pickVertex(wpos, closestVertex);
-				//g_lpDeformable->setPulledVertex(idxVertex);
-				//LogInfoArg1("Selected Vertex Index = %d ", idxVertex);
+			vec3f expand(0.2);
+			Ray ray = TheSceneGraph::Instance().screenToWorldRay(x, y);
+			int idxVertex = -1;
+			for(int i = 0; i < (int)g_lpDeformable->getVolMesh()->countNodes(); i++) {
+				AABB aabb;
+
+				vec3d pos = g_lpDeformable->getVolMesh()->const_nodeAt(i).pos;
+				vec3f posF = vec3f((float)pos.x, (float)pos.y, (float)pos.z);
+				aabb.set(posF - expand, posF + expand);
+
+				if(aabb.intersect(ray, 0.0, FLT_MAX)) {
+					idxVertex = i;
+					break;
+				}
+			}
+
+			//select vertex
+			if (g_lpDeformable->getVolMesh()->isNodeIndex(idxVertex)) {
+				g_lpDeformable->setPulledVertex(idxVertex);
+				LogInfoArg1("Selected Vertex Index = %d ", idxVertex);
 
 				//Edit Fixed Vertices
-				if (g_appSettings.editConstrainedNodes) {
-					//g_appSettings.vFixedVertices.push_back(idxVertex);
-					LogInfoArg1(
-							"Added last selection to fixed vertices. count = %d",
-							g_appSettings.vFixedVertices.size());
-				}
+				g_appSettings.vFixedNodes.push_back(idxVertex);
+				LogInfoArg1("Added last selection to fixed vertices. count = %d",
+						g_appSettings.vFixedNodes.size());
 			}
 		}
 	}
@@ -224,9 +235,11 @@ void NormalKey(unsigned char key, int x, int y)
 	break;
 
 	case('f'): {
-		LogInfo("Begin selecting fixed nodes now!");
-		g_appSettings.editConstrainedNodes = true;
-		g_appSettings.vFixedVertices.resize(0);
+		g_appSettings.selectFixedNodes = !g_appSettings.selectFixedNodes;
+		if(g_appSettings.selectFixedNodes) {
+			g_appSettings.vFixedNodes.resize(0);
+			LogInfo("Begin selecting fixed nodes now!");
+		}
 	}
 	break;
 
@@ -483,7 +496,7 @@ bool LoadSettings(const AnsiStr& strSimFP)
 
 	int ctFixed = 	cfg.readInt("MODEL", "FIXEDVERTICESCOUNT", 0);
 	if(ctFixed > 0) {
-		if(!cfg.readIntArray("MODEL", "FIXEDVERTICES", ctFixed, g_appSettings.vFixedVertices))
+		if(!cfg.readIntArray("MODEL", "FIXEDVERTICES", ctFixed, g_appSettings.vFixedNodes))
 			LogError("Unable to read specified number of fixed vertices!");
 	}
 
@@ -558,9 +571,9 @@ bool SaveSettings(const AnsiStr& strSimFP)
 
 
 	//MODEL PROPS
-	if(g_appSettings.editConstrainedNodes) {
-		cfg.writeInt("MODEL", "FIXEDVERTICESCOUNT", g_appSettings.vFixedVertices.size());
-		cfg.writeIntArray("MODEL", "FIXEDVERTICES", g_appSettings.vFixedVertices);
+	if(g_appSettings.selectFixedNodes) {
+		cfg.writeInt("MODEL", "FIXEDVERTICESCOUNT", g_appSettings.vFixedNodes.size());
+		cfg.writeIntArray("MODEL", "FIXEDVERTICES", g_appSettings.vFixedNodes);
 	}
 
 	return true;
@@ -581,13 +594,19 @@ void testX() {
 	vec3d tri2[3] = { p[0], p[2], p[3]};
 
 	vec3d uvw, xyz;
-	int res = IntersectSegmentTriangle(ss0, ss1, tri1, uvw, xyz);
+	double t;
+	int res = IntersectSegmentTriangle(ss0, ss1, tri1, t, uvw, xyz);
 	if(res == 0)
-		res = IntersectSegmentTriangle(ss0, ss1, tri2, uvw, xyz);
+		res = IntersectSegmentTriangle(ss0, ss1, tri2, t, uvw, xyz);
 
 	if(res > 0) {
 		printf("Intersected xyz = %.3f, %.3f, %.3f\n", xyz.x, xyz.y, xyz.z);
 	}
+}
+
+void cutCompleted() {
+	LogInfo("Cut completed. Sync meshes");
+	g_lpDeformable->syncForceModel();
 }
 
 //Main Loop of Application
@@ -811,39 +830,45 @@ int main(int argc, char* argv[])
 		g_appSettings.msPolyTetrahedraMesh = (tbb::tick_count::now() - tsStart).seconds() * 1000.0;
 
 		//Deformable
-		g_lpDeformable = new Deformable(tetVertices, tetElements, g_appSettings.vFixedVertices);
+		//g_lpDeformable = new Deformable(tetVertices, tetElements, g_appSettings.vFixedVertices);
+
+		VolMesh* tempMesh = PS::MESH::VolMeshSamples::CreateTruthCube(4, 4, 4, 0.5);
+		vector<int> fixed;
+		fixed.push_back(0);
+		fixed.push_back(3);
+		fixed.push_back(48);
+		fixed.push_back(51);
+
+		g_lpDeformable = new Deformable(*tempMesh, fixed);
+		SAFE_DELETE(tempMesh);
+
 		g_lpDeformable->setGravity(true);
-//		g_lpDeformable->setDeformCallback(ApplyDeformations);
+		//g_lpDeformable->setDeformCallback(ApplyDeformations);
 		g_lpDeformable->setHapticForceRadius(g_appSettings.hapticNeighborhoodPropagationRadius);
 		g_lpDeformable->setName("tissue");
 		g_lpDeformable->setCollisionObject(TheSceneGraph::Instance().get("floor"));
 		g_lpDeformable->setVisible(g_appSettings.drawTetMesh);
 		g_lpDeformable->setWireFrameMode(g_appSettings.drawTetMesh == disWireFrame);
-		//g_lpDeformable->setAnimate(false);
+		TheSceneGraph::Instance().add(g_lpDeformable);
 
 		//Probe
 		g_lpProbe = new AvatarProbe(g_lpDeformable);
 		g_lpProbe->transform()->translate(g_appSettings.avatarPos);
 		g_lpProbe->transform()->scale(g_appSettings.avatarThickness);
-		g_lpProbe->unregisterListener();
+		//TheSceneGraph::Instance().add(g_lpProbe);
 
-		//Scalpel and cuttable mesh
-		CuttableMesh* oneTetra = CuttableMesh::CreateOneTetra();
-		oneTetra->setName("onetetra");
-		TheSceneGraph::Instance().add(oneTetra);
-
-		g_lpScalpel = new AvatarScalpel(oneTetra);
+		//scalpel
+		g_lpScalpel = new AvatarScalpel(g_lpDeformable->getVolMesh());
 		g_lpScalpel->transform()->translate(g_appSettings.avatarPos);
+		g_lpScalpel->setOnCutEventHandler(cutCompleted);
+		TheSceneGraph::Instance().add(g_lpScalpel);
 
-
-		TheGizmoManager::Instance().setNode(g_lpScalpel);
+		//set focused node for affine gizmo
+		TheGizmoManager::Instance().setFocusedNode(g_lpScalpel);
 		TheGizmoManager::Instance().setAxis((GizmoAxis)g_appSettings.avatarAxis);
 
 
-		//Cutting
-		TheSceneGraph::Instance().add(g_lpDeformable);
-		TheSceneGraph::Instance().add(g_lpScalpel);
-
+		//log report
 		char chrMsg[1024];
 
 		GPUPoly* poly = TheSketchMachine::Instance().polygonizer();
@@ -851,8 +876,8 @@ int main(int argc, char* argv[])
 					g_appSettings.cellsize,
 					poly->countVertices(),
 					poly->countTriangles(),
-					g_lpDeformable->getMesh()->getNumVertices(),
-					g_lpDeformable->getMesh()->getNumElements());
+					g_lpDeformable->getVolMesh()->countNodes(),
+					g_lpDeformable->getVolMesh()->countCells());
 		TheSceneGraph::Instance().headers()->addHeaderLine("mesh", chrMsg);
 	}
 

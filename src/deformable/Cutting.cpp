@@ -85,8 +85,8 @@ bool Cutting::createMemBuffers() {
 	this->cleanupMemBuffers();
 
 	//TetMesh Stats
-	m_meshInfo.ctTets = m_lpDeformable->getMesh()->getNumElements();
-	m_meshInfo.ctVertices = m_lpDeformable->getMesh()->countVertices();
+	m_meshInfo.ctTets = m_lpDeformable->getVolMesh()->countCells();
+	m_meshInfo.ctVertices = m_lpDeformable->getVolMesh()->countNodes();
 
 
 	U32 szVertexBuffer = sizeof(float) * 4 * m_meshInfo.ctVertices;
@@ -120,8 +120,10 @@ bool Cutting::createMemBuffers() {
 	//Elements
 	U32* arrIndices = new U32[m_meshInfo.ctTets * 4];
 	for(U32 el=0; el<m_meshInfo.ctTets; el++) {
+		const CELL& cell = m_lpDeformable->getVolMesh()->const_cellAt(el);
+
 		for(U32 i=0; i<4; i++) {
-			arrIndices[el*4 + i] = m_lpDeformable->getMesh()->getVertexIndex(el, i);
+			arrIndices[el*4 + i] = cell.nodes[i];
 		}
 	}
 
@@ -132,7 +134,7 @@ bool Cutting::createMemBuffers() {
 
 	float* arrVertices = new float[m_meshInfo.ctVertices * 4];
 	for(U32 i = 0; i<m_meshInfo.ctVertices; i++) {
-		vec3d v = m_lpDeformable->getMesh()->vertexAt(i);
+		vec3d v = m_lpDeformable->getVolMesh()->const_nodeAt(i).pos;
 		arrVertices[i * 4] = static_cast<float>(v.x);
 		arrVertices[i * 4 + 1] = static_cast<float>(v.y);
 		arrVertices[i * 4 + 2] = static_cast<float>(v.z);
@@ -407,13 +409,14 @@ int Cutting::computeFaceSegmentIntersectionTest() {
 	vec3f s0, s1;
 	vec3f p[3];
 	vec3f xyz, uvw;
+	float t;
 
 	s0.load(&scalpelEdge[0]);
 	s1.load(&scalpelEdge[4]);
 	for(int i=0;i<3; i++)
 		p[i].load(&tri[i * 4]);
 
-	int res = PS::INTERSECTIONS::IntersectSegmentTriangleF(s0, s1, p, uvw, xyz);
+	int res = PS::INTERSECTIONS::IntersectSegmentTriangleF(s0, s1, p, t, uvw, xyz);
 
 	float* arrFacePoints = new float[4 * minfo.ctTets];
 	m_lpDevice->enqueueReadBuffer(inoutMemFacePoints, sizeof(float) * 4 * minfo.ctTets, arrFacePoints);

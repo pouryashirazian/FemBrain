@@ -18,7 +18,6 @@
 
 
 #include "SurfaceMesh.h"
-#include "VolumeMesh.h"
 #include "corotationalLinearFEM.h"
 #include "corotationalLinearFEMForceModel.h"
 #include "generateMassMatrix.h"
@@ -35,6 +34,7 @@ using namespace PS::MATH;
 using namespace PS::FEM;
 
 #define DEFAULT_FORCE_NEIGHBORHOOD_SIZE 5
+#define DEFAULT_THREAD_COUNT 8
 
 
 //ApplyDeformations
@@ -58,6 +58,9 @@ struct EdgeIntersection {
 class Deformable : public SGMesh {
 public:
 	Deformable();
+	explicit Deformable(const VolMesh& mesh,
+		 	 	 	 	const vector<int>& vFixedVertices);
+
 	explicit Deformable(const vector<double>& inTetVertices,
 					 	 const vector<U32>& inTetElements,
 					 	 const vector<int>& vFixedVertices);
@@ -123,7 +126,7 @@ public:
 	bool isVolumeChanged() const { return  !EssentiallyEquald(this->computeVolume(), m_restVolume, 0.0001);}
 
 	//Access TetMesh for stats
-	CuttableMesh* getMesh() const { return m_lpMesh;}
+	CuttableMesh* getVolMesh() const { return m_lpVolMesh;}
 
 	//ModelName
 	string getModelName() const {return m_strModelName;}
@@ -145,10 +148,8 @@ public:
 
 	double getSolverTime() const { return m_lpIntegrator->GetSystemSolveTime();}
 
-	//Setup
-	int setupTetMesh(const vector<double>& inTetVertices,
-					 const vector<U32>& inTetElements,
-					 const vector<int>& vFixedVertices);
+	//Force model sync
+	bool syncForceModel();
 
 	/*!
 	 * Return: Outputs number of dofs
@@ -165,8 +166,6 @@ private:
 			    int ctThreads = 0,
 			    const char* lpModelTitle = NULL);
 
-	void setupIntegrator(int ctThreads = 8);
-
 	void init();
 	void cleanup();
 
@@ -180,10 +179,8 @@ private:
 	double m_restVolume;
 
 	//Modifier
-	CuttableMesh* m_lpMesh;
-
-//	//Mesh Graph
-	Graph* m_lpMeshGraph;
+	CuttableMesh* m_lpVolMesh;
+	TetMesh* m_lpForceModelTetMesh;
 
 	//Deformable Model
 	CorotationalLinearFEM* m_lpDeformable;
@@ -206,7 +203,7 @@ private:
 	double* m_qVel;
 	double* m_qAcc;
 	double* m_arrExtForces;
-	double* m_arrElementVolumes;
+
 
 	//Fixed Vertices
 	vector<int> m_vFixedVertices;

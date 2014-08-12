@@ -28,11 +28,32 @@ Deformable::Deformable()
 	init();
 }
 
+Deformable::Deformable(const VolMesh& mesh,
+	 	 	 	 		const vector<int>& vFixedVertices) {
+	init();
+
+	//Copy from the input fixed vertices
+	m_vFixedVertices.assign(vFixedVertices.begin(), vFixedVertices.end());
+
+	//Setup Volumetric Mesh
+	m_lpVolMesh = new CuttableMesh(mesh);
+
+	syncForceModel();
+}
+
+
 Deformable::Deformable(const vector<double>& inTetVertices,
 				 	 const vector<U32>& inTetElements,
 				 	 const vector<int>& vFixedVertices) {
 	init();
-	setupTetMesh(inTetVertices, inTetElements, vFixedVertices);
+
+	//Copy from the input fixed vertices
+	m_vFixedVertices.assign(vFixedVertices.begin(), vFixedVertices.end());
+
+	//Setup Volumetric Mesh
+	m_lpVolMesh = new CuttableMesh(inTetVertices, inTetElements);
+
+	syncForceModel();
 }
 
 
@@ -50,24 +71,23 @@ void Deformable::cleanup()
 
 	SAFE_DELETE(m_lpMassMatrix);
 
-	//SAFE_DELETE(m_lpDeformableMesh);
+	SAFE_DELETE(m_lpForceModelTetMesh);
 	SAFE_DELETE(m_lpDeformableForceModel);
 	SAFE_DELETE(m_lpDeformable);
-	SAFE_DELETE(m_lpMesh);
+	SAFE_DELETE(m_lpVolMesh);
 
 	//Double Arrays
 	SAFE_DELETE_ARRAY(m_q);
 	SAFE_DELETE_ARRAY(m_qVel);
 	SAFE_DELETE_ARRAY(m_qAcc);
 	SAFE_DELETE_ARRAY(m_arrExtForces);
-	SAFE_DELETE_ARRAY(m_arrElementVolumes);
 }
 
 void Deformable::init() {
 	m_ctCollided = 0;
 	m_strModelName = "FEMBRAIN";
 	m_collisionObj = NULL;
-	m_lpMesh = NULL;
+	m_lpVolMesh = NULL;
 
 	//Init Vars
 	m_fOnDeform = NULL;
@@ -93,57 +113,109 @@ void Deformable::init() {
 	//Time Step the model
 	m_timeStep = 0.0333;
 	m_ctTimeStep = 0;
+
+	m_lpForceModelTetMesh = NULL;
+	m_lpDeformable = NULL;
+	m_lpDeformableForceModel = NULL;
+	m_lpMassMatrix = NULL;
 	m_lpIntegrator = NULL;
+
+	m_q = m_qVel = m_qAcc = NULL;
+	m_arrExtForces = NULL;
 }
 
 
+bool Deformable::syncForceModel() {
+	if(m_lpVolMesh == NULL)
+		return false;
 
-int Deformable::setupTetMesh(const vector<double>& inTetVertices,
-		 	 	 	 	 	 const vector<U32>& inTetElements,
-		 	 	 	 	 	 const vector<int>& vFixedVertices) {
+	//recompute AABB for volume mesh
+	setAABB(m_lpVolMesh->computeAABB());
 
-	vector<int> arrElements;
-	arrElements.resize(inTetElements.size());
-	for(U32 i=0; i<inTetElements.size(); i++)
-		arrElements[i] = (int)inTetElements[i];
+	//degrees of freedom
+	m_dof = 3 * m_lpVolMesh->countNodes();
 
-	//Compute Volume
+	//fetch vertices
+	vector<double> vertices;
+	vertices.resize(m_dof);
+	U32 ctNodes = m_lpVolMesh->countNodes();
+
+	for(U32 i = 0; i < ctNodes; i++) {
+		vec3d pos = m_lpVolMesh->const_nodeAt(i).pos;
+		pos.store(&vertices[i * 3]);
+	}
+
+
+	vector<int> elements;
+	elements.resize(m_lpVolMesh->countCells() * 4);
+	U32 ctCells = m_lpVolMesh->countCells();
+
+	for(U32 i = 0; i < ctCells; i++) {
+		const CELL& cell = m_lpVolMesh->const_cellAt(i);
+
+		for(U32 j=0; j < 4; j++)
+			elements[i * 4 + j] = cell.nodes[j];
+	}
+
+	//recompute Volume
 	m_restVolume = computeVolume();
 
-	//Copy from the input fixed vertices
-	m_vFixedVertices.assign(vFixedVertices.begin(), vFixedVertices.end());
+	//cleanup
+	SAFE_DELETE(m_lpIntegrator);
+	SAFE_DELETE(m_lpMassMatrix);
+	SAFE_DELETE(m_lpDeformableForceModel);
+	SAFE_DELETE(m_lpDeformable);
+	SAFE_DELETE(m_lpForceModelTetMesh);
+	SAFE_DELETE(m_q);
+	SAFE_DELETE(m_qVel);
+	SAFE_DELETE(m_qAcc);
+	SAFE_DELETE(m_arrExtForces);
 
-	//Setup Volumetric Mesh
-	m_lpMesh = NULL;
-	m_lpMesh = new CuttableMesh(inTetVertices, inTetElements);
-	m_lpMeshGraph = GenerateMeshGraph::Generate(m_lpMesh);
 
-	//Compute AABB
-	setAABB(m_lpMesh->aabb());
-
+	//build temp tet mesh
+	SAFE_DELETE(m_lpForceModelTetMesh);
+	m_lpForceModelTetMesh = new TetMesh(ctNodes, &vertices[0], ctCells, &elements[0], 1E7, 0.46, 1000);
 
 	//Setup Deformable Model
-	m_lpDeformable = new CorotationalLinearFEM(m_lpMesh);
+	SAFE_DELETE(m_lpDeformable);
+	m_lpDeformable = new CorotationalLinearFEM(m_lpForceModelTetMesh);
 
 	//Setup Force Model
+	SAFE_DELETE(m_lpDeformableForceModel);
 	m_lpDeformableForceModel = new CorotationalLinearFEMForceModel(m_lpDeformable);
 
 	//Compute Mass Matrix
-	GenerateMassMatrix::computeMassMatrix(m_lpMesh, &m_lpMassMatrix, true);
+	SAFE_DELETE(m_lpMassMatrix);
+	GenerateMassMatrix::computeMassMatrix(m_lpForceModelTetMesh, &m_lpMassMatrix, true);
 
-	// total number of DOFs
-	m_dof = 3 * m_lpMesh->getNumVertices();
+	//values
 	m_q = new double[m_dof];
 	m_qVel = new double[m_dof];
 	m_qAcc = new double[m_dof];
-
 	m_arrExtForces = new double[m_dof];
 
 
-	//Create the integrator
-	this->setupIntegrator(tbb::task_scheduler_init::default_num_threads());
+	//reset solver
+	//Update DOFS
+	FixedVerticesToFixedDOF(m_vFixedVertices, m_vFixedDofs);
 
-	return 1;
+	//Rebuilt Integrator
+	int ctThreads = tbb::task_scheduler_init::default_num_threads();
+	LogInfoArg1("Setup Integrator with %d threads.", ctThreads);
+
+	// initialize the Integrator
+	m_lpIntegrator = new VolumeConservingIntegrator(m_dof, m_timeStep,
+													 m_lpMassMatrix,
+													 m_lpDeformableForceModel,
+													 m_positiveDefiniteSolver,
+													 m_vFixedDofs.size(),
+													 &m_vFixedDofs[0],
+													 m_dampingMassCoeff,
+													 m_dampingStiffnessCoeff,
+													 1, 1E-6, ctThreads);
+
+
+	return true;
 }
 
 /*!
@@ -151,16 +223,18 @@ int Deformable::setupTetMesh(const vector<double>& inTetVertices,
  */
 void Deformable::statFillRecord(DBLogger::Record& rec) const
 {
-	rec.ctElements = m_lpMesh->getNumElements();
-	rec.ctVertices = m_lpMesh->getNumVertices();
+	rec.ctElements = m_lpVolMesh->countCells();
+	rec.ctVertices = m_lpVolMesh->countNodes();
 	rec.restVolume = m_restVolume;
 	rec.totalVolume = this->computeVolume();
 
 	rec.youngModulo = 0.0;
 	rec.poissonRatio = 0.0;
-	if(m_lpMesh->getNumMaterials() > 0)
+
+	/*
+	if(m_lpVolMesh->getNumMaterials() > 0)
 	{
-		VolumetricMesh::Material* lpMaterial = m_lpMesh->getMaterial(0);
+		VolumetricMesh::Material* lpMaterial = m_lpVolMesh->getMaterial(0);
 		if(lpMaterial->getType() == VolumetricMesh::Material::ENU)
 		{
 			VolumetricMesh::ENuMaterial* lpENuMaterial = reinterpret_cast<VolumetricMesh::ENuMaterial*>(lpMaterial);
@@ -168,6 +242,7 @@ void Deformable::statFillRecord(DBLogger::Record& rec) const
 			rec.poissonRatio = lpENuMaterial->getNu();
 		}
 	}
+	*/
 
 	rec.xpElementType = "TET";
 	rec.xpForceModel = "COROTATIONAL LINEAR FEM";
@@ -183,18 +258,18 @@ void Deformable::statFillRecord(DBLogger::Record& rec) const
 
 double Deformable::computeVolume(double* arrStore, U32 count) const
 {
-	if(!m_lpMesh)
+	if(!m_lpVolMesh)
 		return 0.0;
 
-	U32 ctElements = m_lpMesh->getNumElements();
+	U32 countCells = m_lpVolMesh->countCells();
 	double vol = 0.0;
 	bool store = false;
-	if(arrStore != NULL && count == ctElements)
+	if(arrStore != NULL && count == countCells)
 		store = true;
 
-	for(U32 i=0; i<ctElements; i++)
+	for(U32 i=0; i<countCells; i++)
 	{
-		double cur = m_lpMesh->getElementVolume(i);
+		double cur = m_lpVolMesh->computeCellVolume(i);
 		if(store)
 			arrStore[i] = cur;
 		vol += cur;
@@ -281,8 +356,8 @@ void Deformable::timestep()
 
 	m_ctCollided = 0;
 
-	for (U32 i = 0; i < m_lpMesh->countVertices(); i++) {
-		pr = m_lpMesh->vertexRestPosAt(i);
+	for (U32 i = 0; i < m_lpVolMesh->countNodes(); i++) {
+		pr = m_lpVolMesh->const_nodeAt(i).restpos;
 
 		q = vec3d(&m_q[i*3]);
 
@@ -295,10 +370,10 @@ void Deformable::timestep()
 	//response
 	if(m_ctCollided > 0) {
 		U32 dof = 0;
-		for (U32 i = 0; i < m_lpMesh->countVertices(); i++) {
+		for (U32 i = 0; i < m_lpVolMesh->countNodes(); i++) {
 			dof = i*3;
 
-			pr = m_lpMesh->vertexRestPosAt(i);
+			pr = m_lpVolMesh->vertexRestPosAt(i);
 			q = vec3d(&m_q[dof]);
 			pc = pr + q;
 
@@ -331,10 +406,10 @@ void Deformable::timestep()
 
 
 	//Apply displacements
-	m_lpMesh->displace(m_q);
+	m_lpVolMesh->displace(m_dof, m_q);
 
 	//Update AABB
-	setAABB(m_lpMesh->aabb());
+	setAABB(m_lpVolMesh->aabb());
 
 
 	if(m_fOnDeform)
@@ -347,7 +422,7 @@ void Deformable::timestep()
 int Deformable::pickVertex(const vec3d& wpos, vec3d& vertex)
 {
 	double dist;
-	int index = m_lpMesh->findClosestVertex(wpos, dist, vertex);
+	int index = m_lpVolMesh->findClosestVertex(wpos, dist, vertex);
 	LogInfoArg2("Clicked on vertex: %d (0-indexed). Dist: %.2f", index, dist);
 	return index;
 }
@@ -357,10 +432,10 @@ int Deformable::pickVertices(const vec3d& boxLo, const vec3d& boxHi,
 {
 	arrFoundCoords.resize(0);
 	arrFoundIndices.resize(0);
-	U32 ctVertices = m_lpMesh->countVertices();
+	U32 ctVertices = m_lpVolMesh->countNodes();
 	for(U32 i=0; i<ctVertices;i++)
 	{
-		vec3d v = m_lpMesh->vertexAt(i);
+		vec3d v = m_lpVolMesh->const_nodeAt(i).pos;
 
 		if(Contains<double>(boxLo, boxHi, v))
 		{
@@ -427,27 +502,6 @@ bool Deformable::updateFixedVertices() {
 	return true;
 }
 
-void Deformable::setupIntegrator(int ctThreads)
-{
-	//Update DOFS
-	FixedVerticesToFixedDOF(m_vFixedVertices, m_vFixedDofs);
-
-	//Rebuilt Integrator
-	SAFE_DELETE(m_lpIntegrator);
-	LogInfoArg1("Setup Integrator with %d threads.", ctThreads);
-
-	// initialize the Integrator
-	m_lpIntegrator = new VolumeConservingIntegrator(m_dof, m_timeStep,
-													 m_lpMassMatrix,
-													 m_lpDeformableForceModel,
-													 m_positiveDefiniteSolver,
-													 m_vFixedDofs.size(),
-													 &m_vFixedDofs[0],
-													 m_dampingMassCoeff,
-													 m_dampingStiffnessCoeff,
-													 1, 1E-6, ctThreads);
-
-}
 
 void Deformable::setPulledVertex(int index) {
 	m_idxPulledVertex = index;
@@ -502,8 +556,8 @@ bool Deformable::collisionDetect() {
 		//Count collided vertices
 		U32 ctCollided = 0;
 		U32 dof = 0;
-		for (U32 i = 0; i < m_lpMesh->countVertices(); i++) {
-			vec3d pc = m_lpMesh->vertexAt(i);
+		for (U32 i = 0; i < m_lpVolMesh->countNodes(); i++) {
+			vec3d pc = m_lpVolMesh->const_nodeAt(i).pos;
 			if (pc.y <= (double)c.y)
 				ctCollided++;
 		}
@@ -511,9 +565,9 @@ bool Deformable::collisionDetect() {
 		if(ctCollided > 0) {
 			printf("Compensation!\n");
 
-			for (U32 i = 0; i < m_lpMesh->countVertices(); i++) {
+			for (U32 i = 0; i < m_lpVolMesh->countNodes(); i++) {
 				dof = i * 3;
-				vec3d pc = m_lpMesh->vertexAt(i);
+				vec3d pc = m_lpVolMesh->const_nodeAt(i).pos;
 				vec3d q   = vec3d(&m_q[dof]);
 				//vec3d acc = vec3d(&m_qAcc[dof]);
 				vec3d vel = vec3d(&m_qVel[dof]);
@@ -610,9 +664,11 @@ bool Deformable::applyHapticForces() {
 			{
 				// traverse all neighbors and check if they were already previously inserted
 				int vtx = *iter;
-				int deg = m_lpMeshGraph->GetNumNeighbors(vtx);
-				for (int k = 0; k < deg; k++) {
-					int vtxNeighbor = m_lpMeshGraph->GetNeighbor(vtx, k);
+
+				vector<U32> nbors;
+				U32 deg = m_lpVolMesh->get_node_neighbors(vtx, nbors);
+				for (U32 k = 0; k < deg; k++) {
+					int vtxNeighbor = nbors[k];
 
 					//If the vertex was not in the set of affected vertices then
 					//Add it to the new set
@@ -669,17 +725,17 @@ void Deformable::hapticSetCurrentDisplacements(const vector<int>& indices,
 
 void Deformable::draw()
 {
-	if(m_lpMesh)
-		m_lpMesh->draw();
+	if(m_lpVolMesh)
+		m_lpVolMesh->draw();
 
-	if(m_idxPulledVertex >= 0  && m_idxPulledVertex < (int)m_lpMesh->countVertices() ) {
+	if(m_lpVolMesh->isNodeIndex(m_idxPulledVertex)) {
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
 			glEnable(GL_POLYGON_OFFSET_POINT);
 			glPolygonOffset(-1.0f, -1.0f);
 			glColor3f(0.0f, 0.0f, 1.0f);
 			glPointSize(8.0f);
 			glBegin(GL_POINTS);
-				glVertex3dv(m_lpMesh->vertexAt(m_idxPulledVertex).cptr());
+				glVertex3dv(m_lpVolMesh->const_nodeAt(m_idxPulledVertex).pos.cptr());
 			glEnd();
 			glDisable(GL_POLYGON_OFFSET_FILL);
 		glPopAttrib();

@@ -44,6 +44,7 @@ void FacePointComputer::operator()(const blocked_range<size_t>& range) const {
 		//Init output
 		vec3d p[3];
 		vec3d uvw, xp;
+		double t;
 		//const float oneThird = 1.0f / 3.0f;
 
 		for(int i=0; i<4; i++) {
@@ -57,7 +58,7 @@ void FacePointComputer::operator()(const blocked_range<size_t>& range) const {
 			p[1].load(&m_vertices[tri1]);
 			p[2].load(&m_vertices[tri2]);
 
-			int res = IntersectSegmentTriangle(m_edge0, m_edge1, p, uvw, xp);
+			int res = IntersectSegmentTriangle(m_edge0, m_edge1, p, t, uvw, xp);
 			if(res > 0) {
 				m_vOutFaceFlags[idxFP] = 1;
 				xp.store(&m_vOutFacePoints[idxFP * 3]);

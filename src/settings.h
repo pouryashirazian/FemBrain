@@ -51,7 +51,7 @@ public:
 		this->drawIsoSurface = disFull;
 		this->drawTetMesh = disFull;
 
-		this->editConstrainedNodes = false;
+		this->selectFixedNodes = false;
 		this->panCamera = false;
 		this->drawAABB = true;
 		this->drawNormals = true;
@@ -90,7 +90,7 @@ public:
 	bool drawAffineWidgets;
 	bool logSql;
 	bool gravity;
-	bool editConstrainedNodes;
+	bool selectFixedNodes;
 
 	//AppSettings
 	int appWidth;
@@ -109,7 +109,7 @@ public:
 	vec2i screenDragEnd;
 
 	//Fixed Vertices
-	vector<int> vFixedVertices;
+	vector<int> vFixedNodes;
 
 	//Propagate force to neighborhood
 	int hapticForceCoeff;
