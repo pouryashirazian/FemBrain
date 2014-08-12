@@ -234,6 +234,26 @@ void NormalKey(unsigned char key, int x, int y)
 	}
 	break;
 
+	case('c'): {
+		g_appSettings.cutTool = !g_appSettings.cutTool;
+
+		if(g_appSettings.cutTool) {
+			LogInfo("Cut tool is on");
+
+			g_lpProbe->setVisible(false);
+			g_lpScalpel->setVisible(true);
+			TheGizmoManager::Instance().setFocusedNode(g_lpScalpel);
+		}
+		else {
+			LogInfo("Probe tool is on");
+
+			g_lpProbe->setVisible(true);
+			g_lpScalpel->setVisible(false);
+			TheGizmoManager::Instance().setFocusedNode(g_lpProbe);
+		}
+	}
+	break;
+
 	case('f'): {
 		g_appSettings.selectFixedNodes = !g_appSettings.selectFixedNodes;
 		if(g_appSettings.selectFixedNodes) {
@@ -834,10 +854,10 @@ int main(int argc, char* argv[])
 
 		VolMesh* tempMesh = PS::MESH::VolMeshSamples::CreateTruthCube(4, 4, 4, 0.5);
 		vector<int> fixed;
-		fixed.push_back(0);
-		fixed.push_back(3);
-		fixed.push_back(48);
-		fixed.push_back(51);
+//		fixed.push_back(2);
+//		fixed.push_back(29);
+//		fixed.push_back(48);
+//		fixed.push_back(0);
 
 		g_lpDeformable = new Deformable(*tempMesh, fixed);
 		SAFE_DELETE(tempMesh);
@@ -855,7 +875,9 @@ int main(int argc, char* argv[])
 		g_lpProbe = new AvatarProbe(g_lpDeformable);
 		g_lpProbe->transform()->translate(g_appSettings.avatarPos);
 		g_lpProbe->transform()->scale(g_appSettings.avatarThickness);
-		//TheSceneGraph::Instance().add(g_lpProbe);
+		g_lpProbe->setVisible(false);
+		TheSceneGraph::Instance().add(g_lpProbe);
+
 
 		//scalpel
 		g_lpScalpel = new AvatarScalpel(g_lpDeformable->getVolMesh());

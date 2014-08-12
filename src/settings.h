@@ -41,6 +41,9 @@ class AppSettings{
 public:
 	//Set to default values in constructor
 	AppSettings() {
+
+		this->cutTool = true;
+
 		//Set the simulation file path
 		this->strSimFilePath = ChangeFileExt(ExtractFilePath(GetExePath()), AnsiStr(".sim"));
 		this->appWidth = WINDOW_WIDTH;
@@ -78,6 +81,7 @@ public:
 public:
 	AnsiStr strSimFilePath;
 	AnsiStr strModelFilePath;
+	bool cutTool;
 	int  drawIsoSurface;
 	int  drawTetMesh;
 	bool drawAvatar;

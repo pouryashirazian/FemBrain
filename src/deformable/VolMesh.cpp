@@ -1684,6 +1684,7 @@ AABB VolMesh::computeAABB() {
 	//set AABB
 	m_aabb.set(vec3f((float)vMin[0], (float)vMin[1], (float)vMin[2]),
 			   vec3f((float)vMax[0], (float)vMax[1], (float)vMax[2]));
+	m_aabb.expand(1.0);
 	return m_aabb;
 }
 

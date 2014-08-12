@@ -130,7 +130,9 @@ bool Deformable::syncForceModel() {
 		return false;
 
 	//recompute AABB for volume mesh
-	setAABB(m_lpVolMesh->computeAABB());
+	AABB aabb = m_lpVolMesh->computeAABB();
+	aabb.expand(1.0);
+	setAABB(aabb);
 
 	//degrees of freedom
 	m_dof = 3 * m_lpVolMesh->countNodes();
@@ -329,7 +331,7 @@ void Deformable::timestep()
 	if(m_bApplyGravity && (m_ctCollided == 0)) {
 		for(U32 i=0; i < m_dof; i++) {
 			if(i % 3 == 1) {
-				m_arrExtForces[i] += -10.0;
+				m_arrExtForces[i] += -1.0;
 			}
 		}
 	}
@@ -357,7 +359,7 @@ void Deformable::timestep()
 	m_ctCollided = 0;
 
 	for (U32 i = 0; i < m_lpVolMesh->countNodes(); i++) {
-		pr = m_lpVolMesh->const_nodeAt(i).restpos;
+		pr = m_lpVolMesh->const_nodeAt(i).pos;
 
 		q = vec3d(&m_q[i*3]);
 
