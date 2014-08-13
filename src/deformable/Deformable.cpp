@@ -328,6 +328,7 @@ void Deformable::timestep()
 	//Apply external forces
 	memset(m_arrExtForces, 0, sizeof(double) * m_dof);
 
+	/*
 	if(m_bApplyGravity && (m_ctCollided == 0)) {
 		for(U32 i=0; i < m_dof; i++) {
 			if(i % 3 == 1) {
@@ -335,6 +336,7 @@ void Deformable::timestep()
 			}
 		}
 	}
+	*/
 
 
 	//Haptic
@@ -359,10 +361,8 @@ void Deformable::timestep()
 	m_ctCollided = 0;
 
 	for (U32 i = 0; i < m_lpVolMesh->countNodes(); i++) {
-		pr = m_lpVolMesh->const_nodeAt(i).pos;
-
+		pr = m_lpVolMesh->const_nodeAt(i).restpos;
 		q = vec3d(&m_q[i*3]);
-
 		pc = pr + q;
 		if(pc.y <= c.y) {
 			m_ctCollided++;
@@ -370,41 +370,39 @@ void Deformable::timestep()
 	}
 
 	//response
-	if(m_ctCollided > 0) {
-		U32 dof = 0;
-		for (U32 i = 0; i < m_lpVolMesh->countNodes(); i++) {
-			dof = i*3;
+	U32 dof = 0;
+	for (U32 i = 0; i < m_lpVolMesh->countNodes(); i++) {
+		dof = i * 3;
+		pr = m_lpVolMesh->const_nodeAt(i).restpos;
+		q = vec3d(&m_q[dof]);
+		pc = pr + q;
 
-			pr = m_lpVolMesh->vertexRestPosAt(i);
-			q = vec3d(&m_q[dof]);
-			pc = pr + q;
+		v = vec3d(&m_qVel[dof]);
+		if(m_ctCollided == 0)
+			v = v + vec3d(0, 0.1, 0);
 
+		vec3d vn = n * vec3d::dot(v, n);
+		vec3d vp = v - vn;
+		vec3d vr = vp - vn * 0.8;
 
-			v = vec3d(&m_qVel[dof]);
-			vec3d vn = n * vec3d::dot(v, n);
-			vec3d vp = v - vn;
-			vec3d vr = vp - vn * 0.8;
+		//set
+		m_qAcc[dof] = 0.0;
+		m_qAcc[dof + 1] = 0.0;
+		m_qAcc[dof + 2] = 0.0;
 
-			//set
-			m_qAcc[dof] = 0.0;
-			m_qAcc[dof+1] = 0.0;
-			m_qAcc[dof+2] = 0.0;
+		m_qVel[dof] = vr.x;
+		m_qVel[dof + 1] = vr.y;
+		m_qVel[dof + 2] = vr.z;
 
-			m_qVel[dof] = vr.x;
-			m_qVel[dof+1] = vr.y;
-			m_qVel[dof+2] = vr.z;
-
-			//Collision
-			if(pc.y <= c.y) {
-				m_q[dof] = q.x;
-				m_q[dof+1] = c.y - pr.y;
-				m_q[dof+2] = q.z;
-			}
+		//Collision
+		if (pc.y <= c.y) {
+			m_q[dof] = q.x;
+			m_q[dof + 1] = c.y - pr.y;
+			m_q[dof + 2] = q.z;
 		}
-
-
-		m_lpIntegrator->SetqState(m_q, m_qVel, m_qAcc);
 	}
+
+	m_lpIntegrator->SetqState(m_q, m_qVel, m_qAcc);
 
 
 	//Apply displacements

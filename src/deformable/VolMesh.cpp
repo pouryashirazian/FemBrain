@@ -1046,7 +1046,7 @@ void VolMesh::displace(U32 countDegreesOfFreedom, const double * u) {
 	}
 
 	for(U32 i=0; i < countNodes(); i++) {
-		m_vNodes[i].pos = m_vNodes[i].pos + vec3d(&u[i * 3]);
+		m_vNodes[i].pos = m_vNodes[i].restpos + vec3d(&u[i * 3]);
 	}
 
 	computeAABB();
