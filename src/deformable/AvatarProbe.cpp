@@ -30,6 +30,9 @@ AvatarProbe::~AvatarProbe(){
 void AvatarProbe::setup()
 {
 	this->setName("probe");
+
+	m_pickMode = false;
+	m_pickedNode = -1;
 	m_idxContactFace = -1;
 	m_hapticForceCoeff = DEFAULT_HAPTIC_FORCE_COEFF;
 
@@ -78,8 +81,33 @@ void AvatarProbe::mousePress(int button, int state, int x, int y) {
 	//Down Start
 	if(state == 0) {
 		if(m_lpTissue) {
-			m_lpTissue->hapticStart(0);
-			TheSceneGraph::Instance().headers()->updateHeaderLine("avatar", "avatar: start probing");
+
+			if(m_pickMode) {
+				vec3f expand(0.2);
+				Ray ray = TheSceneGraph::Instance().screenToWorldRay(x, y);
+				m_pickedNode = -1;
+				for (int i = 0; i < (int) m_lpTissue->getVolMesh()->countNodes();
+						i++) {
+					AABB aabb;
+
+					vec3d pos = m_lpTissue->getVolMesh()->const_nodeAt(i).pos;
+					vec3f posF = vec3f((float) pos.x, (float) pos.y, (float) pos.z);
+					aabb.set(posF - expand, posF + expand);
+					if (aabb.intersect(ray, 0.0, FLT_MAX)) {
+						m_pickedNode = i;
+						break;
+					}
+				}
+
+				m_lpTissue->hapticStart(m_pickedNode);
+				TheSceneGraph::Instance().headers()->updateHeaderLine("avatar", "avatar: start picking node");
+			}
+			else {
+				m_lpTissue->hapticStart(0);
+				TheSceneGraph::Instance().headers()->updateHeaderLine("avatar", "avatar: start probing");
+			}
+
+
 		}
 	}
 	else {
@@ -100,6 +128,20 @@ void AvatarProbe::onTranslate(const vec3f& delta, const vec3f& pos) {
 	//Avatar corners
 	m_aabbCurrent = this->aabb();
 	m_aabbCurrent.transform(m_spTransform->forward());
+
+	if(m_pickMode && m_lpTissue->getVolMesh()->isNodeIndex(m_pickedNode)) {
+
+		vector<int> vIndices;
+		vIndices.push_back(m_pickedNode);
+
+		vector<vec3d> vForces;
+		vForces.push_back(vec3d(delta.x, delta.y, delta.z) * 10000.0);
+		m_lpTissue->hapticSetCurrentForces(vIndices, vForces);
+
+		return;
+	}
+
+
 	vec3f lo = m_aabbCurrent.lower();
 	vec3f hi = m_aabbCurrent.upper();
 	vec3d lower = vec3d(lo.x, lo.y, lo.z);

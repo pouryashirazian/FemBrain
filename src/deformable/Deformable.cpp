@@ -328,15 +328,15 @@ void Deformable::timestep()
 	//Apply external forces
 	memset(m_arrExtForces, 0, sizeof(double) * m_dof);
 
-	/*
-	if(m_bApplyGravity && (m_ctCollided == 0)) {
+	//Gravity
+	bool applyGravity = (m_bApplyGravity && (m_ctCollided == 0));
+	if(applyGravity) {
 		for(U32 i=0; i < m_dof; i++) {
 			if(i % 3 == 1) {
-				m_arrExtForces[i] += -1.0;
+				m_arrExtForces[i] += -10000.0;
 			}
 		}
 	}
-	*/
 
 
 	//Haptic
@@ -378,12 +378,10 @@ void Deformable::timestep()
 		pc = pr + q;
 
 		v = vec3d(&m_qVel[dof]);
-		if(m_ctCollided == 0)
-			v = v + vec3d(0, 0.1, 0);
 
 		vec3d vn = n * vec3d::dot(v, n);
 		vec3d vp = v - vn;
-		vec3d vr = vp - vn * 0.8;
+		vec3d vr = vp - vn * 0.4;
 
 		//set
 		m_qAcc[dof] = 0.0;
@@ -512,7 +510,6 @@ bool Deformable::hapticStart(int index)
 	m_idxPulledVertex = index;
 	m_bHapticInProgress = true;
 	m_vHapticIndices.resize(0);
-	m_vHapticDisplacements.resize(0);
 
 	return true;
 }
@@ -537,7 +534,6 @@ void Deformable::hapticEnd()
 	m_bHapticInProgress = false;
 	m_idxPulledVertex = -1;
 	m_vHapticIndices.resize(0);
-	m_vHapticDisplacements.resize(0);
 }
 
 bool Deformable::collisionDetect() {
@@ -628,6 +624,11 @@ bool Deformable::collisionDetect() {
 	return false;
 }
 
+void Deformable::resetDeformations() {
+	m_lpIntegrator->ResetToRest();
+	m_vHapticForces.resize(0);
+}
+
 bool Deformable::applyHapticForces() {
 	if (m_vHapticIndices.size() == 0)
 		return false;
@@ -713,15 +714,6 @@ void Deformable::hapticSetCurrentForces(const vector<int>& indices,
 	m_vHapticForces.assign(forces.begin(), forces.end());
 }
 
-/*!
- * Haptic displacements
- */
-void Deformable::hapticSetCurrentDisplacements(const vector<int>& indices,
-													 const vector<vec3d>& displacements)
-{
-	m_vHapticIndices.assign(indices.begin(), indices.end());
-	m_vHapticDisplacements.assign(displacements.begin(), displacements.end());
-}
 
 void Deformable::draw()
 {
@@ -733,7 +725,7 @@ void Deformable::draw()
 			glEnable(GL_POLYGON_OFFSET_POINT);
 			glPolygonOffset(-1.0f, -1.0f);
 			glColor3f(0.0f, 0.0f, 1.0f);
-			glPointSize(8.0f);
+			glPointSize(10.0f);
 			glBegin(GL_POINTS);
 				glVertex3dv(m_lpVolMesh->const_nodeAt(m_idxPulledVertex).pos.cptr());
 			glEnd();

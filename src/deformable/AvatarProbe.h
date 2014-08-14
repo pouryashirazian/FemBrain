@@ -20,6 +20,9 @@ public:
 	void draw();
 
 	//From Gizmo Manager
+	bool getPickMode() const { return m_pickMode;}
+	void setPickMode(bool pick) { m_pickMode = pick;}
+
 	void mousePress(int button, int state, int x, int y);
 	void onTranslate(const vec3f& delta, const vec3f& pos);
 
@@ -29,6 +32,9 @@ private:
 	void setup();
 
 protected:
+	int m_pickedNode;
+	bool m_pickMode;
+
 	Deformable* m_lpTissue;
 	std::map<int, vec3d> m_hashVertices;
 	int m_idxContactFace;

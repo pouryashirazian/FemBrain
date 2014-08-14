@@ -114,36 +114,37 @@ void MousePress(int button, int state, int x, int y)
 
 	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
 	{
-		if (g_appSettings.selectFixedNodes)
-		{
-			vec3f expand(0.2);
-			Ray ray = TheSceneGraph::Instance().screenToWorldRay(x, y);
-			int idxVertex = -1;
-			for(int i = 0; i < (int)g_lpDeformable->getVolMesh()->countNodes(); i++) {
-				AABB aabb;
+		vec3f expand(0.2);
+		Ray ray = TheSceneGraph::Instance().screenToWorldRay(x, y);
+		int idxVertex = -1;
+		for (int i = 0; i < (int) g_lpDeformable->getVolMesh()->countNodes();
+				i++) {
+			AABB aabb;
 
-				vec3d pos = g_lpDeformable->getVolMesh()->const_nodeAt(i).pos;
-				vec3f posF = vec3f((float)pos.x, (float)pos.y, (float)pos.z);
-				aabb.set(posF - expand, posF + expand);
-
-				if(aabb.intersect(ray, 0.0, FLT_MAX)) {
-					idxVertex = i;
-					break;
-				}
-			}
-
-			//select vertex
-			if (g_lpDeformable->getVolMesh()->isNodeIndex(idxVertex)) {
-				g_lpDeformable->setPulledVertex(idxVertex);
-				LogInfoArg1("Selected Vertex Index = %d ", idxVertex);
-
-				//Edit Fixed Vertices
-				g_appSettings.vFixedNodes.push_back(idxVertex);
-				LogInfoArg1("Added last selection to fixed vertices. count = %d",
-						g_appSettings.vFixedNodes.size());
+			vec3d pos = g_lpDeformable->getVolMesh()->const_nodeAt(i).pos;
+			vec3f posF = vec3f((float) pos.x, (float) pos.y, (float) pos.z);
+			aabb.set(posF - expand, posF + expand);
+			if (aabb.intersect(ray, 0.0, FLT_MAX)) {
+				idxVertex = i;
+				break;
 			}
 		}
+
+		//select vertex
+		if (g_lpDeformable->getVolMesh()->isNodeIndex(idxVertex)) {
+			g_lpDeformable->setPulledVertex(idxVertex);
+			LogInfoArg1("Selected Vertex Index = %d ", idxVertex);
+		}
+
+		//select fixed node
+		if (g_appSettings.selectFixedNodes) {
+			//Edit Fixed Vertices
+			g_appSettings.vFixedNodes.push_back(idxVertex);
+			LogInfoArg1("Added last selection to fixed vertices. count = %d",
+					g_appSettings.vFixedNodes.size());
+		}
 	}
+
 	//Update selection
 	glutPostRedisplay();
 }
@@ -440,6 +441,20 @@ void SpecialKey(int key, int x, int y)
 			LogInfoArg1("Draw affine widgets: %d", g_appSettings.drawAffineWidgets);
 			break;
 		}
+
+		case(GLUT_KEY_F10):
+		{
+			g_lpDeformable->resetDeformations();
+			break;
+		}
+
+		case(GLUT_KEY_F11):
+		{
+			g_lpProbe->setPickMode(!g_lpProbe->getPickMode());
+			LogInfoArg1("Pick mode for scalpel is %d", g_lpProbe->getPickMode());
+			break;
+		}
+
 	}
 
 	//Modifier
@@ -599,30 +614,6 @@ bool SaveSettings(const AnsiStr& strSimFP)
 	return true;
 }
 
-void testX() {
-
-	vec3d ss0 = vec3d(0, 0, -1);
-	vec3d ss1 = vec3d(0, 1, 0);
-
-	vec3d p[4];
-	p[0] = vec3d(-2.944, 0.997, -0.653);
-	p[1] = vec3d(1.055, 0.997, -0.653);
-	p[2] = vec3d(1.055, 0.344, -0.653);
-	p[3] = vec3d(-2.944, 0.344, -0.653);
-
-	vec3d tri1[3] = { p[0], p[1], p[2]};
-	vec3d tri2[3] = { p[0], p[2], p[3]};
-
-	vec3d uvw, xyz;
-	double t;
-	int res = IntersectSegmentTriangle(ss0, ss1, tri1, t, uvw, xyz);
-	if(res == 0)
-		res = IntersectSegmentTriangle(ss0, ss1, tri2, t, uvw, xyz);
-
-	if(res > 0) {
-		printf("Intersected xyz = %.3f, %.3f, %.3f\n", xyz.x, xyz.y, xyz.z);
-	}
-}
 
 void cutCompleted() {
 	LogInfo("Cut completed. Sync meshes");
@@ -852,17 +843,14 @@ int main(int argc, char* argv[])
 		//Deformable
 		//g_lpDeformable = new Deformable(tetVertices, tetElements, g_appSettings.vFixedVertices);
 
-		VolMesh* tempMesh = PS::MESH::VolMeshSamples::CreateTruthCube(4, 4, 4, 0.5);
+		//VolMesh* tempMesh = PS::MESH::VolMeshSamples::CreateTruthCube(2, 2, 2, 2.0);
+		VolMesh* tempMesh = PS::MESH::VolMeshSamples::CreateTwoTetra();
 		vector<int> fixed;
-//		fixed.push_back(2);
-//		fixed.push_back(29);
-//		fixed.push_back(48);
-//		fixed.push_back(0);
-
 		g_lpDeformable = new Deformable(*tempMesh, fixed);
 		SAFE_DELETE(tempMesh);
 
 		g_lpDeformable->setGravity(true);
+		g_lpDeformable->getVolMesh()->setFlagDetectCutNodes(false);
 		//g_lpDeformable->setDeformCallback(ApplyDeformations);
 		g_lpDeformable->setHapticForceRadius(g_appSettings.hapticNeighborhoodPropagationRadius);
 		g_lpDeformable->setName("tissue");

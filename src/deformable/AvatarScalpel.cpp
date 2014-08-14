@@ -141,6 +141,9 @@ void AvatarScalpel::setTissue(CuttableMesh* tissue) {
 
 //From Gizmo Manager
 void AvatarScalpel::mousePress(int button, int state, int x, int y) {
+	if(!isVisible())
+		return;
+
 	if(button == ArcBallCamera::mbRight) {
 		LogInfo("Right clicked cleared cut context!");
 		clearCutContext();
@@ -182,12 +185,13 @@ void AvatarScalpel::updateVolMeshInfoHeader() const {
 }
 
 void AvatarScalpel::onTranslate(const vec3f& delta, const vec3f& pos) {
-	if(m_lpTissue == NULL || !m_isToolActive)
+	if(m_lpTissue == NULL || !m_isToolActive || !isVisible())
 		return;
 
 	//Box test
 	m_aabbCurrent = this->aabb();
 	m_aabbCurrent.transform(m_spTransform->forward());
+
 
 	//1.If boxes donot intersect and sweptquad is invalid then return
 	if (!m_lpTissue->aabb().intersect(m_aabbCurrent)) {

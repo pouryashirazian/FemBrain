@@ -18,6 +18,7 @@
 
 
 #include "SurfaceMesh.h"
+
 #include "corotationalLinearFEM.h"
 #include "corotationalLinearFEMForceModel.h"
 #include "generateMassMatrix.h"
@@ -95,8 +96,6 @@ public:
 	void hapticSetCurrentForces(const vector<int>& indices,
 									const vector<vec3d>& forces);
 
-	void hapticSetCurrentDisplacements(const vector<int>& indices,
-											const vector<vec3d>& displacements);
 	bool isHapticInProgress() const {return m_bHapticInProgress;}
 	int getHapticForceRadius() const {return m_hapticForceNeighorhoodSize;}
 	void setHapticForceRadius(int radius) { m_hapticForceNeighorhoodSize = radius;}
@@ -140,6 +139,7 @@ public:
 	//Collision object
 	void setCollisionObject(SGNode* obj) {m_collisionObj = obj;}
 	bool collisionDetect();
+	void resetDeformations();
 
 	//Set callbacks
 	void setDeformCallback(FOnApplyDeformations fOnDeform) {
@@ -147,6 +147,7 @@ public:
 	}
 
 	double getSolverTime() const { return m_lpIntegrator->GetSystemSolveTime();}
+
 
 	//Force model sync
 	bool syncForceModel();
@@ -216,7 +217,6 @@ private:
 
 	//vector<vec3d> m_vHaptic
 	vector<vec3d> m_vHapticForces;
-	vector<vec3d> m_vHapticDisplacements;
 	vector<int> m_vHapticIndices;
 	int m_idxPulledVertex;
 	int m_positiveDefiniteSolver;

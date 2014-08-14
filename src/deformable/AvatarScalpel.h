@@ -50,6 +50,8 @@ protected:
 	void updateVolMeshInfoHeader() const;
 
 protected:
+
+
 	OnCutEvent m_fOnCutEvent;
 	AABB m_aabbCurrent;
 	CuttableMesh* m_lpTissue;
