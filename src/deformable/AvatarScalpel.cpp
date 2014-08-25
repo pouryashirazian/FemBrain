@@ -29,6 +29,7 @@ void AvatarScalpel::init() {
 	setName("scalpel");
 
 	m_fOnCutEvent = NULL;
+	m_vSweptQuad.resize(4);
 	m_isSweptQuadValid = false;
 	m_isToolActive = false;
 
@@ -110,10 +111,8 @@ void AvatarScalpel::draw() {
 				glColor4d(1.0, 0.0, 1.0, 0.5);
 				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 				glBegin(GL_QUADS);
-					glVertex3dv(m_sweptQuad[0].cptr());
-					glVertex3dv(m_sweptQuad[1].cptr());
-					glVertex3dv(m_sweptQuad[2].cptr());
-					glVertex3dv(m_sweptQuad[3].cptr());
+					for(U32 i = 0; i < m_vSweptQuad.size(); i++)
+						glVertex3dv(m_vSweptQuad[i].cptr());
 				glEnd();
 				//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
@@ -141,9 +140,6 @@ void AvatarScalpel::setTissue(CuttableMesh* tissue) {
 
 //From Gizmo Manager
 void AvatarScalpel::mousePress(int button, int state, int x, int y) {
-	if(!isVisible())
-		return;
-
 	if(button == ArcBallCamera::mbRight) {
 		LogInfo("Right clicked cleared cut context!");
 		clearCutContext();
@@ -185,20 +181,19 @@ void AvatarScalpel::updateVolMeshInfoHeader() const {
 }
 
 void AvatarScalpel::onTranslate(const vec3f& delta, const vec3f& pos) {
-	if(m_lpTissue == NULL || !m_isToolActive || !isVisible())
+	if(m_lpTissue == NULL || !m_isToolActive)
 		return;
 
 	//Box test
 	m_aabbCurrent = this->aabb();
 	m_aabbCurrent.transform(m_spTransform->forward());
 
-
 	//1.If boxes donot intersect and sweptquad is invalid then return
 	if (!m_lpTissue->aabb().intersect(m_aabbCurrent)) {
 
 		if(m_isSweptQuadValid) {
 			//call the cut method if the tool has passed through the tissue
-			int res = m_lpTissue->cut(m_vCuttingPathEdge0, m_vCuttingPathEdge1, m_sweptQuad, true);
+			int res = m_lpTissue->cut(m_vCuttingPathEdge0, m_vCuttingPathEdge1, m_vSweptQuad, false);
 			LogInfoArg1("Tissue cut. res = %d", res);
 			if((res > 0) && (m_fOnCutEvent != NULL))
 				m_fOnCutEvent();
@@ -246,13 +241,14 @@ void AvatarScalpel::onTranslate(const vec3f& delta, const vec3f& pos) {
 
 	//Swept quad: starts when blade crosses the tissue first and ends where the blade leaves the body
 	m_isSweptQuadValid = false;
+	m_vSweptQuad.resize(4);
 	if(m_vCuttingPathEdge0.size() == 0) {
-		m_sweptQuad[0] = edge0;
-		m_sweptQuad[1] = edge1;
+		m_vSweptQuad[0] = edge0;
+		m_vSweptQuad[1] = edge1;
 	}
 	else {
-		m_sweptQuad[2] = edge1;
-		m_sweptQuad[3] = edge0;
+		m_vSweptQuad[2] = edge1;
+		m_vSweptQuad[3] = edge0;
 		m_isSweptQuadValid = true;
 	}
 

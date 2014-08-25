@@ -110,7 +110,7 @@ int SketchMachine::select(const Ray& r) {
 	int idxSelected = -1;
 	for(int i=0; i < (int)m_blob.countPrimitives(); i++) {
 		 if(m_blob.getPrimAABB(i).intersect(r, t, hit)) {
-			 if(hit.left < selHit.left) {
+			 if(hit.lower() < selHit.lower()) {
 				 selHit = hit;
 				 idxSelected = i;
 				 return i;

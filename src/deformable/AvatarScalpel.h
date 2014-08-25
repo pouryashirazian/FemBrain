@@ -13,7 +13,6 @@
 #include "graphics/Gizmo.h"
 #include "CuttableMesh.h"
 
-
 using namespace PS;
 using namespace PS::SG;
 
@@ -50,9 +49,9 @@ protected:
 	void updateVolMeshInfoHeader() const;
 
 protected:
-
-
+	//cut event
 	OnCutEvent m_fOnCutEvent;
+
 	AABB m_aabbCurrent;
 	CuttableMesh* m_lpTissue;
 
@@ -66,7 +65,7 @@ protected:
 	//cut info
 	vector<vec3d> m_vCuttingPathEdge0;
 	vector<vec3d> m_vCuttingPathEdge1;
-	vec3d m_sweptQuad[4];
+	vector<vec3d> m_vSweptQuad;
 	bool m_isSweptQuadValid;
 	bool m_isToolActive;
 };

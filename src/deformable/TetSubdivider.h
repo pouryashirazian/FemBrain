@@ -27,18 +27,17 @@ public:
 
 
 public:
-	TetSubdivider(VolMesh* pMesh);
+	TetSubdivider();
 	virtual ~TetSubdivider();
 
 	void draw();
-
-	void setMesh(VolMesh* pMesh) { m_lpExtVolMesh = pMesh;}
-
 	char toAlpha(CUTCASE c);
 	static CUTCASE IdentifyCutCase(bool isCutComplete, U8 cutEdgeCode, U8 cutNodeCode);
 	static CUTCASE IdentifyCutCase(bool isCutComplete, U8 cutEdgeCode, U8 cutNodeCode, U8& countCutEdges, U8& countCutNodes);
 
-	int subdivide(U32 idxCell, U8 cutEdgeCode, U8 cutNodeCode, U32 middlePoints[12], bool dosplit = true);
+	int subdivide(VolMesh* pmesh,
+				  U32 idxCell, U8 cutEdgeCode,
+				  U8 cutNodeCode, U32 middlePoints[12]);
 
 
 
@@ -49,8 +48,8 @@ public:
 	 * @targetDist: distance to the node [0-1]
 	 * @cutEdgeCode: output cutedge code
 	 */
-	int generateCaseA(U32 idxCell, U8 node, double targetDistPercentage,
-					  U8& cutEdgeCode, U8& cutNodeCode, double (&tEdges)[6]);
+	int generateCaseA(VolMesh* pmesh, U32 idxCell, U8 node, double targetDistPercentage,
+					  U8& cutEdgeCode, U8& cutNodeCode);
 
 	/*!
 	 * \brief generates case B where an element is sliced into two sections by cutting its 4 edges.
@@ -61,15 +60,12 @@ public:
 	 * @cutNodeCode: output cutnode code
 	 * @tEdges: the distance over the edges where the cuts are happening
 	 */
-	int generateCaseB(U32 idxCell, U8 enteringface, U8& cutEdgeCode,
-					  U8& cutNodeCode, double (&tEdges)[6]);
+	int generateCaseB(VolMesh* pmesh, U32 idxCell, U8 enteringface, U8& cutEdgeCode,
+					  U8& cutNodeCode);
 
 
 	bool writeLookUpTable();
 protected:
-
-	//Not owned volume mesh
-	VolMesh* m_lpExtVolMesh;
 
 	//cut edge code
 	std::map<U8, int> m_mapCutEdgeCodeToTableEntry;

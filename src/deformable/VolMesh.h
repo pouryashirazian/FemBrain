@@ -84,6 +84,7 @@ public:
 	//Determinant
 	double computeCellDeterminant(U32 idxCell) const;
 	double computeCellVolume(U32 idxCell) const;
+	vec3d  computeCellCentroid(U32 idxCell) const;
 	static double ComputeCellDeterminant(const vec3d v[4]);
 	static double ComputeCellVolume(const vec3d v[4]);
 
@@ -95,6 +96,8 @@ public:
 
 	//access
 	bool getFaceNodes(U32 idxFace, U32 (&nodes)[3]) const;
+	bool isNodeOfCell(U32 idxNode, U32 idxCell) const;
+	bool isEdgeOfCell(U32 idxEdge, U32 idxCell) const;
 
 	CELL& cellAt(U32 i);
 	FACE& faceAt(U32 i);
@@ -134,7 +137,10 @@ public:
 	//setters
 	void set_edge(U32 idxEdge, U32 from, U32 to);
 	void set_face(U32 idxFace, U32 edges[3]);
-	void set_cell_faces(U32 idxCell, U32 faces[4]);
+
+	//mesh disjoint parts
+	int get_disjoint_parts(vector<vector<U32>>& cellgroups);
+	void printParts();
 
 	//schedule a cell removal at the next GC
 	void schedule_remove_cell(U32 idxCell);
@@ -171,18 +177,16 @@ public:
 
 
 	//algorithmic functions
-	bool getNodeIncidentEdges(U32 idxNode, vector<U32>& incidentEdges) const;
+	int getNodeIncidentEdges(U32 idxNode, vector<U32>& incidentEdges) const;
+	int getNodeIncidentNodes(U32 idxNode, vector<U32>& incidentNodes) const;
 	bool getCellFacesExpensive(U32 idxCell, U32 (&faces)[4]);
 	bool getCellEdgesExpensive(U32 idxCell, U32 (&edges)[6]);
 
-	//checking
+	//show individual entities
 	void setElemToShow(U32 elem = INVALID_INDEX);
 	U32 getElemToShow() const {return m_elemToShow;}
-
-	//serialize
-	bool readVegaFormat(const AnsiStr& strFP);
-	bool writeVegaFormat(const AnsiStr& strFP) const;
-
+	void setNodeToShow(U32 idxNode = INVALID_INDEX);
+	U32 getNodeToShow() const {return m_nodeToShow;}
 
 	//draw
 	void draw();
@@ -191,6 +195,12 @@ public:
 	//aabb
 	AABB computeAABB();
 
+
+	//selects a node using a ray intersection test
+	int selectNode(const Ray& ray) const;
+
+	bool verbose() const { return m_verbose;}
+	void setVerbose(bool b) { m_verbose = b;}
 private:
 	void init();
 	inline bool insertEdgeIndexToMap(U32 from, U32 to, U32 idxEdge);
@@ -209,16 +219,22 @@ private:
 
 	//incident entities
 	template <class ContainerT>
-	int get_incident_cells(const ContainerT& in_faces, set<U32>& out_cells);
+	int get_incident_cells(const ContainerT& in_faces, set<U32>& out_cells) const;
 
 	template <class ContainerT>
-	int get_incident_faces(const ContainerT& in_edges, set<U32>& out_faces);
+	int get_incident_faces(const ContainerT& in_edges, set<U32>& out_faces) const;
 
 	template <class ContainerT>
-	int get_incident_edges(const ContainerT& in_nodes, set<U32>& out_edges);
+	int get_incident_edges(const ContainerT& in_nodes, set<U32>& out_edges) const;
 
 
 	bool test_cell_topology(U32 idxCell);
+	bool test_cells_topology();
+	bool test_incident_edges();
+	bool test_incident_faces() const;
+	bool test_incident_cells() const;
+
+	bool test_incidents();
 
 protected:
 	//remove core functions
@@ -229,6 +245,8 @@ protected:
 
 protected:
 	U32 m_elemToShow;
+	U32 m_nodeToShow;
+	bool m_verbose;
 
 	//topology events
 	OnNodeEvent m_fOnNodeEvent;
@@ -255,7 +273,7 @@ protected:
 
 	//iterators
 	typedef std::map< EdgeKey, U32 >::iterator MAPHEDGEINDEXITER;
-	typedef std::map< EdgeKey, U32 >::iterator MAPHEDGEINDEXCONSTITER;
+	typedef std::map< EdgeKey, U32 >::const_iterator MAPHEDGEINDEXCONSTITER;
 };
 
 }

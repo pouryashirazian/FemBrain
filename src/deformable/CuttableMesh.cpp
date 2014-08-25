@@ -36,6 +36,7 @@ CuttableMesh::CuttableMesh(int ctVertices, double* vertices, int ctElements, int
 
 CuttableMesh::~CuttableMesh() {
 	SAFE_DELETE(m_lpSubD);
+	m_vSweepSurfaces.resize(0);
 }
 
 void CuttableMesh::setup() {
@@ -51,18 +52,19 @@ void CuttableMesh::setup() {
 	LogInfo("Test completed");
 
 	//Create subdivider
-	m_lpSubD = new TetSubdivider(this);
+	m_lpSubD = new TetSubdivider();
 
 	m_aabb = VolMesh::aabb();
 	m_aabb.expand(1.0);
 	m_ctCompletedCuts = 0;
 	m_flagSplitMeshAfterCut = false;
 	m_flagDetectCutNodes = false;
+	m_flagDrawSweepSurf = false;
 }
 
 void CuttableMesh::clearCutContext() {
-	m_mapCutEdges.clear();
-	m_mapCutNodes.clear();
+//	m_mapCutEdges.clear();
+//	m_mapCutNodes.clear();
 }
 
 void CuttableMesh::draw() {
@@ -80,8 +82,8 @@ void CuttableMesh::draw() {
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
 
 			//Draw cut edges
-			glColor3f(0.7, 0.7, 0.7);
-			glLineWidth(6.0f);
+			glColor3f(1.0, 0.0, 0.0);
+			glLineWidth(8.0f);
 			glBegin(GL_LINES);
 				for(CUTEDGEITER it = m_mapCutEdges.begin(); it != m_mapCutEdges.end(); ++it) {
 					U32 from = VolMesh::edge_from_node(it->first);
@@ -95,11 +97,19 @@ void CuttableMesh::draw() {
 
 			//Draw nodes
 			glPointSize(7.0f);
-			glColor3f(0.0, 0.0, 1.0);
 			glBegin(GL_POINTS);
 			//Draw cutedges crossing
 			for(CUTEDGEITER it = m_mapCutEdges.begin(); it != m_mapCutEdges.end(); ++it) {
+				glColor3f(0.0, 0.0, 0.0);
+				if(isNodeIndex(it->second.idxNP0))
+					glVertex3dv(const_nodeAt(it->second.idxNP0).pos.cptr());
+
+				glColor3f(0.0, 0.0, 1.0);
 				glVertex3dv(it->second.pos.cptr());
+
+				glColor3f(0.0, 0.0, 0.0);
+				if(isNodeIndex(it->second.idxNP1))
+					glVertex3dv(const_nodeAt(it->second.idxNP1).pos.cptr());
 			}
 			glEnd();
 
@@ -113,13 +123,40 @@ void CuttableMesh::draw() {
 
 		glPopAttrib();
 		glEnable(GL_LIGHTING);
+	}
 
+	if(m_flagDrawSweepSurf) {
+		U32 ctCutSurf = m_vSweepSurfaces.size() / 12;
+
+		glDisable(GL_CULL_FACE);
+		glDisable(GL_LIGHTING);
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glEnable(GL_BLEND);
+
+		glColor4f(1.0, 0.0, 0.0, 0.3);
+		glBegin(GL_QUADS);
+
+		//vec3d p[4];
+		//draw cut surfaces
+		for(U32 i=0; i < ctCutSurf; i++) {
+			for(U32 j=0; j < 4; j++) {
+				glVertex3dv(&m_vSweepSurfaces[i * 12 + j * 3]);
+			}
+		}
+		glEnd();
+
+		glDisable(GL_BLEND);
+		glPopAttrib();
+		glEnable(GL_LIGHTING);
+		glEnable(GL_CULL_FACE);
 	}
 }
 
 int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 					  const vector<vec3d>& bladePath1,
-					  vec3d sweptSurface[4], bool modifyMesh) {
+					  const vector<vec3d>& sweptSurface,
+					  bool modifyMesh) {
 
 	//if the swept surface is degenerate then return
 	double area = (sweptSurface[1] - sweptSurface[0]).length2() * (sweptSurface[2] - sweptSurface[1]).length2();
@@ -144,6 +181,9 @@ int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 
 	vec3d tri1[3] = {sweptSurface[0], sweptSurface[1], sweptSurface[2]};
 	vec3d tri2[3] = {sweptSurface[0], sweptSurface[2], sweptSurface[3]};
+
+	vec3d sweptSurfNormal = vec3d::cross(sweptSurface[1] - sweptSurface[0], sweptSurface[3] - sweptSurface[0]);
+	sweptSurfNormal.normalize();
 
 	//Radios of Influence in percent
 	const double roi = 0.2;
@@ -251,42 +291,36 @@ int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 	if(m_mapCutEdges.size() > 0)
 		printf("Cut edges count %d. removed %d\n", (int)m_mapCutEdges.size(), ctRemovedCutEdges);
 
-	//Return if the tool has not left the body
-	if(!modifyMesh)
-		return -1;
-
 	//Find the list of all tets impacted
 	vector<U32> vCutElements;
 	vector<U8> vCutEdgeCodes;
 	vector<U8> vCutNodeCodes;
-	vector<double> vCutParams;
 	vCutElements.reserve(128);
 	vCutEdgeCodes.reserve(128);
 	vCutNodeCodes.reserve(128);
-	vCutParams.reserve(128 * 6);
-
-	//count of tets cut
-	int ctCutTet = 0;
 
 	for(U32 i=0; i < this->countCells(); i++) {
 		const CELL& cell = this->const_cellAt(i);
 		U8 cutEdgeCode = 0;
 		U8 cutNodeCode = 0;
 
-		double tedges[6];
-
 		//compute cutedge code
-		for(int e=0; e < 6; e++) {
-			tedges[e] = 0.0;
+		for(int e=0; e < COUNT_CELL_EDGES; e++) {
 			U32 edge = cell.edges[e];
 			if(m_mapCutEdges.find(edge) != m_mapCutEdges.end()) {
+
+				//check the edge
+				if(!isEdgeOfCell(edge, i)) {
+					LogErrorArg2("Edge %u does not belong to cell %u", edge, i);
+					return -2;
+				}
+
 				cutEdgeCode |= (1 << e);
-				tedges[e] = m_mapCutEdges[edge].t;
 			}
 		}
 
 		//compute cut node code
-		for(int e=0; e < 4; e++) {
+		for(int e=0; e < COUNT_CELL_NODES; e++) {
 			U32 node = cell.nodes[e];
 			if(m_mapCutNodes.find(node) != m_mapCutNodes.end()) {
 				cutNodeCode |= (1 << e);
@@ -296,16 +330,10 @@ int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 		//if there is a cut in this cell
 		if(cutEdgeCode != 0 || cutNodeCode != 0) {
 
-			//increment cut tets
-			ctCutTet++;
-
 			//push back all computed values
 			vCutElements.push_back(i);
 			vCutEdgeCodes.push_back(cutEdgeCode);
 			vCutNodeCodes.push_back(cutNodeCode);
-			//push back param t
-			for(int e=0; e < 6; e++)
-				vCutParams.push_back(tedges[e]);
 
 			//check if the codes are implemented already
 			TetSubdivider::CUTCASE cc = m_lpSubD->IdentifyCutCase(true, cutEdgeCode, cutNodeCode);
@@ -322,6 +350,9 @@ int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 	//	int edgeMaskNeg[6][2] = { {3, 2}, {2, 1}, {1, 3}, {3, 0}, {0, 2}, {1, 0} };
 	//	int faceMaskPos[4][3] = { {1, 2, 3}, {2, 0, 3}, {3, 0, 1}, {1, 0, 2} };
 	//	int faceMaskNeg[4][3] = { {3, 2, 1}, {3, 0, 2}, {1, 0, 3}, {2, 0, 1} };
+	//Return if we won't modify the mesh this time
+//	if(!modifyMesh)
+//		return -1;
 
 	//Now that cutedgecodes and cutnodecodes are computed then subdivide the element
 	LogInfoArg1("BEGIN CUTTING# %u", m_ctCompletedCuts+1);
@@ -339,10 +370,8 @@ int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 		it->second.idxNP1 = idxNP1;
 	}
 
-	//
-	U32 ctElementsCut = 0;
+	U32 ctSubdividedTets = 0;
 	U32 middlePoints[12];
-
 	for(U32 i=0; i < vCutElements.size(); i++) {
 
 		U8 cutEdgeCode = vCutEdgeCodes[i];
@@ -352,7 +381,7 @@ int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 			const CELL& cell = this->const_cellAt(vCutElements[i]);
 
 
-			for(int e=0; e < 6; e++) {
+			for(int e=0; e < COUNT_CELL_EDGES; e++) {
 
 				CUTEDGEITER it = m_mapCutEdges.find(cell.edges[e]);
 
@@ -361,27 +390,33 @@ int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 				middlePoints[e * 2 + 1] = VolMesh::INVALID_INDEX;
 
 				if(it != m_mapCutEdges.end()) {
-
 					middlePoints[e * 2 + 0] = it->second.idxNP0;
 					middlePoints[e * 2 + 1] = it->second.idxNP1;
 				}
 			}
 			//subdivide the element
-			ctElementsCut += m_lpSubD->subdivide(vCutElements[i], cutEdgeCode, cutNodeCode, middlePoints, m_flagSplitMeshAfterCut);
+			ctSubdividedTets += m_lpSubD->subdivide(this, vCutElements[i], cutEdgeCode, cutNodeCode, middlePoints);
 		}
 	}
 
+
 	//increment completed cuts
-	if(ctElementsCut > 0) {
-		LogInfoArg2("END CUTTING# %u: subdivided elements count: %u.", m_ctCompletedCuts + 1, ctElementsCut);
+	if(ctSubdividedTets > 0) {
+		LogInfoArg2("END CUTTING# %u: subdivided elements count: %u.", m_ctCompletedCuts + 1, ctSubdividedTets);
 		m_ctCompletedCuts ++;
+
+		//store sweep surf
+		vector<double> vFlatSurf;
+		FlattenVec3<double>(sweptSurface, vFlatSurf);
+		m_vSweepSurfaces.insert(m_vSweepSurfaces.end(), vFlatSurf.begin(), vFlatSurf.end());
 	}
 	else {
 		LogWarningArg1("END CUTTING# %u: No elements are subdivided.", m_ctCompletedCuts + 1);
 	}
 
+
 	//clear cut context
-	clearCutContext();
+	//clearCutContext();
 
 	//collect all garbage
 	this->garbage_collection();
@@ -389,13 +424,20 @@ int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 	//Perform all tests
 	TestVolMesh::tst_all(this);
 
+	//split mesh parts
+	if(m_flagSplitMeshAfterCut && (ctSubdividedTets > 0)) {
+		splitParts(sweptSurface, 0.2);
+	}
+
+	//print mesh parts
+	this->printParts();
 
 	//recompute AABB and expand it to detect cuts
 	m_aabb = this->computeAABB();
 	m_aabb.expand(1.0);
 
 	//Return number of tets cut
-	return ctCutTet;
+	return ctSubdividedTets;
 }
 
 vec3d CuttableMesh::vertexRestPosAt(U32 i) const {
@@ -444,6 +486,75 @@ double CuttableMesh::pointLineDistance(const vec3d& v1, const vec3d& v2,
 	return vec3d::distance(p, projection);
 }
 
+bool CuttableMesh::splitParts(const vector<vec3d>& vSweeptSurf, double dist) {
+	vec3d sweptSurfNormal = vec3d::cross(vSweeptSurf[1] - vSweeptSurf[0], vSweeptSurf[3] - vSweeptSurf[0]);
+	sweptSurfNormal.normalize();
+
+	vec3d dfront = sweptSurfNormal * dist;
+
+	//compute centroid
+	vec3d sweptSurfCentroid = vSweeptSurf[0];
+	for(int i = 1; i < 4; i++)
+		sweptSurfCentroid = sweptSurfCentroid + vSweeptSurf[i];
+	sweptSurfCentroid = sweptSurfCentroid * 0.25;
+
+
+	vector< vector<U32> > cellgroups;
+	get_disjoint_parts(cellgroups);
+
+
+	//set of nodes
+	set<U32> setFrontNodes;
+	set<U32> setBackNodes;
+
+	for(U32 i = 0; i < cellgroups.size(); i++) {
+
+		vector<U32> cells = cellgroups[i];
+
+		U32 ctFront = 0;
+		for(vector<U32>::const_iterator it = cells.begin(); it !=cells.end(); ++it) {
+			if(isCellIndex(*it)) {
+				vec3d x = computeCellCentroid(*it);
+
+				x = x - sweptSurfCentroid;
+				if(vec3d::dot(x, sweptSurfNormal) > 0)
+					ctFront++;
+			}
+		}
+
+		//categorize nodes based on front and back count
+		if(ctFront == cells.size()) {
+			for(vector<U32>::const_iterator it = cells.begin(); it !=cells.end(); it++) {
+				const CELL& cell = const_cellAt(*it);
+				for(int j=0; j < COUNT_CELL_NODES; j++)
+					setFrontNodes.insert(cell.nodes[j]);
+			}
+		}
+		else if(ctFront == 0) {
+			//add to back
+			for(vector<U32>::const_iterator it = cells.begin(); it !=cells.end(); it++) {
+				const CELL& cell = const_cellAt(*it);
+				for(int j=0; j < COUNT_CELL_NODES; j++)
+					setBackNodes.insert(cell.nodes[j]);
+			}
+		}
+	}
+
+	vector<U32> frontNodes(setFrontNodes.begin(), setFrontNodes.end());
+	vector<U32> backNodes(setBackNodes.begin(), setBackNodes.end());
+
+	for(vector<U32>::const_iterator it = frontNodes.begin(); it != frontNodes.end(); it++) {
+		NODE& node = nodeAt(*it);
+		node.pos = node.pos + dfront;
+	}
+
+	for(vector<U32>::const_iterator it = backNodes.begin(); it != backNodes.end(); it++) {
+		NODE& node = nodeAt(*it);
+		node.pos = node.pos - dfront;
+	}
+
+	return true;
+}
 
 }
 

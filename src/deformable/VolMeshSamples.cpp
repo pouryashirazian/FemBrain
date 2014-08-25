@@ -34,6 +34,7 @@ VolMesh* VolMeshSamples::CreateOneTetra() {
 	elements[3] = 3;
 
 	VolMesh* tet = new VolMesh(vertices, elements);
+	tet->setName("onetet");
 	return tet;
 }
 
@@ -44,21 +45,22 @@ VolMesh* VolMeshSamples::CreateTwoTetra() {
 	{
 		vector<vec3d> vertices;
 		vertices.push_back(vec3d(-1, 0, 0));
-		vertices.push_back(vec3d(0, 0, -2));
 		vertices.push_back(vec3d(1, 0, 0));
-		vertices.push_back(vec3d(0, 2, -1));
-		vertices.push_back(vec3d(0, 0, 2));
+		vertices.push_back(vec3d(0, 0, -1));
+		vertices.push_back(vec3d(0, 0, 1));
+		vertices.push_back(vec3d(0, 2, 0));
 		FlattenVec3<double>(vertices, vFlatVertices);
 	}
 
 	{
 		vector< Vec4<U32> > elements;
-		elements.push_back( Vec4<U32>(0, 1, 2, 3) );
 		elements.push_back( Vec4<U32>(0, 2, 3, 4) );
+		elements.push_back( Vec4<U32>(1, 2, 3, 4) );
 		FlattenVec4<U32>(elements, vFlatElements);
 	}
 
 	VolMesh* tet = new VolMesh(vFlatVertices, vFlatElements);
+	tet->setName("twotets");
 	return tet;
 }
 
@@ -120,6 +122,8 @@ VolMesh* VolMeshSamples::CreateTruthCube(int nx, int ny, int nz, double cellsize
 	FlattenVec3<double>(vertices, vFlatVertices);
 	FlattenVec4<U32>(elements, vFlatElements);
 
+	AnsiStr strName = printToAStr("truthcube_%dx%dx%d", nx, ny, nz);
 	VolMesh* cube = new VolMesh(vFlatVertices, vFlatElements);
+	cube->setName(strName.cptr());
 	return cube;
 }

@@ -683,47 +683,8 @@ int main(int argc, char* argv[])
 	glutCloseFunc(Close);
 	glutIdleFunc(timestep);
 
-
-//	const long N = 1024 * 1024;
-//	std::vector<real> A = random_vector < real > (N);
-//	std::vector<real> B(N);
-
-	//Setup Shading Environment
-	static const GLfloat lightColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-	static const GLfloat lightPos[4] = { 0.0f, 9.0f, 0.0f, 1.0f };
-
-	//Setup Light0 Position and Color
-	glLightfv(GL_LIGHT0, GL_AMBIENT, lightColor);
-	glLightfv(GL_LIGHT0, GL_DIFFUSE, lightColor);
-	glLightfv(GL_LIGHT0, GL_SPECULAR, lightColor);
-	glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
-
-	//Turn on Light 0
-	glEnable(GL_LIGHT0);
-	//Enable Lighting
-	glEnable(GL_LIGHTING);
-
-	//Enable features we want to use from OpenGL
-	glShadeModel(GL_SMOOTH);
-	glEnable(GL_POLYGON_SMOOTH);
-	glEnable(GL_LINE_SMOOTH);
-
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_CULL_FACE);
-	glEnable(GL_STENCIL_TEST);
-	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-
-	//glClearColor(0.45f, 0.45f, 0.45f, 1.0f);
-	glClearColor(1.0, 1.0, 1.0, 1.0);
-
-	//Compiling shaders
-	GLenum err = glewInit();
-	if (err != GLEW_OK)
-	{
-		//Problem: glewInit failed, something is seriously wrong.
-		fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
-		exit(1);
-	}
+	//initialize gl
+	def_initgl();
 
 	//Build Shaders for drawing the mesh
 	AnsiStr strRoot = ExtractOneLevelUp(ExtractFilePath(GetExePath()));
@@ -753,6 +714,8 @@ int main(int argc, char* argv[])
 	TheSceneGraph::Instance().add(woodenFloor);
 
 	//Light source
+	vec4f lightPos;
+	glGetLightfv(GL_LIGHT0, GL_POSITION, lightPos.ptr());
 	SGSphere* s = new SGSphere(0.3f, 8, 8);
 	s->setName("light0");
 	s->transform()->translate(vec3f(&lightPos[0]));
