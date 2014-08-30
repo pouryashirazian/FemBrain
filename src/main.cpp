@@ -116,19 +116,7 @@ void MousePress(int button, int state, int x, int y)
 	{
 		vec3f expand(0.2);
 		Ray ray = TheSceneGraph::Instance().screenToWorldRay(x, y);
-		int idxVertex = -1;
-		for (int i = 0; i < (int) g_lpDeformable->getVolMesh()->countNodes();
-				i++) {
-			AABB aabb;
-
-			vec3d pos = g_lpDeformable->getVolMesh()->const_nodeAt(i).pos;
-			vec3f posF = vec3f((float) pos.x, (float) pos.y, (float) pos.z);
-			aabb.set(posF - expand, posF + expand);
-			if (aabb.intersect(ray, 0.0, FLT_MAX)) {
-				idxVertex = i;
-				break;
-			}
-		}
+		int idxVertex = g_lpDeformable->getVolMesh()->selectNode(ray);
 
 		//select vertex
 		if (g_lpDeformable->getVolMesh()->isNodeIndex(idxVertex)) {

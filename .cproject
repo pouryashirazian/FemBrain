@@ -138,6 +138,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty/eigen}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty/vegafem/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty/bullet3/src}&quot;"/>
 									<listOptionValue builtIn="false" value="/opt/intel/mkl/include"/>
 									<listOptionValue builtIn="false" value="/opt/AMDAPP/include"/>
 									<listOptionValue builtIn="false" value="/usr/local/cuda/include"/>
