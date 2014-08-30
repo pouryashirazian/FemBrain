@@ -36,6 +36,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty/eigen}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty/vegafem/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty/bullet3}&quot;"/>
 									<listOptionValue builtIn="false" value="/opt/intel/mkl/include"/>
 									<listOptionValue builtIn="false" value="/opt/AMDAPP/include"/>
 									<listOptionValue builtIn="false" value="/usr/local/cuda/include"/>
@@ -57,8 +58,6 @@
 							<tool id="cdt.managedbuild.tool.gnu.cross.cpp.linker.1378118749" name="Cross G++ Linker" superClass="cdt.managedbuild.tool.gnu.cross.cpp.linker">
 								<option id="gnu.cpp.link.option.libs.307462716" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="mkl_intel_lp64"/>
-									<listOptionValue builtIn="false" value="OpenMeshCore"/>
-									<listOptionValue builtIn="false" value="OpenMeshTools"/>
 									<listOptionValue builtIn="false" value="mkl_core"/>
 									<listOptionValue builtIn="false" value="mkl_intel_thread"/>
 									<listOptionValue builtIn="false" value="iomp5"/>
@@ -81,6 +80,7 @@
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/tbb/build/linux_intel64_gcc_cc4.8_libc2.17_kernel3.11.0_release"/>
 									<listOptionValue builtIn="false" value="${CPP_COMPONENTS}/BOARD/lib"/>
 									<listOptionValue builtIn="false" value="&quot;${CPP_COMPONENTS}/LOKI/lib&quot;"/>
+									<listOptionValue builtIn="false" value="/usr/local/lib"/>
 									<listOptionValue builtIn="false" value="/opt/AMDAPP/lib/x86_64"/>
 									<listOptionValue builtIn="false" value="/opt/intel/mkl/lib/intel64"/>
 									<listOptionValue builtIn="false" value="/opt/intel/lib/intel64"/>
@@ -138,7 +138,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty/eigen}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty/vegafem/include}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty/bullet3/src}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/3rdparty/bullet3}&quot;"/>
 									<listOptionValue builtIn="false" value="/opt/intel/mkl/include"/>
 									<listOptionValue builtIn="false" value="/opt/AMDAPP/include"/>
 									<listOptionValue builtIn="false" value="/usr/local/cuda/include"/>
@@ -159,8 +159,6 @@
 							<tool id="cdt.managedbuild.tool.gnu.cross.cpp.linker.810974475" name="Cross G++ Linker" superClass="cdt.managedbuild.tool.gnu.cross.cpp.linker">
 								<option id="gnu.cpp.link.option.libs.1206443473" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="mkl_intel_lp64"/>
-									<listOptionValue builtIn="false" value="OpenMeshCore"/>
-									<listOptionValue builtIn="false" value="OpenMeshTools"/>
 									<listOptionValue builtIn="false" value="mkl_core"/>
 									<listOptionValue builtIn="false" value="mkl_intel_thread"/>
 									<listOptionValue builtIn="false" value="iomp5"/>
@@ -186,7 +184,6 @@
 									<listOptionValue builtIn="false" value="/opt/AMDAPP/lib/x86_64"/>
 									<listOptionValue builtIn="false" value="/opt/intel/mkl/lib/intel64"/>
 									<listOptionValue builtIn="false" value="/opt/intel/lib/intel64"/>
-									<listOptionValue builtIn="false" value="/usr/local/lib/OpenMesh"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.1477305617" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>

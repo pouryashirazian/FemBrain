@@ -8,7 +8,7 @@
 #ifndef COLLISIONDETECTION_H_
 #define COLLISIONDETECTION_H_
 
-#include <btBulletDynamicsCommon.h>
+#include "btBulletDynamicsCommon.h"
 
 namespace PS {
 namespace SG {
