@@ -9,6 +9,7 @@
 #define COLLISIONDETECTION_H_
 
 #include "btBulletDynamicsCommon.h"
+#include "SGPhysicsMesh.h"
 
 namespace PS {
 namespace SG {
@@ -19,6 +20,8 @@ public:
 	World();
 	virtual ~World();
 
+	bool addNode(SGPhysicsMesh* pMesh);
+	bool removeNode(SGPhysicsMesh* pMesh);
 	void step();
 private:
 	btBroadphaseInterface* m_lpBroadPhase;

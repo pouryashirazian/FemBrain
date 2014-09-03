@@ -20,30 +20,35 @@ World::World() {
 	m_lpDynamicsWorld->setGravity(btVector3(0, -10, 0));
 }
 
-void World::step() {
-	m_lpDynamicsWorld->stepSimulation(1 / 60.f, 10);
-
-}
-
 World::~World() {
-//	dynamicsWorld->removeRigidBody(fallRigidBody);
-//	delete fallRigidBody->getMotionState();
-//	delete fallRigidBody;
-//
-//	dynamicsWorld->removeRigidBody(groundRigidBody);
-//	delete groundRigidBody->getMotionState();
-//	delete groundRigidBody;
-//
-//	delete fallShape;
-//
-//	delete groundShape;
-
 	delete m_lpDynamicsWorld;
 	delete m_lpSolver;
 	delete m_lpCollisionConfig;
 	delete m_lpDispatcher;
 	delete m_lpBroadPhase;
 }
+
+void World::step() {
+	m_lpDynamicsWorld->stepSimulation(1 / 60.f, 10);
+
+}
+
+bool World::addNode(SGPhysicsMesh* pMesh) {
+	if(pMesh == NULL)
+		return false;
+
+	m_lpDynamicsWorld->addRigidBody(pMesh->getB3RigidBody());
+	return true;
+}
+
+bool World::removeNode(SGPhysicsMesh* pMesh) {
+	if(pMesh == NULL)
+		return false;
+
+	m_lpDynamicsWorld->removeRigidBody(pMesh->getB3RigidBody());
+	return true;
+}
+
 
 
 

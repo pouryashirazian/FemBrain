@@ -9,6 +9,7 @@
 #define SGPHYSICSMESH_H_
 
 #include "SGMesh.h"
+#include "Geometry.h"
 #include <btBulletDynamicsCommon.h>
 
 using namespace PS;
@@ -24,7 +25,22 @@ public:
 	SGPhysicsMesh(const Geometry& g, float mass);
 	virtual ~SGPhysicsMesh();
 
+	virtual void setupPhysics(const Geometry& g, float mass);
+
+	void updateNodeTransformFromMotionState();
+	void updateMotionStateFromNodeTransform();
+
+
+
+	btRigidBody* getB3RigidBody() const {return m_lpRigidBody;}
+	btCollisionShape* getB3CollisionShape() const {return m_lpShape;}
+
 	void draw();
+	void timestep();
+
+protected:
+	void init();
+
 
 protected:
 	btRigidBody* m_lpRigidBody;

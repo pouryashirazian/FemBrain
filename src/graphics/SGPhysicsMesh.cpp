@@ -9,10 +9,31 @@
 
 using namespace PS::SG;
 
-SGPhysicsMesh::SGPhysicsMesh() {
+SGPhysicsMesh::SGPhysicsMesh():SGMesh() {
+	init();
 }
 
 SGPhysicsMesh::SGPhysicsMesh(const Geometry& g, float mass) {
+	init();
+
+	setupPhysics(g, mass);
+}
+
+SGPhysicsMesh::~SGPhysicsMesh() {
+	delete (m_lpRigidBody->getMotionState());
+	SAFE_DELETE(m_lpRigidBody);
+	SAFE_DELETE(m_lpShape);
+}
+
+void SGPhysicsMesh::init() {
+	m_lpRigidBody = NULL;
+	m_lpShape = NULL;
+}
+
+void SGPhysicsMesh::setupPhysics(const Geometry& g, float mass) {
+
+	//setup mesh
+	setup(g);
 
 	//1
 	btQuaternion rotation(btVector3(1.0, 0.0, 0.0), 0.0);
@@ -27,7 +48,7 @@ SGPhysicsMesh::SGPhysicsMesh(const Geometry& g, float mass) {
 
 	//4
 	btScalar bodyMass = mass;
-	btVector3 bodyInertia;
+	btVector3 bodyInertia(0, 0, 0);
 	m_lpShape = new btConvexHullShape();
 	for (int i = 0; i < g.countVertices(); i++) {
 		vec3f v = g.vertexAt(i);
@@ -54,12 +75,49 @@ SGPhysicsMesh::SGPhysicsMesh(const Geometry& g, float mass) {
 	//9
 	m_lpRigidBody->setLinearFactor(btVector3(1, 1, 0));
 
+	//animate
+	setAnimate(true);
 }
 
-SGPhysicsMesh::~SGPhysicsMesh() {
+void SGPhysicsMesh::updateNodeTransformFromMotionState() {
 
+	//btScalar m[16];
+	btTransform trans;
+	m_lpRigidBody->getMotionState()->getWorldTransform(trans);
+	btVector3 t = trans.getOrigin();
+	vec3f tt = vec3f(t.x(), t.y(), t.z());
+
+	transform()->translate(tt - transform()->getTranslate());
+	//trans.getOpenGLMatrix(m);
+//	vec3f s = transform()->getScale();
+//	mat44f mtxTR;
+//	mtxTR.copyFrom(m);
+//	transform()->set(mtxTR);
+	//transform()->scale(s);
 }
+
+void SGPhysicsMesh::updateMotionStateFromNodeTransform() {
+	if(!m_lpRigidBody->getMotionState())
+		return;
+
+	vec3f t = transform()->getTranslate();
+
+	btTransform trans(btQuaternion(0, 0, 0, 1), btVector3(t.x, t.y, t.z));
+	m_lpRigidBody->getMotionState()->setWorldTransform(trans);
+}
+
 
 void SGPhysicsMesh::draw() {
-
+	SGMesh::draw();
 }
+
+void SGPhysicsMesh::timestep() {
+	if(m_lpRigidBody == NULL)
+		return;
+
+	updateNodeTransformFromMotionState();
+}
+
+
+
+

@@ -8,10 +8,12 @@
 #include "SketchMachine.h"
 #include "base/SettingsScript.h"
 #include "base/Logger.h"
+#include "base/Vec.h"
 #include "graphics/selectgl.h"
 #include "graphics/Gizmo.h"
 #include "graphics/ArcBallCamera.h"
-#include "base/Vec.h"
+#include "graphics/SceneGraph.h"
+
 
 using namespace PS::MATH;
 

@@ -4,7 +4,7 @@
  *  Created on: Dec 14, 2013
  *      Author: pourya
  */
-#pragma once
+
 #ifndef SELECTGL_H_
 #define SELECTGL_H_
 

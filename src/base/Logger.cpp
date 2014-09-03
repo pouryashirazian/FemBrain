@@ -54,7 +54,7 @@ namespace PS{
 	EventLogger::EventLogger()
 	{
 		m_fOnDisplay = NULL;
-		m_strFP = ChangeFileExt(GetExePath(), AnsiStr(".pslog"));
+		m_strFP = ChangeFileExt(GetExePath(), AnsiStr(".log"));
         m_strRootPath = ExtractOneLevelUp(ExtractFilePath(GetExePath()));
 		m_szBufferSize = 0;
 		setWriteFlags(PS_LOG_WRITE_EVENTTYPE | PS_LOG_WRITE_SOURCE | PS_LOG_WRITE_TO_SCREEN);
@@ -194,7 +194,7 @@ namespace PS{
 			strLine = m_lstLog[i];
 			if(strLine.length() > 0)
 			{
-				ofs << strLine << '\0' << endl;
+				ofs << strLine << endl;
 			}
 		}
 		ofs.close();

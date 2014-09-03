@@ -6,6 +6,7 @@
  */
 #include "AvatarProbe.h"
 #include "base/Vec.h"
+#include "graphics/SceneGraph.h"
 
 #define DEFAULT_HAPTIC_FORCE_COEFF 200000
 

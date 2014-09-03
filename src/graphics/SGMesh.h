@@ -1,7 +1,6 @@
 #ifndef SG_MESH_H
 #define SG_MESH_H
 
-#include "SceneGraph.h"
 #include "GLMeshBuffer.h"
 
 using namespace PS;
@@ -13,9 +12,9 @@ namespace SG {
 class SGMesh : public GLMeshBuffer {
 public:
 	SGMesh():GLMeshBuffer() {}
-	SGMesh(const Geometry& g):GLMeshBuffer(g) {
-        this->setAABB(g.aabb());
-    }
+
+	explicit SGMesh(const Geometry& g);
+	explicit SGMesh(const AnsiStr& strFilePath);
 
 	virtual ~SGMesh() {
 		GLMeshBuffer::cleanup();
@@ -28,9 +27,7 @@ public:
 
 	virtual void draw();
 
-    virtual void drawNoEffect() {
-		GLMeshBuffer::draw();
-    }
+    virtual void drawNoEffect();
 };
 
 }
