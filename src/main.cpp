@@ -10,6 +10,8 @@
 #include "base/Profiler.h"
 #include "base/FileDirectory.h"
 #include "base/SettingsScript.h"
+#include "base/CmdLineParser.h"
+
 
 #include "graphics/AppScreen.h"
 #include "graphics/selectgl.h"
@@ -55,6 +57,7 @@ using namespace PS::CL;
 AvatarProbe* g_lpProbe = NULL;
 AvatarScalpel* g_lpScalpel = NULL;
 GLMeshBuffer* g_lpDrawNormals = NULL;
+CmdLineParser g_cmdLineParser;
 
 //SpringDumble* g_lpMassSpring = NULL;
 //Particles* g_lpParticles = NULL;
@@ -622,30 +625,13 @@ int main(int argc, char* argv[])
 
 	//SIM files define the simulation parameters
 	//Parse Input Args
-	if(argc > 0) {
-		int iArg = 0;
-		while(iArg < argc) {
-			string strArg = string(argv[iArg]);
-			if(strArg == "-f") {
-				AnsiStr strSimFP = AnsiStr(argv[++iArg]);
-				g_appSettings.strSimFilePath = ExtractFilePath(GetExePath()) + strSimFP;
-				LogInfoArg1("Simulation filepath selected is %s", strSimFP.cptr());
-			}
-			else if(strArg == "-t") {
-				g_appSettings.ctSolverThreads = atoi(argv[++iArg]);
-				LogInfoArg1("Number of solver threads %d", g_appSettings.ctSolverThreads);
-			}
+	g_cmdLineParser.add_option("file", "[.sim file] Specify simulation file path.", Value(AnsiStr("../data/models/tumor.sim")));
+	g_cmdLineParser.add_option("threads", "number of threads", Value((int)tbb::task_scheduler_init::default_num_threads()));
+	if(g_cmdLineParser.parse(argc, argv) < 0)
+		exit(0);
 
-			else if(strArg == "-h") {
-				printf("Usage: FemBrain -f [SIM FILE] \n");
-				printf("-f [SIM FILE] Input file defining the simulation scene.\n");
-				exit(0);
-			}
-
-			iArg++;
-		}
-	}
-
+	g_appSettings.ctSolverThreads = g_cmdLineParser.value<int>("threads");
+	g_appSettings.strSimFilePath = ExtractFilePath(GetExePath()) + g_cmdLineParser.value<AnsiStr>("file");
 
 
 	//Setup the event logger
