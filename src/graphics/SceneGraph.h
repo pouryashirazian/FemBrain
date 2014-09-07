@@ -23,8 +23,6 @@
 #include "ArcBallCamera.h"
 #include "SGNode.h"
 #include "SGHeaders.h"
-#include "SGPhysicsMesh.h"
-#include "World.h"
 
 using namespace Loki;
 using namespace std;
@@ -59,7 +57,6 @@ public:
 
     //Nodes
     U32 add(SGNode* aNode);
-    U32 addToPhysicsWorld(SGPhysicsMesh* pNode);
     U32 addSceneBox(const AABB& box);
     U32 addFloor(int rows, int cols, float step = 1.0f);
     bool remove(U32 index);
@@ -124,7 +121,8 @@ private:
 	CopyStack<mat44f> m_stkProjection;
 	CopyStack<mat44f> m_stkModelView;
 	std::vector<SGNode*> m_vSceneNodes;
-	World* m_lpWorld;
+
+
     ArcBallCamera m_camera;
     SGHeaders* m_headers;
     int m_idCamHeader;

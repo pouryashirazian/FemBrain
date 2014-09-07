@@ -9,6 +9,7 @@
 #define VOLMESH_H
 
 #include "graphics/SGNode.h"
+#include "graphics/Geometry.h"
 #include "VolMeshEntities.h"
 #include <functional>
 #include <set>
@@ -23,6 +24,7 @@
 */
 using namespace PS;
 using namespace PS::SG;
+using namespace PS::GL;
 using namespace std;
 
 
@@ -187,6 +189,9 @@ public:
 	U32 getElemToShow() const {return m_elemToShow;}
 	void setNodeToShow(U32 idxNode = INVALID_INDEX);
 	U32 getNodeToShow() const {return m_nodeToShow;}
+
+	//export
+	bool exportGeometry(Geometry& g) const;
 
 	//draw
 	void draw();

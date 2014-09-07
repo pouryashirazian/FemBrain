@@ -1574,6 +1574,44 @@ void VolMesh::setNodeToShow(U32 idxNode) {
 	m_nodeToShow = idxNode;
 }
 
+bool VolMesh::exportGeometry(Geometry& g) const {
+
+	if(countNodes() == 0)
+		return false;
+
+	vector<float> vertices;
+	vertices.reserve(countNodes() * 3);
+	for(U32 i=0; i < countNodes(); i++) {
+		const NODE& node = const_nodeAt(i);
+		vec3f pos = vec3f(node.pos.x, node.pos.y, node.pos.z);
+		vertices.push_back(pos.x);
+		vertices.push_back(pos.y);
+		vertices.push_back(pos.z);
+	}
+
+	vector<U32> triangles;
+	triangles.reserve(countCells() * 4 * 3);
+	for(U32 i=0; i < countCells(); i++) {
+		const CELL& cell = const_cellAt(i);
+		U32 tri[3];
+		for(U32 j=0; j < COUNT_CELL_FACES; j++) {
+			//const FACE& face = const_faceAt(cell.faces[j]);
+			getFaceNodes(cell.faces[j], tri);
+
+			//triangles
+			triangles.push_back(tri[0]);
+			triangles.push_back(tri[1]);
+			triangles.push_back(tri[2]);
+		}
+
+	}
+
+	g.init(3, 4, 2, ftTriangles);
+	g.addVertexAttribs(vertices, 3, mbtPosition);
+	g.addFaceIndices(triangles, ftTriangles);
+
+	return true;
+}
 
 void VolMesh::draw() {
 	glPushAttrib(GL_ALL_ATTRIB_BITS);

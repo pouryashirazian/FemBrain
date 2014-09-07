@@ -28,7 +28,6 @@ SceneGraph::SceneGraph() {
 
 	m_tick = tbb::tick_count::now();
 	m_ctFrames = m_ctSampledFrames = 0;
-	m_lpWorld = new World();
 
 
 	//Headers to show
@@ -48,7 +47,6 @@ void SceneGraph::cleanup() {
 //	for (U32 i = 0; i < m_vSceneNodes.size(); i++)
 	//	SAFE_DELETE(m_vSceneNodes[i]);
 	m_vSceneNodes.resize(0);
-	SAFE_DELETE(m_lpWorld);
 }
 
 U32 SceneGraph::add(SGNode *aNode) {
@@ -59,13 +57,6 @@ U32 SceneGraph::add(SGNode *aNode) {
 	return (m_vSceneNodes.size() - 1);
 }
 
-U32 SceneGraph::addToPhysicsWorld(SGPhysicsMesh* pNode) {
-	if(pNode == NULL)
-		return -1;
-
-	m_lpWorld->addNode(pNode);
-	return add(pNode);
-}
 
 bool SceneGraph::remove(U32 index) {
 	if(index >= m_vSceneNodes.size())
@@ -161,7 +152,6 @@ void SceneGraph::draw() {
 			m_vSceneNodes[i]->draw();
 	}
 
-
 	//Cull SwapBuffers of the API such as
 	//glutSwapBuffers
 }
@@ -178,9 +168,6 @@ void SceneGraph::drawBBoxes() {
 }
 
 void SceneGraph::timestep() {
-	//world
-	m_lpWorld->step();
-
 	//update
 	for (U32 i = 0; i < m_vSceneNodes.size(); i++) {
 		if(m_vSceneNodes[i]->isAnimate())

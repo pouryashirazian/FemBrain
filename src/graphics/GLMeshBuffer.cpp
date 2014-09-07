@@ -224,7 +224,7 @@ void GLMeshBuffer::cleanup()
 }
 
 void GLMeshBuffer::setup(const Geometry& g) {
-
+	GLMeshBuffer::cleanup();
 	if(g.countVertices() > 0)
 		this->setupVertexAttribs(g.vertices(), g.getVertexStep(), mbtPosition);
 	if(g.countColor() > 0)
@@ -339,6 +339,20 @@ void GLMeshBuffer::setupIndexBufferObject(const vector<U32>& arrIndex, int faceM
 	glBufferData(GL_ARRAY_BUFFER, arrIndex.size() * sizeof(U32), &arrIndex[0], GL_STATIC_DRAW);
 }
 
+bool GLMeshBuffer::updateVertexBuffer(U32 offset, U32 szTotal, const void* lpData) {
+	if (!m_isValidVertex)
+		return false;
+
+	U32 szVertexBuffer = m_stepVertex * m_ctVertices * sizeof(float);
+	if ((szTotal > szVertexBuffer) || lpData == NULL)
+		return false;
+
+	//Bind Buffer
+	glBindBuffer(GL_ARRAY_BUFFER, m_vboVertex);
+	glBufferSubData(GL_ARRAY_BUFFER, offset, szTotal, lpData);
+
+	return true;
+}
 
 bool GLMeshBuffer::readbackMeshVertexAttribGL(MemoryBufferType attrib, U32& count, vector<float>& values) const {
 	U32 vbo = 0;

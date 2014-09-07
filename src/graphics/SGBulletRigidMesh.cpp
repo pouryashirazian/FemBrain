@@ -1,39 +1,47 @@
 /*
- * SGPhysicsMesh.cpp
+ * SGBulletRigidMesh.cpp
  *
  *  Created on: Aug 28, 2014
  *      Author: pourya
  */
 
-#include "SGPhysicsMesh.h"
+#include "SGBulletRigidMesh.h"
 
 using namespace PS::SG;
 
-SGPhysicsMesh::SGPhysicsMesh():SGMesh() {
+SGBulletRigidMesh::SGBulletRigidMesh():SGMesh() {
 	init();
 }
 
-SGPhysicsMesh::SGPhysicsMesh(const Geometry& g, float mass) {
+SGBulletRigidMesh::SGBulletRigidMesh(const Geometry& g, float mass) {
 	init();
 
-	setupPhysics(g, mass);
+	setup(g, mass);
 }
 
-SGPhysicsMesh::~SGPhysicsMesh() {
+SGBulletRigidMesh::SGBulletRigidMesh(const SGTransform& t, const Geometry& g, float mass) {
+	init();
+	this->transform()->copyFrom(t);
+
+	setup(g, mass);
+}
+
+SGBulletRigidMesh::~SGBulletRigidMesh() {
 	delete (m_lpRigidBody->getMotionState());
 	SAFE_DELETE(m_lpRigidBody);
 	SAFE_DELETE(m_lpShape);
 }
 
-void SGPhysicsMesh::init() {
+void SGBulletRigidMesh::init() {
 	m_lpRigidBody = NULL;
 	m_lpShape = NULL;
+	resetTransform();
 }
 
-void SGPhysicsMesh::setupPhysics(const Geometry& g, float mass) {
+void SGBulletRigidMesh::setup(const Geometry& g, float mass) {
 
 	//setup mesh
-	setup(g);
+	SGMesh::setup(g);
 
 	//1
 	btQuaternion rotation(btVector3(1.0, 0.0, 0.0), 0.0);
@@ -77,9 +85,14 @@ void SGPhysicsMesh::setupPhysics(const Geometry& g, float mass) {
 
 	//animate
 	setAnimate(true);
+
+
+	if(TheShaderManager::Instance().has("phong")) {
+        m_spEffect = SmartPtrSGEffect(new SGEffect(TheShaderManager::Instance().get("phong")));
+    }
 }
 
-void SGPhysicsMesh::updateNodeTransformFromMotionState() {
+void SGBulletRigidMesh::updateNodeTransformFromMotionState() {
 
 	//btScalar m[16];
 	btTransform trans;
@@ -96,7 +109,7 @@ void SGPhysicsMesh::updateNodeTransformFromMotionState() {
 	//transform()->scale(s);
 }
 
-void SGPhysicsMesh::updateMotionStateFromNodeTransform() {
+void SGBulletRigidMesh::updateMotionStateFromNodeTransform() {
 	if(!m_lpRigidBody->getMotionState())
 		return;
 
@@ -107,11 +120,12 @@ void SGPhysicsMesh::updateMotionStateFromNodeTransform() {
 }
 
 
-void SGPhysicsMesh::draw() {
+void SGBulletRigidMesh::draw() {
+
 	SGMesh::draw();
 }
 
-void SGPhysicsMesh::timestep() {
+void SGBulletRigidMesh::timestep() {
 	if(m_lpRigidBody == NULL)
 		return;
 

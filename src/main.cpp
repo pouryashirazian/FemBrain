@@ -38,6 +38,8 @@
 #include "deformable/VolMeshSamples.h"
 #include "deformable/Cutting_CPU.h"
 #include "deformable/VolMeshSamples.h"
+#include "deformable/CollisionDetection.h"
+#include "graphics/SGBulletSoftRigidDynamics.h"
 
 #include "graphics/Intersections.h"
 #include "volumetricMeshLoader.h"
@@ -51,6 +53,7 @@ using namespace PS;
 using namespace PS::INTERSECTIONS;
 using namespace PS::FILESTRINGUTILS;
 using namespace PS::CL;
+using namespace PS::SG;
 
 
 //Visual Cues
@@ -65,6 +68,8 @@ CmdLineParser g_cmdLineParser;
 //SimulationObjects
 //PS::CL::FastRBF*	g_lpFastRBF = NULL;
 Deformable* 		g_lpDeformable = NULL;
+CollisionDetection* g_lpCD = NULL;
+PS::SG::SGBulletSoftRigidDynamics* g_lpWorld = NULL;
 
 //Info Lines
 AppSettings g_appSettings;
@@ -673,6 +678,10 @@ int main(int argc, char* argv[])
 	if(!LoadSettings(g_appSettings.strSimFilePath))
 		exit(0);
 
+	//CD
+//	g_lpCD = new CollisionDetection();
+//	TheSceneGraph::Instance().add(g_lpCD);
+
 	//Ground and Room
 	//TheSceneGraph::Instance().addFloor(32, 32, 0.5f);
 	//TheSceneGraph::Instance().get("floor")->transform()->translate(vec3f(0, -1, 0));
@@ -686,6 +695,19 @@ int main(int argc, char* argv[])
 	woodenFloor->transform()->translate(vec3f(0, -1.0f, 0));
 	woodenFloor->transform()->rotate(vec3f(1.0f, 0.0f, 0.0f), 90.0f);
 	TheSceneGraph::Instance().add(woodenFloor);
+
+
+	/*
+	Geometry g;
+	g.addCube(vec3f(-8, -1.5, -8), vec3f(8, -1, 8));
+	g.addPerVertexColor(vec4f(0,0,1,1));
+	SGBulletShape* floor = new SGBulletShape(g);
+	floor->setName("floor");
+	TheSceneGraph::Instance().add(floor);
+	g_lpCD->add(floor);
+	*/
+
+
 
 	//Light source
 	vec4f lightPos;
@@ -778,14 +800,9 @@ int main(int argc, char* argv[])
 		g_appSettings.msPolyTetrahedraMesh = (tbb::tick_count::now() - tsStart).seconds() * 1000.0;
 
 		//Deformable
-		//g_lpDeformable = new Deformable(tetVertices, tetElements, g_appSettings.vFixedVertices);
-
-		//VolMesh* tempMesh = PS::MESH::VolMeshSamples::CreateTruthCube(2, 2, 2, 2.0);
 		VolMesh* tempMesh = PS::MESH::VolMeshSamples::CreateTwoTetra();
 		vector<int> fixed;
 		g_lpDeformable = new Deformable(*tempMesh, fixed);
-		SAFE_DELETE(tempMesh);
-
 		g_lpDeformable->setGravity(true);
 		g_lpDeformable->getVolMesh()->setFlagDetectCutNodes(false);
 		//g_lpDeformable->setDeformCallback(ApplyDeformations);
@@ -795,6 +812,8 @@ int main(int argc, char* argv[])
 		g_lpDeformable->setVisible(g_appSettings.drawTetMesh);
 		g_lpDeformable->setWireFrameMode(g_appSettings.drawTetMesh == disWireFrame);
 		TheSceneGraph::Instance().add(g_lpDeformable);
+		SAFE_DELETE(tempMesh);
+
 
 		//Probe
 		g_lpProbe = new AvatarProbe(g_lpDeformable);
@@ -809,6 +828,42 @@ int main(int argc, char* argv[])
 		g_lpScalpel->transform()->translate(g_appSettings.avatarPos);
 		g_lpScalpel->setOnCutEventHandler(cutCompleted);
 		TheSceneGraph::Instance().add(g_lpScalpel);
+
+
+		//create bullet world
+		g_lpWorld = new SGBulletSoftRigidDynamics();
+		TheSceneGraph::Instance().add(g_lpWorld);
+
+		//create rigid bodies
+		Geometry g1;
+		g1.addCube(vec3f(-4.0, 5.0, 2.0), 1);
+		g1.addPerVertexColor(vec4f(0,0,1,1));
+		SGBulletRigidMesh* acube = new SGBulletRigidMesh(g1, 1.0);
+		TheSceneGraph::Instance().add(acube);
+		g_lpWorld->addRigidBody(acube);
+
+
+		//
+		/*
+		Geometry g1;
+		g1.addCube(vec3f(-4.0, 1.0f, 2.0), 1);
+		g1.addPerVertexColor(vec4f(0,0,1,1));
+		SGBulletShape* acube = new SGBulletShape(g1);
+		acube->setNodalDisplacement(vec3f(0.01,0,0));
+
+		Geometry g2;
+		g2.addCube(vec3f(4.0, 1.0f, 2.0), 1);
+		g2.addPerVertexColor(vec4f(1,0,0,1));
+		SGBulletShape* bcube = new SGBulletShape(g2);
+		bcube->setNodalDisplacement(vec3f(-0.01,0,0));
+		TheSceneGraph::Instance().add(acube);
+		TheSceneGraph::Instance().add(bcube);
+
+		//add to collision detections
+		g_lpCD->add(acube);
+		g_lpCD->add(bcube);
+		*/
+
 
 		//set focused node for affine gizmo
 		TheGizmoManager::Instance().setFocusedNode(g_lpScalpel);

@@ -23,13 +23,26 @@ using namespace PS::INTERSECTIONS;
 
 CuttableMesh* g_lpModifier = NULL;
 
-Deformable::Deformable()
+Deformable::Deformable():SGMesh()
 {
 	init();
 }
 
+Deformable::Deformable(const VolMesh& mesh):SGMesh() {
+	init();
+
+	//Copy from the input fixed vertices
+	m_vFixedVertices.clear();
+
+	//Setup Volumetric Mesh
+	m_lpVolMesh = new CuttableMesh(mesh);
+	//SGBulletShape::setup(mesh);
+
+	syncForceModel();
+}
+
 Deformable::Deformable(const VolMesh& mesh,
-	 	 	 	 		const vector<int>& vFixedVertices) {
+	 	 	 	 		const vector<int>& vFixedVertices):SGMesh() {
 	init();
 
 	//Copy from the input fixed vertices
@@ -37,21 +50,7 @@ Deformable::Deformable(const VolMesh& mesh,
 
 	//Setup Volumetric Mesh
 	m_lpVolMesh = new CuttableMesh(mesh);
-
-	syncForceModel();
-}
-
-
-Deformable::Deformable(const vector<double>& inTetVertices,
-				 	 const vector<U32>& inTetElements,
-				 	 const vector<int>& vFixedVertices) {
-	init();
-
-	//Copy from the input fixed vertices
-	m_vFixedVertices.assign(vFixedVertices.begin(), vFixedVertices.end());
-
-	//Setup Volumetric Mesh
-	m_lpVolMesh = new CuttableMesh(inTetVertices, inTetElements);
+	//SGBulletShape::setup(*m_lpVolMesh);
 
 	syncForceModel();
 }
@@ -409,6 +408,9 @@ void Deformable::timestep()
 	//Update AABB
 	setAABB(m_lpVolMesh->aabb());
 
+	//Update CD Shape
+	//SGBulletShape::updateShape(*m_lpVolMesh);
+
 
 	if(m_fOnDeform)
 		m_fOnDeform(m_dof, m_q);
@@ -717,6 +719,7 @@ void Deformable::hapticSetCurrentForces(const vector<int>& indices,
 
 void Deformable::draw()
 {
+	//draw volume mesh
 	if(m_lpVolMesh)
 		m_lpVolMesh->draw();
 

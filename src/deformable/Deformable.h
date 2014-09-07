@@ -29,12 +29,14 @@
 #include "graph.h"
 #include "DBLogger.h"
 #include "CuttableMesh.h"
+#include "SGBulletCDShape.h"
 
 
 using namespace std;
 using namespace Loki;
 using namespace PS::MATH;
 using namespace PS::FEM;
+using namespace PS::SG;
 
 #define DEFAULT_FORCE_NEIGHBORHOOD_SIZE 5
 #define DEFAULT_THREAD_COUNT 8
@@ -61,12 +63,11 @@ struct EdgeIntersection {
 class Deformable : public SGMesh {
 public:
 	Deformable();
+
+	explicit Deformable(const VolMesh& mesh);
+
 	explicit Deformable(const VolMesh& mesh,
 		 	 	 	 	const vector<int>& vFixedVertices);
-
-	explicit Deformable(const vector<double>& inTetVertices,
-					 	 const vector<U32>& inTetElements,
-					 	 const vector<int>& vFixedVertices);
 
 	virtual ~Deformable();
 

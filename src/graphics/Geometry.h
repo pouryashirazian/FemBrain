@@ -55,6 +55,9 @@ public:
 	vec3f normalAt(int index) const;
 	vec3u32 triangleAt(int index) const;
 	vec4u32 quadAt(int index) const;
+
+	void setVertex(int index, const vec3f& v);
+
 	const vector<float>& vertices() const {return m_vertices;}
 	const vector<float>& colors() const {return m_colors;}
 	const vector<float>& texcoords() const {return m_texCoords;}

@@ -5,11 +5,19 @@
  *      Author: pourya
  */
 
-#include "World.h"
+#include "SGBulletSoftRigidDynamics.h"
 
 using namespace PS::SG;
 
-World::World() {
+SGBulletSoftRigidDynamics::SGBulletSoftRigidDynamics():SGNode() {
+	init();
+}
+
+SGBulletSoftRigidDynamics::~SGBulletSoftRigidDynamics() {
+	cleanup();
+}
+
+void SGBulletSoftRigidDynamics::init() {
 	m_lpBroadPhase = new btDbvtBroadphase();
 	m_lpCollisionConfig = new btDefaultCollisionConfiguration();
 
@@ -20,7 +28,7 @@ World::World() {
 	m_lpDynamicsWorld->setGravity(btVector3(0, -10, 0));
 }
 
-World::~World() {
+void SGBulletSoftRigidDynamics::cleanup() {
 	delete m_lpDynamicsWorld;
 	delete m_lpSolver;
 	delete m_lpCollisionConfig;
@@ -28,12 +36,16 @@ World::~World() {
 	delete m_lpBroadPhase;
 }
 
-void World::step() {
+void SGBulletSoftRigidDynamics::draw() {
+
+}
+
+void SGBulletSoftRigidDynamics::timestep() {
 	m_lpDynamicsWorld->stepSimulation(1 / 60.f, 10);
 
 }
 
-bool World::addNode(SGPhysicsMesh* pMesh) {
+bool SGBulletSoftRigidDynamics::addRigidBody(SGBulletRigidMesh* pMesh) {
 	if(pMesh == NULL)
 		return false;
 
@@ -41,7 +53,7 @@ bool World::addNode(SGPhysicsMesh* pMesh) {
 	return true;
 }
 
-bool World::removeNode(SGPhysicsMesh* pMesh) {
+bool SGBulletSoftRigidDynamics::removeRigidBody(SGBulletRigidMesh* pMesh) {
 	if(pMesh == NULL)
 		return false;
 
