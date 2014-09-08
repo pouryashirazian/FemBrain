@@ -68,7 +68,6 @@ CmdLineParser g_cmdLineParser;
 //SimulationObjects
 //PS::CL::FastRBF*	g_lpFastRBF = NULL;
 Deformable* 		g_lpDeformable = NULL;
-CollisionDetection* g_lpCD = NULL;
 PS::SG::SGBulletSoftRigidDynamics* g_lpWorld = NULL;
 
 //Info Lines
@@ -678,17 +677,44 @@ int main(int argc, char* argv[])
 	if(!LoadSettings(g_appSettings.strSimFilePath))
 		exit(0);
 
-	//CD
-//	g_lpCD = new CollisionDetection();
-//	TheSceneGraph::Instance().add(g_lpCD);
-
-	//Ground and Room
-	//TheSceneGraph::Instance().addFloor(32, 32, 0.5f);
-	//TheSceneGraph::Instance().get("floor")->transform()->translate(vec3f(0, -1, 0));
+	//Scenebox
 	TheSceneGraph::Instance().addSceneBox(AABB(vec3f(-10,-10,-16), vec3f(10,10,16)));
+
+	//create bullet world
+	g_lpWorld = new SGBulletSoftRigidDynamics();
+	TheSceneGraph::Instance().add(g_lpWorld);
+
+	//floor
+	{
+		btCollisionShape* shape = new btStaticPlaneShape(btVector3(0, 1, 0), 1);
+		shape->setMargin(0.04);
+
+		btDefaultMotionState* motionState = new btDefaultMotionState(btTransform(btQuaternion(0,0,0,1), btVector3(0,0,0)));
+		btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(
+			0,                  // mass
+			motionState,        // initial position
+			shape,              // collision shape of body
+			btVector3(0,0,0)    // local inertia
+		);
+
+		btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
+
+		Geometry g;
+		g.addCube(vec3f(-8, -0.5, -8), vec3f(8, 0.0, 8));
+		g.addPerVertexColor(vec4f(0.5, 0.5, 0.5, 1.0));
+		SGBulletRigidMesh* floor = new SGBulletRigidMesh();
+		floor->setName("floor");
+		floor->setup(g, rigidBody);
+
+		TheSceneGraph::Instance().add(floor);
+		g_lpWorld->addRigidBody(floor);
+	}
+
+
 
 
 	//Textured Ground
+	/*
 	TheTexManager::Instance().add(strTexRoot + "wood.png");
 	SGQuad* woodenFloor = new SGQuad(16.0f, 16.0f, TheTexManager::Instance().get("wood"));
 	woodenFloor->setName("floor");
@@ -697,17 +723,14 @@ int main(int argc, char* argv[])
 	TheSceneGraph::Instance().add(woodenFloor);
 
 
-	/*
 	Geometry g;
-	g.addCube(vec3f(-8, -1.5, -8), vec3f(8, -1, 8));
-	g.addPerVertexColor(vec4f(0,0,1,1));
-	SGBulletShape* floor = new SGBulletShape(g);
+	g.addCube(vec3f(-8, 0.0, -8), vec3f(8, 0.01, 8));
+	g.addPerVertexColor(vec4f(0.5,0.5,0.5,1));
+	SGBulletRigidMesh* floor = new SGBulletRigidMesh(g, 0.0);
 	floor->setName("floor");
 	TheSceneGraph::Instance().add(floor);
-	g_lpCD->add(floor);
-	*/
-
-
+	g_lpWorld->addRigidBody(floor);
+*/
 
 	//Light source
 	vec4f lightPos;
@@ -717,10 +740,6 @@ int main(int argc, char* argv[])
 	s->transform()->translate(vec3f(&lightPos[0]));
 	TheSceneGraph::Instance().add(s);
 
-	//Add morphing sphere
-	//MorphingSphere* m = new MorphingSphere(2.0f, 16, 16);
-//	m->setName("floor");
-//	TheSceneGraph::Instance().add(m);
 
 	//Check the model file extension
 	AnsiStr strFileExt = ExtractFileExt(AnsiStr(g_appSettings.strModelFilePath.c_str()));
@@ -799,13 +818,13 @@ int main(int argc, char* argv[])
 		TetGenExporter::tesselate(vertices, elements, tetVertices, tetElements);
 		g_appSettings.msPolyTetrahedraMesh = (tbb::tick_count::now() - tsStart).seconds() * 1000.0;
 
+
 		//Deformable
 		VolMesh* tempMesh = PS::MESH::VolMeshSamples::CreateTwoTetra();
 		vector<int> fixed;
 		g_lpDeformable = new Deformable(*tempMesh, fixed);
 		g_lpDeformable->setGravity(true);
 		g_lpDeformable->getVolMesh()->setFlagDetectCutNodes(false);
-		//g_lpDeformable->setDeformCallback(ApplyDeformations);
 		g_lpDeformable->setHapticForceRadius(g_appSettings.hapticNeighborhoodPropagationRadius);
 		g_lpDeformable->setName("tissue");
 		g_lpDeformable->setCollisionObject(TheSceneGraph::Instance().get("floor"));
@@ -830,45 +849,20 @@ int main(int argc, char* argv[])
 		TheSceneGraph::Instance().add(g_lpScalpel);
 
 
-		//create bullet world
-		g_lpWorld = new SGBulletSoftRigidDynamics();
-		TheSceneGraph::Instance().add(g_lpWorld);
-
 		//create rigid bodies
-		Geometry g1;
-		g1.addCube(vec3f(-4.0, 5.0, 2.0), 1);
-		g1.addPerVertexColor(vec4f(0,0,1,1));
-		SGBulletRigidMesh* acube = new SGBulletRigidMesh(g1, 1.0);
-		TheSceneGraph::Instance().add(acube);
-		g_lpWorld->addRigidBody(acube);
-
-
-		//
-		/*
-		Geometry g1;
-		g1.addCube(vec3f(-4.0, 1.0f, 2.0), 1);
-		g1.addPerVertexColor(vec4f(0,0,1,1));
-		SGBulletShape* acube = new SGBulletShape(g1);
-		acube->setNodalDisplacement(vec3f(0.01,0,0));
-
-		Geometry g2;
-		g2.addCube(vec3f(4.0, 1.0f, 2.0), 1);
-		g2.addPerVertexColor(vec4f(1,0,0,1));
-		SGBulletShape* bcube = new SGBulletShape(g2);
-		bcube->setNodalDisplacement(vec3f(-0.01,0,0));
-		TheSceneGraph::Instance().add(acube);
-		TheSceneGraph::Instance().add(bcube);
-
-		//add to collision detections
-		g_lpCD->add(acube);
-		g_lpCD->add(bcube);
-		*/
+		{
+			Geometry g1;
+			g1.addCube(vec3f(-2.0, 5.0, 2.0), 1);
+			g1.addPerVertexColor(vec4f(0,0,1,1));
+			SGBulletRigidMesh* acube = new SGBulletRigidMesh(g1, 1.0);
+			TheSceneGraph::Instance().add(acube);
+			g_lpWorld->addRigidBody(acube);
+		}
 
 
 		//set focused node for affine gizmo
 		TheGizmoManager::Instance().setFocusedNode(g_lpScalpel);
 		TheGizmoManager::Instance().setAxis((GizmoAxis)g_appSettings.avatarAxis);
-
 
 		//log report
 		char chrMsg[1024];

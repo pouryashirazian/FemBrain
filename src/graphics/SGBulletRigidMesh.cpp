@@ -27,24 +27,28 @@ SGBulletRigidMesh::SGBulletRigidMesh(const SGTransform& t, const Geometry& g, fl
 }
 
 SGBulletRigidMesh::~SGBulletRigidMesh() {
-	delete (m_lpRigidBody->getMotionState());
-	SAFE_DELETE(m_lpRigidBody);
-	SAFE_DELETE(m_lpShape);
+	cleanup();
 }
 
 void SGBulletRigidMesh::init() {
 	m_lpRigidBody = NULL;
-	m_lpShape = NULL;
 	resetTransform();
 }
 
+void SGBulletRigidMesh::cleanup() {
+
+	btCollisionShape* pShape = NULL;
+	if(m_lpRigidBody) {
+		pShape = m_lpRigidBody->getCollisionShape();
+		delete (m_lpRigidBody->getMotionState());
+		SAFE_DELETE(m_lpRigidBody);
+	}
+	SAFE_DELETE(pShape);
+}
+
 void SGBulletRigidMesh::setup(const Geometry& g, float mass) {
-
-	//setup mesh
-	SGMesh::setup(g);
-
 	//1
-	btQuaternion rotation(btVector3(1.0, 0.0, 0.0), 0.0);
+	btQuaternion rotation(0.0, 0.0, 0.0, 1.0);
 
 	//2
 	vec3f t = this->transform()->getTranslate();
@@ -57,18 +61,19 @@ void SGBulletRigidMesh::setup(const Geometry& g, float mass) {
 	//4
 	btScalar bodyMass = mass;
 	btVector3 bodyInertia(0, 0, 0);
-	m_lpShape = new btConvexHullShape();
+	btConvexHullShape* pCDShape = new btConvexHullShape();
 	for (int i = 0; i < g.countVertices(); i++) {
 		vec3f v = g.vertexAt(i);
 		btVector3 btv = btVector3(v.x, v.y, v.z);
-		((btConvexHullShape*) m_lpShape)->addPoint(btv);
+		pCDShape->addPoint(btv);
 	}
-	m_lpShape->calculateLocalInertia(bodyMass, bodyInertia);
+	pCDShape->calculateLocalInertia(bodyMass, bodyInertia);
+	//pCDShape->setMargin(0.04);
 
 	//5
 	btRigidBody::btRigidBodyConstructionInfo bodyCI =
 			btRigidBody::btRigidBodyConstructionInfo(bodyMass, motionState,
-					m_lpShape, bodyInertia);
+					pCDShape, bodyInertia);
 
 	//6
 	bodyCI.m_restitution = 1.0f;
@@ -83,9 +88,25 @@ void SGBulletRigidMesh::setup(const Geometry& g, float mass) {
 	//9
 	m_lpRigidBody->setLinearFactor(btVector3(1, 1, 0));
 
+	//setup mesh
+	SGMesh::setup(g);
+
 	//animate
 	setAnimate(true);
 
+	if(TheShaderManager::Instance().has("phong")) {
+        m_spEffect = SmartPtrSGEffect(new SGEffect(TheShaderManager::Instance().get("phong")));
+    }
+}
+
+void SGBulletRigidMesh::setup(const Geometry& g, const btRigidBody* pBody) {
+	m_lpRigidBody = const_cast<btRigidBody*>(pBody);
+
+	//setup mesh
+	SGMesh::setup(g);
+
+	//animate
+	setAnimate(true);
 
 	if(TheShaderManager::Instance().has("phong")) {
         m_spEffect = SmartPtrSGEffect(new SGEffect(TheShaderManager::Instance().get("phong")));
@@ -95,18 +116,15 @@ void SGBulletRigidMesh::setup(const Geometry& g, float mass) {
 void SGBulletRigidMesh::updateNodeTransformFromMotionState() {
 
 	//btScalar m[16];
-	btTransform trans;
-	m_lpRigidBody->getMotionState()->getWorldTransform(trans);
-	btVector3 t = trans.getOrigin();
-	vec3f tt = vec3f(t.x(), t.y(), t.z());
+	btTransform trans = m_lpRigidBody->getWorldTransform();
 
-	transform()->translate(tt - transform()->getTranslate());
-	//trans.getOpenGLMatrix(m);
-//	vec3f s = transform()->getScale();
-//	mat44f mtxTR;
-//	mtxTR.copyFrom(m);
-//	transform()->set(mtxTR);
-	//transform()->scale(s);
+	//rotate
+//	btQuaternion q = trans.getRotation();
+//	transform()->setRotate(quat(q.x(), q.y(), q.z(), q.w()));
+
+	//translate
+	btVector3 t = trans.getOrigin();
+	transform()->setTranslate(vec3f(t.x(), t.y(), t.z()));
 }
 
 void SGBulletRigidMesh::updateMotionStateFromNodeTransform() {
