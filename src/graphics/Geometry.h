@@ -64,6 +64,12 @@ public:
 	const vector<float>& normals() const {return m_normals;}
 	const vector<U32>& indices() const {return m_indices;}
 
+	vector<float>& vertices() {return m_vertices;}
+	vector<float>& colors()  {return m_colors;}
+	vector<float>& texcoords()  {return m_texCoords;}
+	vector<float>& normals()  {return m_normals;}
+	vector<U32>& indices()  {return m_indices;}
+
 
 	//Add Attributes
 	bool addVertex(const vec3f& v);
