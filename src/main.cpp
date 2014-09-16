@@ -38,6 +38,7 @@
 #include "deformable/VolMeshSamples.h"
 #include "deformable/Cutting_CPU.h"
 #include "deformable/VolMeshSamples.h"
+#include "deformable/VolMeshExport.h"
 #include "deformable/CollisionDetection.h"
 #include "graphics/SGBulletSoftRigidDynamics.h"
 
@@ -818,6 +819,15 @@ int main(int argc, char* argv[])
 		TetGenExporter::tesselate(vertices, elements, tetVertices, tetElements);
 		g_appSettings.msPolyTetrahedraMesh = (tbb::tick_count::now() - tsStart).seconds() * 1000.0;
 
+		{
+			AnsiStr strVegFilePath = FILESTRINGUTILS::ChangeFileExt(g_appSettings.strModelFilePath, ".veg");
+			VolMesh* vmesh = new VolMesh(tetVertices, tetElements);
+			bool bres = VolMeshIO::writeVega(vmesh, strVegFilePath);
+			SAFE_DELETE(vmesh);
+
+			if(bres)
+				LogInfoArg1("Saved veg file to: %s", strVegFilePath.cptr());
+		}
 
 		//Deformable
 		VolMesh* tempMesh = PS::MESH::VolMeshSamples::CreateTwoTetra();
