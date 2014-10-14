@@ -21,10 +21,14 @@ SceneGraph::SceneGraph() {
 	m_stkModelView.top().identity();
 	m_stkProjection.top().identity();
 
+	//World
+	//m_lpWorld = new SGBulletRigidDynamics();
+	m_lpWorld = new SGBulletSoftRigidDynamics();
+	m_vSceneNodes.push_back(m_lpWorld);
+
 	//add header to opaque list
 	m_headers = new SGHeaders();
 	m_vSceneNodes.push_back(m_headers);
-
 
 	m_tick = tbb::tick_count::now();
 	m_ctFrames = m_ctSampledFrames = 0;
@@ -47,6 +51,7 @@ void SceneGraph::cleanup() {
 //	for (U32 i = 0; i < m_vSceneNodes.size(); i++)
 	//	SAFE_DELETE(m_vSceneNodes[i]);
 	m_vSceneNodes.resize(0);
+	SAFE_DELETE(m_lpWorld);
 }
 
 U32 SceneGraph::add(SGNode *aNode) {
@@ -57,6 +62,15 @@ U32 SceneGraph::add(SGNode *aNode) {
 	return (m_vSceneNodes.size() - 1);
 }
 
+U32 SceneGraph::addRigidBody(SGBulletRigidMesh* aRigidBody) {
+	m_lpWorld->addRigidBody(aRigidBody);
+	return add(aRigidBody);
+}
+
+U32 SceneGraph::addSoftBody(SGBulletSoftMesh* aSoftBody) {
+	m_lpWorld->addSoftBody(aSoftBody);
+	return add(aSoftBody);
+}
 
 bool SceneGraph::remove(U32 index) {
 	if(index >= m_vSceneNodes.size())
@@ -78,6 +92,9 @@ bool SceneGraph::remove(const string& name) {
 }
 
 bool SceneGraph::remove(const SGNode* pnode) {
+	if(pnode == NULL)
+		return false;
+
 	for (U32 i = 0; i < m_vSceneNodes.size(); i++) {
 		if (m_vSceneNodes[i] == pnode) {
 			m_vSceneNodes.erase(m_vSceneNodes.begin() + i);

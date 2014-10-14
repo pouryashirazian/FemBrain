@@ -47,7 +47,7 @@ void Geometry::init() {
 }
 
 void Geometry::init(int stepVertex, int stepColor,
-		   	   	   	   int stepTexCoords, PS::GL::FaceType faceMode) {
+		   	   	   	   int stepTexCoords, PS::GL::GLFaceType faceMode) {
 	this->cleanup();
 	m_stepVertex = stepVertex;
 	m_stepColor = stepColor;
@@ -286,39 +286,39 @@ void Geometry::transform(const mat44f& m) {
 	}
 }
 
-bool Geometry::addVertexAttribs(const vector<float>& arrAttribs, int step, MemoryBufferType attribKind) {
+bool Geometry::addVertexAttribs(const vector<float>& arrAttribs, int step, GLBufferType attribKind) {
 
 	switch(attribKind) {
-	case(mbtPosition): {
+	case(gbtPosition): {
 		if(step != m_stepVertex)
 			return false;
 		m_vertices.insert(m_vertices.end(), arrAttribs.begin(), arrAttribs.end());
 		break;
 	}
 
-	case(mbtColor): {
+	case(gbtColor): {
 		if(step != m_stepColor)
 			return false;
 		m_colors.insert(m_colors.end(), arrAttribs.begin(), arrAttribs.end());
 		break;
 	}
 
-	case(mbtNormal): {
+	case(gbtNormal): {
 		if(step != 3)
 			return false;
 		m_normals.insert(m_normals.end(), arrAttribs.begin(), arrAttribs.end());
 		break;
 	}
 
-	case(mbtTexCoord): {
+	case(gbtTexCoord): {
 		if(step != m_stepTexCoord)
 			return false;
 		m_texCoords.insert(m_texCoords.end(), arrAttribs.begin(), arrAttribs.end());
 		break;
         
-    case(mbtFaceIndices):
+    case(gbtFaceIndex):
         return false;
-    case(mbtCount):
+    case(gbtCount):
         return false;
 	}
 	}
@@ -326,28 +326,28 @@ bool Geometry::addVertexAttribs(const vector<float>& arrAttribs, int step, Memor
 	return true;
 }
 
-void Geometry::clearBuffer(MemoryBufferType btype) {
+void Geometry::clearBuffer(GLBufferType btype) {
 	switch(btype) {
-	case(mbtPosition):
+	case(gbtPosition):
 		m_vertices.resize(0);
 	break;
 
-	case(mbtColor):
+	case(gbtColor):
 		m_colors.resize(0);
 	break;
 
-	case(mbtNormal):
+	case(gbtNormal):
 		m_normals.resize(0);
 	break;
 
-	case(mbtTexCoord):
+	case(gbtTexCoord):
 		m_texCoords.resize(0);
 	break;
 
-    case(mbtFaceIndices):
+    case(gbtFaceIndex):
     	m_indices.resize(0);
     break;
-    case(mbtCount):
+    case(gbtCount):
     break;
 	}
 }
@@ -371,7 +371,7 @@ void Geometry::addPerVertexColor(const vec4f& color, U32 ctVertices) {
 	m_colors.insert(m_colors.end(), colors.begin(), colors.end());
 }
 
-bool Geometry::addFaceIndices(const vector<U32>& arrIndex, PS::GL::FaceType faceMode) {
+bool Geometry::addFaceIndices(const vector<U32>& arrIndex, PS::GL::GLFaceType faceMode) {
 	if(m_faceMode != faceMode)
 		return false;
 
@@ -453,16 +453,16 @@ bool Geometry::readObj(const AnsiStr& strFilePath) {
 	if(unitFace != 3 && unitFace != 4)
 		return false;
 
-	PS::GL::FaceType ftype = ftTriangles;
+	PS::GL::GLFaceType ftype = ftTriangles;
 	if(node->getUnitFace() == 4)
 		ftype = ftQuads;
 
 	//read mesh info
 	init(node->getUnitVertex(), node->getUnitColor(), node->getUnitTexCoord(), ftype);
-	addVertexAttribs(node->vertices(), node->getUnitVertex(), mbtPosition);
-	addVertexAttribs(node->normals(), 3, mbtNormal);
-	addVertexAttribs(node->colors(), node->getUnitColor(), mbtColor);
-	addVertexAttribs(node->texcoords(), node->getUnitTexCoord(), mbtTexCoord);
+	addVertexAttribs(node->vertices(), node->getUnitVertex(), gbtPosition);
+	addVertexAttribs(node->normals(), 3, gbtNormal);
+	addVertexAttribs(node->colors(), node->getUnitColor(), gbtColor);
+	addVertexAttribs(node->texcoords(), node->getUnitTexCoord(), gbtTexCoord);
 	addFaceIndices(node->faceElements(), ftype);
 
 	return true;
@@ -471,10 +471,10 @@ bool Geometry::readObj(const AnsiStr& strFilePath) {
 bool Geometry::writeObj(const AnsiStr& strFilePath) const {
 
 	MeshNode* pnode = new MeshNode();
-	pnode->setVertexAttrib(m_vertices, mbtPosition, m_stepVertex);
-	pnode->setVertexAttrib(m_normals, mbtNormal, 3);
-	pnode->setVertexAttrib(m_colors, mbtColor, m_stepColor);
-	pnode->setVertexAttrib(m_texCoords, mbtTexCoord, m_stepTexCoord);
+	pnode->setVertexAttrib(m_vertices, gbtPosition, m_stepVertex);
+	pnode->setVertexAttrib(m_normals, gbtNormal, 3);
+	pnode->setVertexAttrib(m_colors, gbtColor, m_stepColor);
+	pnode->setVertexAttrib(m_texCoords, gbtTexCoord, m_stepTexCoord);
 	pnode->setFaceIndices(m_indices, m_stepFace);
 
 
@@ -732,6 +732,60 @@ void Geometry::addCube(const vec3f& lower, const vec3f& upper) {
     	}
     }
 
+    void Geometry::addCylinder(float radius, float height, int sectors, bool base, bool roof) {
+    	U32 idxStartBase = countVertices();
+    	double oneOverSector = 1.0 / static_cast<double>(sectors);
+
+    	vec3f origin(0.0f);
+
+
+    	addVertex(origin);
+    	addTexCoord(vec2f(0.0, 0.0));
+    	U32 count = 1;
+    	for(int i=0; i<sectors+1; i++) {
+    		double angle = double(i) * TwoPi * oneOverSector;
+    		vec3f v = vec3f::mul(radius, vec3f(cos(angle), 0.0, sin(angle)));
+
+    		addVertex(v);
+    		addTexCoord(vec2f( double(i) * oneOverSector, 0.0f));
+    		count++;
+    	}
+
+    	U32 idxStartRoof = countVertices();
+    	for(U32 i=idxStartBase; i < idxStartRoof; i++) {
+    		addVertex(vertexAt(i) + vec3f(0, height, 0));
+    		addTexCoord(texcoordAt(i) + vec2f(0.0f, 1.0f));
+    	}
+
+    	//triangulate base
+    	if(base) {
+    		for(U32 i = 1; i < count; i++) {
+    			if(i == (count - 1))
+    				addTriangle(vec3u32(idxStartBase, idxStartBase + i, idxStartBase + 1));
+    			else
+    				addTriangle(vec3u32(idxStartBase, idxStartBase + i, idxStartBase + i + 1));
+    		}
+    	}
+
+    	if(roof) {
+    		for(U32 i = 1; i < count; i++) {
+    			if(i == (count - 1))
+    				addTriangle(vec3u32(idxStartRoof, idxStartRoof + i, idxStartRoof + 1));
+    			else
+    				addTriangle(vec3u32(idxStartRoof, idxStartRoof + i, idxStartRoof + i + 1));
+    		}
+    	}
+
+
+    	//add walls
+    	for(U32 i = 1; i < count - 1; i++) {
+			addTriangle(vec3u32(idxStartRoof + i, idxStartRoof + i + 1, idxStartBase + i));
+			addTriangle(vec3u32(idxStartRoof + i + 1, idxStartBase + i + 1, idxStartBase + i));
+    	}
+
+    	computeNormalsFromFaces();
+    }
+
     void Geometry::addTetrahedra(vec3f v[4]) {
     	int idxStart = countVertices();
 
@@ -757,7 +811,7 @@ void Geometry::addCube(const vec3f& lower, const vec3f& upper) {
 
     	U32 ctVertices = vertices.size() / 3;
     	U32 ctTets = tets.size() / 4;
-    	addVertexAttribs(vertices, 3, mbtPosition);
+    	addVertexAttribs(vertices, 3, gbtPosition);
 
     	vec3f v[4];
     	for(U32 i=0; i<ctTets; i++) {
@@ -785,19 +839,45 @@ void Geometry::addCube(const vec3f& lower, const vec3f& upper) {
     	}
     }
 
-    bool Geometry::addRing(int sectors,
-                           int xsections,
-                           float innerRadius,
-                           float outerRadius,
-                           const vec3f& o) {
-        if(sectors <= 0 || xsections <= 0 ||
-           innerRadius < EPSILON || outerRadius < EPSILON)
+    bool Geometry::addRingStripAroundXAxis(int sectors,
+    									   float radius,
+										   float thickness,
+										   const vec3f& origin) {
+        if(sectors <= 0 || radius < thickness)
             return false;
 
-        
-        
-        
-        return false;
+        int idxStart = countVertices();
+    	float oneOverSector = 1.0f / static_cast<float>(sectors);
+    	float halfThickness = 0.5 * thickness;
+
+    	for(int i=0; i<sectors; i++) {
+
+    		float vcos = radius * cos(i * (TwoPi * oneOverSector));
+    		float vsin = radius * sin(i * (TwoPi * oneOverSector));
+    		vec3f v1 = origin + vec3f(0.0, vcos, vsin);
+    		vec3f v2 = origin + vec3f(thickness, vcos, vsin);
+
+    		//surface
+    		addVertex(v1);
+    		addVertex(v2);
+
+    		if(i > 0) {
+    			int base = idxStart + (i - 1) * 2;
+    			addTriangle(vec3u32(base + 0, base + 1, base + 2));
+    			addTriangle(vec3u32(base + 2, base + 1, base + 3));
+    		}
+    	}
+
+    	//add triangles
+    	int lastQuad[4];
+    	lastQuad[0] = idxStart + (sectors - 1) * 2;
+    	lastQuad[1] = idxStart + (sectors - 1) * 2 + 1;
+    	lastQuad[2] = idxStart;
+    	lastQuad[3] = idxStart + 1;
+		addTriangle(vec3u32(lastQuad[0], lastQuad[1], lastQuad[2]));
+		addTriangle(vec3u32(lastQuad[2], lastQuad[1], lastQuad[3]));
+
+        return true;
     }
     
     bool Geometry::addDisc(int sectors,

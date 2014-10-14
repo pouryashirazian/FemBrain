@@ -11,6 +11,7 @@
 //#include "vegafem/include/tetMesh.h"
 #include "graphics/SGMesh.h"
 #include "VolMesh.h"
+#include "deformable/VolMeshRender.h"
 #include "TetSubdivider.h"
 #include "base/Vec.h"
 
@@ -19,6 +20,14 @@ using namespace PS::MATH;
 using namespace PS::MESH;
 
 namespace PS {
+
+#define CUT_ERR_INVALID_INPUT_ARG -1
+#define CUT_ERR_NO_INTERSECTION -2
+#define CUT_ERR_UNHANDLED_CUT_STATE -3
+#define CUT_ERR_UNABLE_TO_CUT_EDGE -4
+#define CUT_ERR_USER_CANCELLED_CUT -5
+
+#define DEFAULT_MESH_SPLIT_DIST 0.6
 
 class CuttableMesh : public VolMesh {
 public:
@@ -30,11 +39,14 @@ public:
 		vec3d uvw;
 		U32 idxNP0;
 		U32 idxNP1;
+		U32 idxOrgFrom;
+		U32 idxOrgTo;
 
 
 		CutEdge() {
 			t = 0;
 			idxNP0 = idxNP1 = VolMesh::INVALID_INDEX;
+			idxOrgFrom = idxOrgTo = VolMesh::INVALID_INDEX;
 		}
 
 		CutEdge& operator = (const CutEdge& A) {
@@ -43,6 +55,9 @@ public:
 			uvw = A.uvw;
 			idxNP0 = A.idxNP0;
 			idxNP1 = A.idxNP1;
+			idxOrgFrom = A.idxOrgFrom;
+			idxOrgTo = A.idxOrgTo;
+
 			return (*this);
 		}
 	};
@@ -60,6 +75,7 @@ public:
 	};
 
 public:
+
 	CuttableMesh(const VolMesh& volmesh);
 	CuttableMesh(const vector<double>& vertices, const vector<U32>& elements);
 	CuttableMesh(int ctVertices, double* vertices, int ctElements, int* elements);
@@ -76,9 +92,21 @@ public:
 
 	//cutting
 	void clearCutContext();
-	int cut(const vector<vec3d>& bladePath0,
-			const vector<vec3d>& bladePath1,
-			const vector<vec3d>& sweptSurface,
+
+	//kernel to compute cut-edges per tool segment
+	int computeCutEdgesKernel(const vec3d sweptquad[4],
+							  std::map<U32, CutEdge>& mapCutEdges);
+
+	//kernel to compute cut nodes per tool segment
+	int computeCutNodesKernel(const vec3d& blade0,
+							  const vec3d& blade1,
+							  const vec3d sweptquad[4],
+							  std::map<U32, CutEdge>& mapCutEdges,
+							  std::map<U32, CutNode>& mapCutNodes);
+
+
+	int cut(const vector<vec3d>& segments,
+			const vector<vec3d>& quadstrips,
 			bool modifyMesh);
 
 	//Access vertex neibors
@@ -95,7 +123,23 @@ public:
 	 * @param dist
 	 * @return
 	 */
-	bool splitParts(const vector<vec3d>& vSweeptSurf, double dist);
+	bool splitParts(const vec3d sweptquad[4], double dist);
+
+	/*!
+	 * First finds all disjoint parts of the mesh and then produces new cuttablemesh nodes
+	 * out of those disjoint pieces. Main mesh will be part of the newly created meshes so the
+	 * original cuttable mesh node can be discarded if desired.
+	 * @param vOutNewMeshes list of newly created mesh nodes
+	 * @return number of newly created mesh nodes.
+	 */
+	int convertDisjointPartsToMeshes(vector<CuttableMesh*>& vOutNewMeshes);
+
+	/*!
+	 * This is a convenient function to aid in transforming original volume meshes and placing them
+	 * in the right projection view. Later the transform is applied to all mesh nodes and then the
+	 * transform itself is reset.
+	 */
+	void applyTransformToMeshThenResetTransform();
 
 	//splitting
 	bool getFlagSplitMeshAfterCut() const {return m_flagSplitMeshAfterCut;}
@@ -106,6 +150,11 @@ public:
 
 	bool getFlagDrawSweepSurf() const { return m_flagDrawSweepSurf;}
 	void setFlagDrawSweepSurf(bool flag) { m_flagDrawSweepSurf = flag;}
+
+	bool getFlagDrawAABB() const { return m_flagDrawAABB;}
+	void setFlagDrawAABB(bool flag) { m_flagDrawAABB = flag;}
+
+
 protected:
 	void setup();
 
@@ -113,6 +162,7 @@ protected:
 
 	//TODO: Sync vbo after synced physics mesh
 private:
+	//VolMeshRender m_render;
 	TetSubdivider* m_lpSubD;
 	int m_ctCompletedCuts;
 	bool m_flagSplitMeshAfterCut;
@@ -120,7 +170,8 @@ private:
 
 	//sweep surfaces
 	bool m_flagDrawSweepSurf;
-	vector<double> m_vSweepSurfaces;
+	bool m_flagDrawAABB;
+	vector<vec3d> m_quadstrips;
 
 	//Cut Nodes
 	std::map<U32, CutNode > m_mapCutNodes;

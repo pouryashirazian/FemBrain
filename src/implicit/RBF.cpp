@@ -334,14 +334,14 @@ bool FastRBF::setupFromMesh(Mesh* lpMesh) {
 		ctVertices = GLMeshBuffer::ConvertFloat3ToFloat4(lpNode->vertices(), vSurfXYZW);
 	else {
 		assert(lpNode->getUnitVertex() == 4);
-		lpNode->getVertexAttrib(ctVertices, vSurfXYZW, mbtPosition);
+		lpNode->getVertexAttrib(ctVertices, vSurfXYZW, gbtPosition);
 	}
 
 	if(lpNode->countVertices() > 0)
-		this->setupVertexAttribs(vSurfXYZW, 4, mbtPosition);
+		this->setupVertexAttribs(vSurfXYZW, 4, gbtPosition);
 
 	if(lpNode->countNormals() > 0)
-		this->setupVertexAttribs(lpNode->normals(), lpNode->getUnitNormal(), mbtNormal);
+		this->setupVertexAttribs(lpNode->normals(), lpNode->getUnitNormal(), gbtNormal);
 
 	if(lpNode->countFaces() > 0)
 		this->setupIndexBufferObject(lpNode->faceElements(), ftTriangles);
@@ -356,7 +356,7 @@ bool FastRBF::setupFromMesh(Mesh* lpMesh) {
 	U32 ctNormals = 0;
 
 	vOffSurfXYZF.resize(2 * ctVertices * 4);
-	lpNode->getVertexAttrib(ctNormals, normals, mbtNormal);
+	lpNode->getVertexAttrib(ctNormals, normals, gbtNormal);
 
 	//Loop over vertices
 	for (U32 i = 0; i < ctVertices; i++) {
@@ -519,7 +519,7 @@ vec3f FastRBF::gradientRBF(const vec3f& v) const {
 
 bool FastRBF::applyFemDisplacements(U32 dof, double* displacements) {
 
-	if(!m_isValidVertex)
+	if(!m_gmbVertex.isValid())
 		return false;
 
 	size_t arrLocalIndex[3];
@@ -545,7 +545,7 @@ bool FastRBF::applyFemDisplacements(U32 dof, double* displacements) {
 	m_lpGPU->enqueueWriteBuffer(inMemDisplacements, szVertexBuffer, &homogenousDisplacements[0]);
 
 	//Vertices
-	cl_mem outMemMeshVertices = m_lpGPU->createMemBufferFromGL(m_vboVertex, PS::CL::memWriteOnly);
+	cl_mem outMemMeshVertices = m_lpGPU->createMemBufferFromGL(m_gmbVertex.handle(), PS::CL::memWriteOnly);
 	m_lpGPU->enqueueAcquireGLObject(1, &outMemMeshVertices);
 
 
@@ -591,7 +591,7 @@ bool FastRBF::readbackMeshV3T3(U32& ctVertices, vector<float>& vertices,
 
 	U32 fstep;
 	vector<float> arrTemp;
-	CLMeshBuffer::ReadbackMeshVertexAttribCL(m_lpGPU, this, mbtPosition, ctVertices, fstep, arrTemp);
+	CLMeshBuffer::ReadbackMeshVertexAttribCL(m_lpGPU, this, gbtPosition, ctVertices, fstep, arrTemp);
 	if(fstep > 3) {
 		vertices.resize(ctVertices * 3);
 		for(U32 i=0; i<ctVertices; i++) {

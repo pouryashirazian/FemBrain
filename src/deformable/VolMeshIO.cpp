@@ -5,8 +5,10 @@
  *      Author: pourya
  */
 
-#include "VolMeshExport.h"
+#include "VolMeshIO.h"
 #include "base/FileDirectory.h"
+#include "base/Logger.h"
+#include "base/FlatArray.h"
 #include "graphics/Mesh.h"
 #include <fstream>
 
@@ -251,5 +253,214 @@ bool VolMeshIO::writeObj(const VolMesh* vm, const AnsiStr& strPath) {
 	//
 	objMesh.addNode(aNode);
 	return objMesh.store(strPath.cptr());
+}
+
+bool VolMeshIO::fitmesh(VolMesh* vm, const AABB& toBox) {
+	if(!toBox.isValid())
+		return false;
+
+	AABB curBox = vm->computeAABB();
+
+	vec3f s = vec3f::div(toBox.extent(), curBox.extent());
+	double minScaleFactor = MATHMIN(MATHMIN(s.x, s.y), s.z);
+	vec3d scale(minScaleFactor);
+	LogErrorArg1("Using minScaleFactor %f", minScaleFactor);
+
+	vec3f t = toBox.lower() - curBox.lower();
+	vec3d translate(t.x, t.y, t.z);
+
+	return fitmesh(vm, scale, translate);
+}
+
+bool VolMeshIO::fitmesh(VolMesh* vm, const vec3d& scale, const vec3d& translate) {
+	//first translate all nodes
+	for(U32 i=0; i < vm->countNodes(); i++) {
+		NODE& p = vm->nodeAt(i);
+
+		//translate
+		p.pos = p.pos + translate;
+		p.restpos = p.restpos + translate;
+
+		//scale
+		p.pos = vec3d::mul(p.pos, scale);
+		p.restpos = vec3d::mul(p.restpos, scale);
+	}
+
+	return true;
+}
+
+bool VolMeshIO::rotatemesh(VolMesh* vm, const quatd& quat) {
+	if(vm == NULL)
+		return false;
+
+	quatd qInv = quat.inverted();
+
+	//first translate all nodes
+	for(U32 i=0; i < vm->countNodes(); i++) {
+		NODE& p = vm->nodeAt(i);
+
+		p.pos = quat.transform(qInv, p.pos);
+		p.restpos = quat.transform(qInv, p.restpos);
+	}
+
+	return true;
+}
+
+bool VolMeshIO::convertMatlabTextToVega(const AnsiStr& strNodesFP,
+										const AnsiStr& strFacesFP,
+										const AnsiStr& strCellsFP) {
+	//	node: node coordinates (in mm)
+	//		face: surface triangles; the last column is the surface ID,
+	//			1-scalp, 2-CSF, 3-gray matter, 4-white matter
+	//		elem: tetrahedral elements; the last column is the region ID,
+	//			1-scalp and skull layer, 2-CSF, 3-gray matter, 4-white matter
+	if(!FileExists(strNodesFP) || !FileExists(strCellsFP)) {
+		LogError("Invalid input file!");
+		return false;
+	}
+
+
+	vector<vec3d> nodes;
+	ifstream fpNodes(strNodesFP.cptr());
+	if (!fpNodes.is_open())
+		return false;
+
+	//read nodes
+	U32 ctLine = 0;
+	char chrLine[1024];
+	while (!fpNodes.eof()) {
+		fpNodes.getline(chrLine, 1024);
+
+		AnsiStr strLine(chrLine);
+		strLine.trim();
+		strLine.removeStartEndSpaces();
+		if (strLine.length() == 0)
+			continue;
+
+		if (strLine.firstChar() == '#')
+			continue;
+
+		//count tokens
+		{
+			vector<AnsiStr> tokens;
+			int ctTokens = strLine.decompose(',', tokens);
+			if(ctTokens < 2)
+				continue;
+
+			vec3d v;
+			v.x = atof(tokens[0].cptr());
+			v.y = atof(tokens[1].cptr());
+			v.z = atof(tokens[2].cptr());
+			nodes.push_back(v);
+		}
+		ctLine++;
+	}
+	fpNodes.close();
+
+
+
+	vector< vector<U32> > vBrainSegmentCells;
+	vBrainSegmentCells.resize(4);
+
+
+	//read cells
+	ifstream fpCells(strCellsFP.cptr());
+	if (!fpCells.is_open())
+		return false;
+
+	U32 ctExpectedTokens = 5;
+	vector<U32> vConvTokens;
+	vConvTokens.resize(ctExpectedTokens);
+
+	while (!fpCells.eof()) {
+		fpCells.getline(chrLine, 1024);
+
+		AnsiStr strLine(chrLine);
+		strLine.trim();
+		strLine.removeStartEndSpaces();
+		if (strLine.length() == 0)
+			continue;
+
+		if (strLine.firstChar() == '#')
+			continue;
+
+		//count tokens
+		{
+			vector<AnsiStr> tokens;
+			int ctTokens = strLine.decompose(',', tokens);
+			if(ctTokens < 2)
+				continue;
+
+			for(U32 i=0; i < ctExpectedTokens; i++)
+				vConvTokens[i] = atoi(tokens[i].cptr());
+
+			U32 idxSegment = vConvTokens.back() - 1;
+			for(U32 i=0; i < ctExpectedTokens - 1; i++)
+				vBrainSegmentCells[idxSegment].push_back(vConvTokens[i] - 1);
+		}
+	}
+	fpCells.close();
+
+
+	//export brain segments
+	enum BrainSegment {bsSkull = 1, bsCSF = 2, bsGrayMatter = 3, bsWhiteMatter = 4};
+	string arrSegmentTitles[4] = {"skull", "csf", "graymatter", "whitematter"};
+
+
+	AnsiStr strRoot = ExtractFilePath(strNodesFP);
+
+	//export segments
+	for(U32 i=0; i < 4; i++) {
+		vector<U32> vFlatCells(vBrainSegmentCells[i].begin(), vBrainSegmentCells[i].end());
+
+		vector<vec3d> vFinalNodes;
+		vFinalNodes.reserve(nodes.size());
+
+		map<U32, U32> mapSegmentNodes;
+
+		//Make a unique set of nodes
+		for(U32 j=0; j < vFlatCells.size(); j++) {
+
+			//if not found in cache the add it
+			if(mapSegmentNodes.find(vFlatCells[j]) == mapSegmentNodes.end()) {
+				vFinalNodes.push_back(nodes[vFlatCells[j] ]);
+				U32 idxNewNode = vFinalNodes.size() - 1;
+				mapSegmentNodes[ vFlatCells[j] ] = idxNewNode;
+			}
+
+			//convert to the new node index
+			vFlatCells[j] = mapSegmentNodes[ vFlatCells[j] ];
+		}
+
+		//clear the map
+		mapSegmentNodes.clear();
+
+		vector<double> vFlatNodes;
+		FlattenVec3<double>(vFinalNodes, vFlatNodes);
+		VolMesh* pvm = new VolMesh(vFlatNodes, vFlatCells);
+		pvm->setVerbose(true);
+
+//		quatd q;
+//		q.fromAxisAngle(vec3d(0, 0, 1), 90.0);
+//		rotatemesh(pvm, q);
+
+		//aabb
+//		AABB box1(vec3f(0.0f, 0.0f, 0.0f), vec3f(4.0f, 4.0f, 4.0f));
+//		fitmesh(pvm, box1);
+
+
+		//aabb
+		AABB box2(vec3f(-2.0f, 0.0f, -2.0f), vec3f(2.0f, 4.0f, 2.0f));
+		fitmesh(pvm, box2);
+
+		AnsiStr strFP = strRoot + AnsiStr(arrSegmentTitles[i].c_str()) + AnsiStr(".veg");
+		if(writeVega(pvm, strFP)) {
+			LogInfoArg2("Saved segment %s to %s", arrSegmentTitles[i].c_str(), strFP.cptr());
+		}
+
+		SAFE_DELETE(pvm);
+	}
+
+	return true;
 }
 

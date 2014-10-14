@@ -9,8 +9,10 @@
 #include "graphics/selectgl.h"
 #include "graphics/Intersections.h"
 #include "deformable/test_VolMesh.h"
+#include "deformable/VolMeshStats.h"
 #include "base/Logger.h"
 #include "base/FlatArray.h"
+#include "base/Profiler.h"
 #include <map>
 
 using namespace std;
@@ -36,7 +38,7 @@ CuttableMesh::CuttableMesh(int ctVertices, double* vertices, int ctElements, int
 
 CuttableMesh::~CuttableMesh() {
 	SAFE_DELETE(m_lpSubD);
-	m_vSweepSurfaces.resize(0);
+	m_quadstrips.resize(0);
 }
 
 void CuttableMesh::setup() {
@@ -47,12 +49,14 @@ void CuttableMesh::setup() {
     }
 
 	//Perform all tests
-	LogInfo("Begin testing the volumetric mesh");
 	TestVolMesh::tst_all(this);
-	LogInfo("Test completed");
+	LogInfo("tests done!");
 
 	//Create subdivider
 	m_lpSubD = new TetSubdivider();
+
+	//Create render
+	//m_render.sync(this);
 
 	m_aabb = VolMesh::aabb();
 	m_aabb.expand(1.0);
@@ -60,19 +64,34 @@ void CuttableMesh::setup() {
 	m_flagSplitMeshAfterCut = false;
 	m_flagDetectCutNodes = false;
 	m_flagDrawSweepSurf = false;
+	m_flagDrawAABB = false;
+	m_flagDrawNodes = false;
+	m_flagDrawWireFrameMesh = false;
 }
 
 void CuttableMesh::clearCutContext() {
-//	m_mapCutEdges.clear();
-//	m_mapCutNodes.clear();
+	m_mapCutEdges.clear();
+	m_mapCutNodes.clear();
 }
 
 void CuttableMesh::draw() {
 
-	drawBBox();
-
 	//draw volmesh
+	if(m_spEffect)
+		m_spEffect->bind();
+	if(m_spTransform)
+		m_spTransform->bind();
+
+	if(m_flagDrawAABB)
+		drawBBox();
+
 	VolMesh::draw();
+	//m_render.draw();
+
+	if(m_spTransform)
+		m_spTransform->unbind();
+	if(m_spEffect)
+		m_spEffect->unbind();
 
 	//draw cut context
 	int ctCutEdges = m_mapCutEdges.size();
@@ -80,21 +99,6 @@ void CuttableMesh::draw() {
 	if(ctCutNodes > 0 || ctCutEdges > 0) {
 		glDisable(GL_LIGHTING);
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
-
-			//Draw cut edges
-			glColor3f(1.0, 0.0, 0.0);
-			glLineWidth(8.0f);
-			glBegin(GL_LINES);
-				for(CUTEDGEITER it = m_mapCutEdges.begin(); it != m_mapCutEdges.end(); ++it) {
-					U32 from = VolMesh::edge_from_node(it->first);
-					U32 to = VolMesh::edge_to_node(it->first);
-
-					glVertex3dv(const_nodeAt(from).pos.cptr());
-					glVertex3dv(const_nodeAt(to).pos.cptr());
-				}
-			glEnd();
-
-
 			//Draw nodes
 			glPointSize(7.0f);
 			glBegin(GL_POINTS);
@@ -126,8 +130,6 @@ void CuttableMesh::draw() {
 	}
 
 	if(m_flagDrawSweepSurf) {
-		U32 ctCutSurf = m_vSweepSurfaces.size() / 12;
-
 		glDisable(GL_CULL_FACE);
 		glDisable(GL_LIGHTING);
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
@@ -135,14 +137,9 @@ void CuttableMesh::draw() {
 		glEnable(GL_BLEND);
 
 		glColor4f(1.0, 0.0, 0.0, 0.3);
-		glBegin(GL_QUADS);
-
-		//vec3d p[4];
-		//draw cut surfaces
-		for(U32 i=0; i < ctCutSurf; i++) {
-			for(U32 j=0; j < 4; j++) {
-				glVertex3dv(&m_vSweepSurfaces[i * 12 + j * 3]);
-			}
+		glBegin(GL_QUAD_STRIP);
+		for(U32 i=0; i < m_quadstrips.size(); i++) {
+			glVertex3dv(m_quadstrips[i].cptr());
 		}
 		glEnd();
 
@@ -153,50 +150,33 @@ void CuttableMesh::draw() {
 	}
 }
 
-int CuttableMesh::cut(const vector<vec3d>& bladePath0,
-					  const vector<vec3d>& bladePath1,
-					  const vector<vec3d>& sweptSurface,
-					  bool modifyMesh) {
+
+int CuttableMesh::computeCutEdgesKernel(const vec3d sweptquad[4],
+						  	  	  	  	std::map<U32, CutEdge>& mapCutEdges) {
 
 	//if the swept surface is degenerate then return
-	double area = (sweptSurface[1] - sweptSurface[0]).length2() * (sweptSurface[2] - sweptSurface[1]).length2();
+	double area = (sweptquad[1] - sweptquad[0]).length2() * (sweptquad[2] - sweptquad[0]).length2();
 	if(area < EPSILON)
 		return -1;
-	double l2 = (sweptSurface[3] - sweptSurface[2]).length2();
+	double l2 = (sweptquad[3] - sweptquad[2]).length2();
 	if(l2 < EPSILON)
 		return -1;
 
 
-
-	//1.Compute all cut-edges
-	//2.Compute cut nodes and remove all incident edges to cut nodes from cut edges
-	//3.split cut edges and compute the reference position of the split point
-	//4.duplicate cut nodes and incident edges
-
-	// iterate over all edges
-	m_mapCutEdges.clear();
-	std::map< U32, CutEdge > mapTempCutEdges;
+	//vars
 	vec3d uvw, xyz, ss0, ss1;
 	double t;
 
-	vec3d tri1[3] = {sweptSurface[0], sweptSurface[1], sweptSurface[2]};
-	vec3d tri2[3] = {sweptSurface[0], sweptSurface[2], sweptSurface[3]};
+	vec3d tri1[3] = {sweptquad[0], sweptquad[2], sweptquad[1]};
+	vec3d tri2[3] = {sweptquad[2], sweptquad[3], sweptquad[1]};
 
-	vec3d sweptSurfNormal = vec3d::cross(sweptSurface[1] - sweptSurface[0], sweptSurface[3] - sweptSurface[0]);
-	sweptSurfNormal.normalize();
-
-	//Radios of Influence in percent
-	const double roi = 0.2;
-
-	//Swept Surf
-	printf("SWEPT SURF[0]: %.3f, %.3f, %.3f\n", sweptSurface[0].x, sweptSurface[0].y, sweptSurface[0].z);
-	printf("SWEPT SURF[2]: %.3f, %.3f, %.3f\n", sweptSurface[2].x, sweptSurface[2].y, sweptSurface[2].z);
 
 	//Cut-Edges
-	for (U32 i=0; i < this->countEdges(); i++) {
+	U32 ctEdges = countEdges();
+	int found = 0;
+	for (U32 i=0; i < ctEdges; i++) {
 
 		const EDGE& e = this->const_edgeAt(i);
-
 
 		ss0 = this->const_nodeAt(e.from).pos;
 		ss1 = this->const_nodeAt(e.to).pos;
@@ -206,6 +186,8 @@ int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 			res = IntersectSegmentTriangle(ss0, ss1, tri2, t, uvw, xyz);
 		if(res > 0) {
 			CutEdge ce;
+			ce.idxOrgFrom = e.from;
+			ce.idxOrgTo = e.to;
 			ce.pos = xyz;
 			ce.uvw = uvw;
 			ce.t = t;
@@ -215,81 +197,141 @@ int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 			assert( (xyz - temp).length() < EPSILON);
 
 			//add to cut edges map
-			mapTempCutEdges.insert( std::make_pair(i, ce));
+			if(mapCutEdges.find(i) == mapCutEdges.end()) {
+				mapCutEdges.insert( std::make_pair(i, ce));
+				found++;
+			}
+			else {
+				mapCutEdges.erase(i);
+				LogErrorArg1("Edge %d has already been cut!", i);
+			}
 		}
 	}
 
+	return found;
+}
+
+int CuttableMesh::computeCutNodesKernel(const vec3d& blade0,
+									   const vec3d& blade1,
+									   const vec3d sweptquad[4],
+									   std::map<U32, CutEdge>& mapCutEdges,
+									   std::map<U32, CutNode>& mapCutNodes) {
+	//Radios of Influence in percent
+	const double roi = 0.2;
 
 	//blade
-	vec3d blade0 = bladePath0[bladePath0.size() - 1];
-	vec3d blade1 = bladePath1[bladePath1.size() - 1];
 	const double edgelen2 = (blade1 - blade0).length2();
-
 	int ctRemovedCutEdges = 0;
-	m_mapCutNodes.clear();
+	vec3d ss0, ss1;
 
 	//detect all cut-nodes and remove the cut-edges that emanate from a cut-node
-	if (m_flagDetectCutNodes) {
-		for (CUTEDGEITER it = mapTempCutEdges.begin();
-				it != mapTempCutEdges.end(); ++it) {
+	for (CUTEDGEITER it = mapCutEdges.begin(); it != mapCutEdges.end(); ++it) {
 
-			const EDGE& cutedge = const_edgeAt(it->first);
-			ss0 = const_nodeAt(cutedge.from).pos;
-			ss1 = const_nodeAt(cutedge.to).pos;
-			double d0 = pointLineDistance(blade0, blade1, edgelen2, ss0);
-			double d1 = pointLineDistance(blade0, blade1, edgelen2, ss1);
-			double denom = (ss1 - ss0).length();
-			if (denom == 0)
-				denom = 1;
+		const EDGE& cutedge = const_edgeAt(it->first);
+		ss0 = const_nodeAt(cutedge.from).pos;
+		ss1 = const_nodeAt(cutedge.to).pos;
+		double d0 = pointLineDistance(blade0, blade1, edgelen2, ss0);
+		double d1 = pointLineDistance(blade0, blade1, edgelen2, ss1);
+		double denom = (ss1 - ss0).length();
+		if (denom == 0)
+			denom = 1;
 
-			double t = 10.0;
-			if (d0 < d1)
-				t = (it->second.pos - ss0).length() / denom;
-			else
-				t = (it->second.pos - ss1).length() / denom;
+		double t = 10.0;
+		if (d0 < d1)
+			t = (it->second.pos - ss0).length() / denom;
+		else
+			t = (it->second.pos - ss1).length() / denom;
 
-			//If the start of edge is close to the swept surface remove all incident edges from Ec
-			if (d0 < d1 && t < roi) {
-				CutNode cn;
-				cn.idxNode = cutedge.from;
-				cn.pos = ss0;
-				m_mapCutNodes.insert(std::pair<U32, CutNode>(cn.idxNode, cn));
+		//If the start of edge is close to the swept surface remove all incident edges from Ec
+		if (d0 < d1 && t < roi) {
+			CutNode cn;
+			cn.idxNode = cutedge.from;
+			cn.pos = ss0;
+			mapCutNodes.insert(std::pair<U32, CutNode>(cn.idxNode, cn));
 
-				//iterate over all incident edges
-				vector<U32> incidentEdges;
-				this->getNodeIncidentEdges(cn.idxNode, incidentEdges);
+			//iterate over all incident edges
+			vector<U32> incidentEdges;
+			this->getNodeIncidentEdges(cn.idxNode, incidentEdges);
 
-				for (U32 i = 0; i < incidentEdges.size(); i++) {
-					mapTempCutEdges.erase(incidentEdges[i]);
-					ctRemovedCutEdges++;
-				}
+			for (U32 i = 0; i < incidentEdges.size(); i++) {
+				mapCutEdges.erase(incidentEdges[i]);
+				ctRemovedCutEdges++;
 			}
-			//If the end of edge close to the swept surface remove all incident edges from Ec
-			else if (d0 > d1 && t < roi) {
-				CutNode cn;
-				cn.idxNode = cutedge.to;
-				cn.pos = ss1;
-				m_mapCutNodes.insert(std::pair<U32, CutNode>(cn.idxNode, cn));
+		}
+		//If the end of edge close to the swept surface remove all incident edges from Ec
+		else if (d0 > d1 && t < roi) {
+			CutNode cn;
+			cn.idxNode = cutedge.to;
+			cn.pos = ss1;
+			mapCutNodes.insert(std::pair<U32, CutNode>(cn.idxNode, cn));
 
-				//iterate over all incident edges
-				vector<U32> incidentEdges;
-				this->getNodeIncidentEdges(cn.idxNode, incidentEdges);
+			//iterate over all incident edges
+			vector<U32> incidentEdges;
+			this->getNodeIncidentEdges(cn.idxNode, incidentEdges);
 
-				for (U32 i = 0; i < incidentEdges.size(); i++) {
-					mapTempCutEdges.erase(incidentEdges[i]);
-					ctRemovedCutEdges++;
-				}
+			for (U32 i = 0; i < incidentEdges.size(); i++) {
+				mapCutEdges.erase(incidentEdges[i]);
+				ctRemovedCutEdges++;
 			}
 		}
 	}
 
-	//Copy
+	return ctRemovedCutEdges;
+}
+
+
+int CuttableMesh::cut(const vector<vec3d>& segments,
+			 	 	  const vector<vec3d>& quadstrips,
+					  bool modifyMesh) {
+
+	if(segments.size() < 2)
+		return CUT_ERR_INVALID_INPUT_ARG;
+	if(quadstrips.size() < 4 || (quadstrips.size() % 2 != 0))
+		return CUT_ERR_INVALID_INPUT_ARG;
+
+	ProfileAutoArg("cut");
+
+	//1.Compute all cut-edges
+	//2.Compute cut nodes and remove all incident edges to cut nodes from cut edges
+	//3.split cut edges and compute the reference position of the split point
+	//4.duplicate cut nodes and incident edges
 	m_mapCutEdges.clear();
+	m_mapCutNodes.clear();
+
+	std::map< U32, CutEdge > mapTempCutEdges;
+	std::map< U32, CutNode > mapTempCutNodes;
+
+	U32 ctSegments = segments.size() - 1;
+	U32 ctQuads = (quadstrips.size() - 2) / 2;
+	assert(ctSegments == ctQuads);
+
+	U32 ctRemovedCutEdges = 0;
+
+	//scalpel segments
+	vector<int> vPerSegmentCuts;
+	vPerSegmentCuts.resize(ctSegments);
+	for(U32 i = 0; i < ctSegments; i++) {
+
+		vec3d s0 = segments[i];
+		vec3d s1 = segments[i + 1];
+		vPerSegmentCuts[i] = computeCutEdgesKernel(&quadstrips[i * 2], mapTempCutEdges);
+
+		if (m_flagDetectCutNodes) {
+			ctRemovedCutEdges += computeCutNodesKernel(s0, s1, &quadstrips[i * 2], mapTempCutEdges, mapTempCutNodes);
+		}
+	}
+
+	//nothing has been cut!?
+	if(mapTempCutEdges.size() == 0 && mapTempCutNodes.size() == 0)
+		return 0;
+
+	//Copy
 	m_mapCutEdges.insert(mapTempCutEdges.begin(), mapTempCutEdges.end());
+	m_mapCutNodes.insert(mapTempCutNodes.begin(), mapTempCutNodes.end());
 	if(m_mapCutNodes.size() > 0)
-		printf("Cut nodes count %d.\n", (int)m_mapCutNodes.size());
+		printf("Cut nodes count %u.\n", (U32)m_mapCutNodes.size());
 	if(m_mapCutEdges.size() > 0)
-		printf("Cut edges count %d. removed %d\n", (int)m_mapCutEdges.size(), ctRemovedCutEdges);
+		printf("Cut edges count %u. removed %u\n", (U32)m_mapCutEdges.size(), (U32)ctRemovedCutEdges);
 
 	//Find the list of all tets impacted
 	vector<U32> vCutElements;
@@ -341,7 +383,7 @@ int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 			if(chrCutCase != 'A' && chrCutCase != 'B') {
 				LogErrorArg3("This cut contains a cut case which is not handled yet. case: %c, cutEdgeCode: %x, cutNodeCode: %x",
 							 chrCutCase, cutEdgeCode, cutNodeCode);
-				return -1;
+				return CUT_ERR_UNHANDLED_CUT_STATE;
 			}
 		}
 	}
@@ -350,9 +392,10 @@ int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 	//	int edgeMaskNeg[6][2] = { {3, 2}, {2, 1}, {1, 3}, {3, 0}, {0, 2}, {1, 0} };
 	//	int faceMaskPos[4][3] = { {1, 2, 3}, {2, 0, 3}, {3, 0, 1}, {1, 0, 2} };
 	//	int faceMaskNeg[4][3] = { {3, 2, 1}, {3, 0, 2}, {1, 0, 3}, {2, 0, 1} };
+
 	//Return if we won't modify the mesh this time
-//	if(!modifyMesh)
-//		return -1;
+	if(!modifyMesh)
+		return CUT_ERR_USER_CANCELLED_CUT;
 
 	//Now that cutedgecodes and cutnodecodes are computed then subdivide the element
 	LogInfoArg1("BEGIN CUTTING# %u", m_ctCompletedCuts+1);
@@ -363,7 +406,7 @@ int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 
 		if(!this->cut_edge(it->first, it->second.t, &idxNP0, &idxNP1)) {
 			LogErrorArg2("Unable to cut edge %d, edgecutpoint t = %.3f.", it->first, it->second.t);
-			return -1;
+			return CUT_ERR_UNABLE_TO_CUT_EDGE;
 		}
 
 		it->second.idxNP0 = idxNP0;
@@ -380,18 +423,32 @@ int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 
 			const CELL& cell = this->const_cellAt(vCutElements[i]);
 
-
+			//select the middle points for cut edges
 			for(int e=0; e < COUNT_CELL_EDGES; e++) {
-
 				CUTEDGEITER it = m_mapCutEdges.find(cell.edges[e]);
 
 				//mid points
 				middlePoints[e * 2 + 0] = VolMesh::INVALID_INDEX;
 				middlePoints[e * 2 + 1] = VolMesh::INVALID_INDEX;
 
+				//if edge is in the list of cutedges
 				if(it != m_mapCutEdges.end()) {
-					middlePoints[e * 2 + 0] = it->second.idxNP0;
-					middlePoints[e * 2 + 1] = it->second.idxNP1;
+					const EDGE& edge = const_edgeAt(cell.edges[e]);
+
+					U32 idxOrgFrom = it->second.idxOrgFrom;
+					U32 idxOrgTo = it->second.idxOrgTo;
+					U32 idxNP0 = it->second.idxNP0;
+					U32 idxNP1 = it->second.idxNP1;
+
+					bool res1 = edge_exists(idxOrgFrom, idxNP0);
+					bool res2 = edge_exists(idxNP1, idxOrgTo);
+
+					if(!res1 || !res2)
+						cerr << "invalid edge" << endl;
+					assert(res1 && res2);
+
+					middlePoints[e * 2 + 0] = idxNP0;
+					middlePoints[e * 2 + 1] = idxNP1;
 				}
 			}
 			//subdivide the element
@@ -406,9 +463,8 @@ int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 		m_ctCompletedCuts ++;
 
 		//store sweep surf
-		vector<double> vFlatSurf;
-		FlattenVec3<double>(sweptSurface, vFlatSurf);
-		m_vSweepSurfaces.insert(m_vSweepSurfaces.end(), vFlatSurf.begin(), vFlatSurf.end());
+		m_quadstrips.clear();
+		m_quadstrips.insert(m_quadstrips.end(), quadstrips.begin(), quadstrips.end());
 	}
 	else {
 		LogWarningArg1("END CUTTING# %u: No elements are subdivided.", m_ctCompletedCuts + 1);
@@ -419,22 +475,30 @@ int CuttableMesh::cut(const vector<vec3d>& bladePath0,
 	//clearCutContext();
 
 	//collect all garbage
-	this->garbage_collection();
+	garbage_collection();
 
 	//Perform all tests
 	TestVolMesh::tst_all(this);
 
 	//split mesh parts
 	if(m_flagSplitMeshAfterCut && (ctSubdividedTets > 0)) {
-		splitParts(sweptSurface, 0.2);
+
+		for(U32 i = 0; i < ctSegments; i++) {
+			if(vPerSegmentCuts[i] > 0)
+				splitParts(&quadstrips[i * 2], DEFAULT_MESH_SPLIT_DIST);
+		}
 	}
 
 	//print mesh parts
-	this->printParts();
+	//printParts();
+	VolMeshStats::printAllStats(this);
 
 	//recompute AABB and expand it to detect cuts
 	m_aabb = this->computeAABB();
 	m_aabb.expand(1.0);
+
+	//update renderer
+	//m_render.sync(this);
 
 	//Return number of tets cut
 	return ctSubdividedTets;
@@ -486,19 +550,21 @@ double CuttableMesh::pointLineDistance(const vec3d& v1, const vec3d& v2,
 	return vec3d::distance(p, projection);
 }
 
-bool CuttableMesh::splitParts(const vector<vec3d>& vSweeptSurf, double dist) {
-	vec3d sweptSurfNormal = vec3d::cross(vSweeptSurf[1] - vSweeptSurf[0], vSweeptSurf[3] - vSweeptSurf[0]);
+bool CuttableMesh::splitParts(const vec3d sweptquad[4], double dist) {
+
+	vec3d sweptSurfNormal = vec3d::cross(sweptquad[1] - sweptquad[0], sweptquad[2] - sweptquad[0]);
 	sweptSurfNormal.normalize();
 
 	vec3d dfront = sweptSurfNormal * dist;
 
 	//compute centroid
-	vec3d sweptSurfCentroid = vSweeptSurf[0];
+	vec3d sweptSurfCentroid = sweptquad[0];
 	for(int i = 1; i < 4; i++)
-		sweptSurfCentroid = sweptSurfCentroid + vSweeptSurf[i];
+		sweptSurfCentroid = sweptSurfCentroid + sweptquad[i];
 	sweptSurfCentroid = sweptSurfCentroid * 0.25;
 
 
+	//find disjoint mesh-parts
 	vector< vector<U32> > cellgroups;
 	get_disjoint_parts(cellgroups);
 
@@ -507,6 +573,7 @@ bool CuttableMesh::splitParts(const vector<vec3d>& vSweeptSurf, double dist) {
 	set<U32> setFrontNodes;
 	set<U32> setBackNodes;
 
+	//partition nodes to front and back of the sweep surf
 	for(U32 i = 0; i < cellgroups.size(); i++) {
 
 		vector<U32> cells = cellgroups[i];
@@ -543,17 +610,112 @@ bool CuttableMesh::splitParts(const vector<vec3d>& vSweeptSurf, double dist) {
 	vector<U32> frontNodes(setFrontNodes.begin(), setFrontNodes.end());
 	vector<U32> backNodes(setBackNodes.begin(), setBackNodes.end());
 
+	//move nodes to front
 	for(vector<U32>::const_iterator it = frontNodes.begin(); it != frontNodes.end(); it++) {
 		NODE& node = nodeAt(*it);
 		node.pos = node.pos + dfront;
 	}
 
+	//move nodes to back
 	for(vector<U32>::const_iterator it = backNodes.begin(); it != backNodes.end(); it++) {
 		NODE& node = nodeAt(*it);
 		node.pos = node.pos - dfront;
 	}
 
 	return true;
+}
+
+int CuttableMesh::convertDisjointPartsToMeshes(vector<CuttableMesh*>& vOutNewMeshes) {
+
+	vOutNewMeshes.clear();
+	vector< vector<U32> > parts;
+	int count = get_disjoint_parts(parts);
+	if(count < 2)
+		return vOutNewMeshes.size();
+
+	//
+	vOutNewMeshes.reserve(parts.size());
+
+	//
+	vector<U32> vAllSplittedCells;
+
+
+	//loop over parts
+	for(U32 i=0; i < parts.size(); i++) {
+		vector<U32> curpart = parts[i];
+
+		if(curpart.size() == 0) {
+			LogErrorArg1("splitted part %d is empty.", i);
+			continue;
+		}
+
+
+		//maps old nodes to new nodes
+		map<U32, U32> mapNodes;
+		vector<vec3d> vNewNodes;
+		vector<U32> vNewCells;
+
+		for(vector<U32>::const_iterator c_it = curpart.begin(); c_it != curpart.end(); ++c_it) {
+			vAllSplittedCells.push_back(*c_it);
+			const CELL& cell = const_cellAt(*c_it);
+
+			//add all new vertices
+			for(U32 k=0; k < COUNT_CELL_NODES; k++) {
+
+				//if the new nodes are not cached
+				if(mapNodes.find(cell.nodes[k]) == mapNodes.end()) {
+					vec3d v = const_nodeAt(cell.nodes[k]).pos;
+					vNewNodes.push_back(v);
+					U32 idxNew = vNewNodes.size() - 1;
+					mapNodes.insert(std::make_pair(cell.nodes[k], idxNew));
+				}
+
+				//add all 4 element indices
+				vNewCells.push_back(mapNodes[cell.nodes[k]]);
+			}
+		}
+
+		//create the mesh
+		vector<double> vFlatNodes;
+		FlattenVec3<double>(vNewNodes, vFlatNodes);
+		CuttableMesh* amesh = new CuttableMesh(vFlatNodes, vNewCells);
+
+		AnsiStr strName = printToAStr("%s_cut%d_part%d", this->name().c_str(), countCompletedCuts(), i);
+		amesh->setName(string(strName.cptr()));
+		vOutNewMeshes.push_back(amesh);
+
+		//clean for this part
+		mapNodes.clear();
+	}
+
+
+	//schedule all cells for deletion
+	for(vector<U32>::const_iterator c_it = vAllSplittedCells.begin(); c_it != vAllSplittedCells.end(); ++c_it)
+		this->schedule_remove_cell(*c_it);
+	this->garbage_collection();
+
+	return vOutNewMeshes.size();
+}
+
+void CuttableMesh::applyTransformToMeshThenResetTransform() {
+	if(!m_spTransform)
+		return;
+
+	for(U32 i = 0; i < countNodes(); i++) {
+		NODE& n = nodeAt(i);
+
+		vec3d pd = n.pos;
+		vec3f pf = vec3f(pd.x, pd.y, pd.z);
+
+		pf = m_spTransform->forward().map(pf);
+
+		pd = vec3d(pf.x, pf.y, pf.z);
+		n.pos = pd;
+		n.restpos = pd;
+	}
+
+	m_spTransform->reset();
+	computeAABB();
 }
 
 }

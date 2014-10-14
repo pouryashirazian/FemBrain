@@ -8,8 +8,9 @@
 #ifndef VOLMESH_H
 #define VOLMESH_H
 
+#include <base/Vec.h>
+#include <base/Color.h>
 #include "graphics/SGNode.h"
-#include "graphics/Geometry.h"
 #include "VolMeshEntities.h"
 #include <functional>
 #include <set>
@@ -24,9 +25,10 @@
 */
 using namespace PS;
 using namespace PS::SG;
-using namespace PS::GL;
 using namespace std;
 
+#define FLAT_CELL_VOLUME 1e-4
+#define MIN_EDGE_LENGTH 1e-4
 
 namespace PS {
 namespace MESH {
@@ -85,10 +87,23 @@ public:
 
 	//Determinant
 	double computeCellDeterminant(U32 idxCell) const;
+
+	//Volume
 	double computeCellVolume(U32 idxCell) const;
+
+	//Centroid
 	vec3d  computeCellCentroid(U32 idxCell) const;
+
+	double computeAspectRatio(U32 idxCell) const;
+	double computeInscribedRadius(U32 idxCell) const;
+	double computeCircumscribedRadius(U32 idxCell) const ;
+
+	static double ComputeCircumscribedRadius(const vec3d v[4]);
 	static double ComputeCellDeterminant(const vec3d v[4]);
 	static double ComputeCellVolume(const vec3d v[4]);
+
+	U32 removeZeroVolumeCells();
+
 
 	//Index control
 	inline bool isCellIndex(U32 i) const { return (i < m_vCells.size());}
@@ -117,6 +132,9 @@ public:
 	inline U32 countNodes() const {return m_vNodes.size();}
 
 	//edge-wise funcs
+	bool edge_exists(U32 from, U32 to);
+	U32 edge_handle(U32 from, U32 to);
+
 	U32 edge_from_node(U32 idxEdge) const;
 	U32 edge_to_node(U32 idxEdge) const;
 
@@ -190,8 +208,21 @@ public:
 	void setNodeToShow(U32 idxNode = INVALID_INDEX);
 	U32 getNodeToShow() const {return m_nodeToShow;}
 
-	//export
-	bool exportGeometry(Geometry& g) const;
+	//flag on what to show
+	void setFlagDrawWireFrame(bool drawWireFrame) { m_flagDrawWireFrameMesh = drawWireFrame;}
+	bool getFlagDrawWireFrame() const {return m_flagDrawWireFrameMesh;}
+
+	void setFlagDrawNodes(bool drawNodes) { m_flagDrawNodes = drawNodes;}
+	bool getFlagDrawNodes() const {return m_flagDrawNodes;}
+
+	void setFlagFilterOutFlatCells(bool flag) { m_flagFilterOutFlatCells = flag;}
+	bool getFlagFilterOutFlatCells() const {return m_flagFilterOutFlatCells;}
+
+
+	//set base color
+	Color getColor() const {return m_color;}
+	void setColor(const Color& c) { m_color = c;}
+
 
 	//draw
 	void draw();
@@ -206,15 +237,14 @@ public:
 
 	bool verbose() const { return m_verbose;}
 	void setVerbose(bool b) { m_verbose = b;}
-private:
+
+protected:
 	void init();
 	inline bool insertEdgeIndexToMap(U32 from, U32 to, U32 idxEdge);
 	inline bool removeEdgeIndexFromMap(U32 from, U32 to);
 
 
 	inline EdgeKey computeEdgeKey(U32 idxEdge) const;
-	inline bool edge_exists(U32 from, U32 to);
-	U32 edge_handle(U32 from, U32 to);
 
 	inline bool face_exists_by_edges(U32 edges[3]) const;
 	inline bool face_exists_by_nodes(U32 nodes[3]);
@@ -241,6 +271,7 @@ private:
 
 	bool test_incidents();
 
+	AABB computeNodalAABB() const;
 protected:
 	//remove core functions
 	void remove_cell_core(U32 idxCell);
@@ -252,6 +283,10 @@ protected:
 	U32 m_elemToShow;
 	U32 m_nodeToShow;
 	bool m_verbose;
+	bool m_flagDrawWireFrameMesh;
+	bool m_flagDrawNodes;
+	bool m_flagFilterOutFlatCells;
+	Color m_color;
 
 	//topology events
 	OnNodeEvent m_fOnNodeEvent;

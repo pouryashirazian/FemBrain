@@ -68,7 +68,7 @@ void SGBulletRigidMesh::setup(const Geometry& g, float mass) {
 		pCDShape->addPoint(btv);
 	}
 	pCDShape->calculateLocalInertia(bodyMass, bodyInertia);
-	//pCDShape->setMargin(0.04);
+	pCDShape->setMargin(0.04);
 
 	//5
 	btRigidBody::btRigidBodyConstructionInfo bodyCI =
@@ -119,8 +119,8 @@ void SGBulletRigidMesh::updateNodeTransformFromMotionState() {
 	btTransform trans = m_lpRigidBody->getWorldTransform();
 
 	//rotate
-//	btQuaternion q = trans.getRotation();
-//	transform()->setRotate(quat(q.x(), q.y(), q.z(), q.w()));
+	btQuaternion q = trans.getRotation();
+	transform()->setRotate(quat(q.x(), q.y(), q.z(), q.w()));
 
 	//translate
 	btVector3 t = trans.getOrigin();

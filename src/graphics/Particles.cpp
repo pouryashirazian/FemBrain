@@ -145,8 +145,8 @@ namespace PS {
 			ComputeKernel::ComputeLocalIndexSpace(3, m_lpKernelMove->getKernelWorkGroupSize(), arrLocalIndex);
 			ComputeKernel::ComputeGlobalIndexSpace(3, arrLocalIndex, arrGlobalIndex);
 
-			cl_mem inoutMemVertexBuffer = m_lpDevice->createMemBufferFromGL(m_vboVertex, PS::CL::memReadWrite);
-			cl_mem inoutMemColorBuffer = m_lpDevice->createMemBufferFromGL(m_vboColor, PS::CL::memReadWrite);
+			cl_mem inoutMemVertexBuffer = m_lpDevice->createMemBufferFromGL(m_gmbVertex.handle(), PS::CL::memReadWrite);
+			cl_mem inoutMemColorBuffer = m_lpDevice->createMemBufferFromGL(m_gmbColor.handle(), PS::CL::memReadWrite);
 			m_lpDevice->enqueueAcquireGLObject(1, &inoutMemVertexBuffer);
 			m_lpDevice->enqueueAcquireGLObject(1, &inoutMemColorBuffer);
 

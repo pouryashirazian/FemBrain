@@ -52,7 +52,7 @@ namespace PS {
     		m_lpKernelFieldArrayStackLess = m_lpGPU->addKernel(prgID, "ComputeFieldArray");
 
      		m_blobLoaded = false;
-     		m_vboVertex = INVALID_GLBUFFER;
+     		m_gmbVertex.cleanup();
         }
       
         void FieldComputer::cleanup() {

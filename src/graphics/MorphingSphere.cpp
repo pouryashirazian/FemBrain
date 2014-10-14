@@ -90,10 +90,10 @@ void MorphingSphere::setup(float rho, int hseg, int vseg) {
 	}
 
 	//Setup Mesh Buffers
-	setupVertexAttribs(vertices, 3, mbtPosition);
-	setupVertexAttribs(colors, 4, mbtColor);
-	setupVertexAttribs(normals, 3, mbtNormal);
-	setupIndexBufferObject(indices, ftTriangles);
+	setupVertexAttribs(vertices, 3, gbtPosition);
+	setupVertexAttribs(colors, 4, gbtColor);
+	setupVertexAttribs(normals, 3, gbtNormal);
+	setupFaceIndexBuffer(indices, ftTriangles);
 	//setupVertexAttribs(arrColors, 3, mbtColor);
 	//m_ctFaceElements = m_ctVertices;
 	m_faceMode = ftLineLoop;

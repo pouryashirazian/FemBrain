@@ -8,6 +8,7 @@
 
 #include "test_VolMesh.h"
 #include "base/Logger.h"
+#include "base/Profiler.h"
 #include <map>
 
 using namespace std;
@@ -30,6 +31,8 @@ bool TestVolMesh::tst_report_mesh_info(VolMesh* pmesh) {
 bool TestVolMesh::tst_correct_elements(VolMesh* pmesh) {
 	if(pmesh == NULL)
 		return false;
+
+	LogInfo("Begin test correct elements");
 
 	U32 ctErrors = 0;
 	for(U32 i = 0; i < pmesh->countCells(); i++) {
@@ -125,6 +128,7 @@ bool TestVolMesh::tst_correct_elements(VolMesh* pmesh) {
 
 	}
 
+	LogInfo("End test correct elements");
 	if(ctErrors == 0)
 		LogInfoArg1("PASS: %s", __FUNCTION__);
 	else
@@ -262,6 +266,7 @@ bool TestVolMesh::tst_connectivity(VolMesh* pmesh) {
 
 
 bool TestVolMesh::tst_all(VolMesh* pmesh) {
+	ProfileAutoArg("testall");
 
 	U32 idxTest = 0;
 	const U32 maxTest = 4;
